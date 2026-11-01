@@ -78,7 +78,7 @@ void PhraseEditorModule::draw_row(Canvas& c, int x, int y, int index, const Phra
     const int textY = dataRowY + TEXT_PADDING;
 
     // Left to right: RowCells joins a selected run across the gutters only in layout order.
-    RowCells cells(c, textY, t);
+    RowCells cells(c, textY, t, index == s.cursorRow ? s.cursorFlashAlpha : 0);
 
     // Note-emptiness dims NOTE/VOL/INST; fx-emptiness its own pair.
     const auto cur = [&](int col) { return index == s.cursorRow && s.cursorColumn == col; };

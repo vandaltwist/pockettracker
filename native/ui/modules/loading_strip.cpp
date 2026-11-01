@@ -22,7 +22,7 @@ constexpr int BAR_Y = ROW2_Y + TEXT_PADDING + 3;
 constexpr int SWEEP_MS = 1400;
 
 constexpr const char* PREFIX = "LOADING ";
-constexpr const char* CANCEL = "B=STOP";
+constexpr const char* CANCEL = "OPT=STOP";
 
 }  // namespace
 

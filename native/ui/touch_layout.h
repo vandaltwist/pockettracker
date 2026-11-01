@@ -34,14 +34,10 @@ inline int pattern_unit(int available_width, int available_height) {
     return static_cast<int>(v);
 }
 
-// LEFT box: L, D-pad, SELECT.
+// LEFT box: D-pad only.
 struct Left {
     int   x;
     int   button_size;
-    int   l_button_width;
-    int   l_button_height;
-    int   select_width;
-    int   select_height;
     int   small_spacer;
     int   large_spacer;
     int   medium_spacer_width;
@@ -50,14 +46,10 @@ struct Left {
     float small_font_sp;
 };
 
-// RIGHT box: R, A, B, START. Not a mirror of LEFT (its own spacers).
+// RIGHT box: A and B only.
 struct Right {
     int   x;
     int   button_size;
-    int   r_button_width;
-    int   r_button_height;
-    int   start_width;
-    int   start_height;
     int   small_spacer;
     int   medium_spacer;
     int   large_spacer;
@@ -93,10 +85,6 @@ inline Left left(int available_width, int available_height, float density) {
     Left m;
     m.x                   = x;
     m.button_size         = x;
-    m.l_button_width      = static_cast<int>(std::floor(x * 1.5f));
-    m.l_button_height     = static_cast<int>(std::floor(x * 0.7f));
-    m.select_width        = static_cast<int>(std::floor(x * 1.2f));
-    m.select_height       = static_cast<int>(std::floor(x * 0.6f));
     m.small_spacer        = static_cast<int>(std::floor(x * 0.2f));
     m.large_spacer        = static_cast<int>(std::floor(x * 2.0f));
     m.medium_spacer_width = static_cast<int>(std::floor(x * 1.0f));
@@ -111,12 +99,8 @@ inline Right right(int available_width, int available_height, float density) {
     Right m;
     m.x               = x;
     m.button_size     = x;
-    m.r_button_width  = static_cast<int>(std::floor(x * 1.5f));
-    m.r_button_height = static_cast<int>(std::floor(x * 0.7f));
-    m.start_width     = static_cast<int>(std::floor(x * 1.2f));
-    m.start_height    = static_cast<int>(std::floor(x * 0.6f));
     m.small_spacer    = static_cast<int>(std::floor(x * 0.2f));
-    m.medium_spacer   = static_cast<int>(std::floor(x * 0.7f));   // LEFT's is 1.0
+    m.medium_spacer   = static_cast<int>(std::floor(x * 0.7f));
     m.large_spacer    = static_cast<int>(std::floor(x * 2.0f));
     m.left_spacer     = static_cast<int>(std::floor(x * 1.7f));
     m.right_spacer    = static_cast<int>(std::floor(x * 0.7f));
@@ -167,19 +151,19 @@ struct ButtonRect {
     bool contains(int px, int py) const { return px >= x && px < x + w && py >= y && py < y + h; }
 };
 
-// A laid-out box, in draw order (LEFT fills 6, RIGHT 4, PORTRAIT2 10).
+// A laid-out box, in draw order (LEFT fills 4, RIGHT 2, PORTRAIT2 6).
 struct BoxRects {
     ButtonRect r[10];
     int        count = 0;
 };
 
-// LEFT: L on top, the D-pad cross, SELECT below.
+// LEFT: the 4-directional cross only (UP / LEFT / RIGHT / DOWN), centred in the box.
 inline BoxRects left_rects(int available_width, int available_height) {
     const Left m = left(available_width, available_height, 1.0f);
     const int  W = available_width;
 
     const int content_h =
-        4 * m.small_spacer + m.l_button_height + 3 * m.button_size + m.select_height;
+        3 * m.small_spacer + 3 * m.button_size;
     int y = (available_height - content_h) / 2;
 
     BoxRects box;
@@ -187,10 +171,8 @@ inline BoxRects left_rects(int available_width, int available_height) {
     auto cx   = [&](int w) { return (W - w) / 2; };  // centre a child of width w in the box
 
     y += m.small_spacer;  // Spacer
-    push(Button::L_SHIFT, cx(m.l_button_width), y, m.l_button_width, m.l_button_height);
-    y += m.l_button_height + m.small_spacer;  // + Spacer
     push(Button::DPAD_UP, cx(m.button_size), y, m.button_size, m.button_size);
-    y += m.button_size;
+    y += m.button_size + m.small_spacer;  // + Spacer
     {  // Row: [small] LEFT [medium] RIGHT [small], centred as a unit
         const int row_w = 2 * m.small_spacer + 2 * m.button_size + m.medium_spacer_width;
         const int row_x = (W - row_w) / 2;
@@ -198,58 +180,41 @@ inline BoxRects left_rects(int available_width, int available_height) {
         push(Button::DPAD_RIGHT, row_x + m.small_spacer + m.button_size + m.medium_spacer_width, y,
              m.button_size, m.button_size);
     }
-    y += m.button_size;
-    push(Button::DPAD_DOWN, cx(m.button_size), y, m.button_size, m.button_size);
     y += m.button_size + m.small_spacer;  // + Spacer
-    {  // Row: [large] SELECT [small], centred
-        const int row_w = m.large_spacer + m.select_width + m.small_spacer;
-        const int row_x = (W - row_w) / 2;
-        push(Button::SELECT, row_x + m.large_spacer, y, m.select_width, m.select_height);
-    }
+    push(Button::DPAD_DOWN, cx(m.button_size), y, m.button_size, m.button_size);
     return box;
 }
 
-// RIGHT: R on top, A upper-right and B lower-left, START below.
+// RIGHT: A upper-right and B lower-left, centred in the box.
 inline BoxRects right_rects(int available_width, int available_height) {
     const Right m = right(available_width, available_height, 1.0f);
     const int   W = available_width;
 
-    const int content_h = 2 * m.small_spacer + 2 * m.medium_spacer + m.r_button_height +
-                          2 * m.button_size + m.start_height;
+    const int content_h = 2 * m.small_spacer + 2 * m.button_size;
     int y = (available_height - content_h) / 2;
 
     BoxRects box;
     auto push = [&](Button b, int x, int yy, int w, int h) { box.r[box.count++] = {b, x, yy, w, h}; };
 
     y += m.small_spacer;  // Spacer
-    push(Button::R_SHIFT, (W - m.r_button_width) / 2, y, m.r_button_width, m.r_button_height);
-    y += m.r_button_height + m.medium_spacer;  // + Spacer
     {  // Row: [left] A [right], centred — leftSpacer > rightSpacer, so A sits to the RIGHT
         const int row_w = m.left_spacer + m.button_size + m.right_spacer;
         const int row_x = (W - row_w) / 2;
         push(Button::A, row_x + m.left_spacer, y, m.button_size, m.button_size);
     }
-    y += m.button_size;
+    y += m.button_size + m.small_spacer;  // + Spacer
     {  // Row: [right] B [left], centred — same total width, so B sits to the LEFT of where A was
         const int row_w = m.right_spacer + m.button_size + m.left_spacer;
         const int row_x = (W - row_w) / 2;
         push(Button::B, row_x + m.right_spacer, y, m.button_size, m.button_size);
     }
-    y += m.button_size + m.medium_spacer;  // + Spacer
-    {  // Row: [small] START [large], centred
-        const int row_w = m.small_spacer + m.start_width + m.large_spacer;
-        const int row_x = (W - row_w) / 2;
-        push(Button::START, row_x + m.small_spacer, y, m.start_width, m.start_height);
-    }
     return box;
 }
 
-// ─── PORTRAIT2: four rows, inset by round(1.5X), each round(33X) tall, split into equal slots ─────
+// ─── PORTRAIT2: two rows, inset by round(1.5X), each round(33X) tall, split into four equal slots ───
 //
-//   Row 0:  [ L Shift ][ R Shift ]     (2 wide slots)
-//   Row 1:  [    ][ ↑ ][ B ][ A ]      (4 slots; slot 0 empty)
-//   Row 2:  [ ← ][ ↓ ][ → ][    ]      (4 slots; slot 3 empty)
-//   Row 3:  [    ][Sel][Sta][    ]     (4 slots; slots 0 and 3 empty)
+//   Row 0:  [    ][ ↑ ][ B ][ A ]      (4 slots; slot 0 empty)
+//   Row 1:  [ ← ][ ↓ ][ → ][    ]      (4 slots; slot 3 empty)
 
 // Split `W` into `n` slots of round(W/n), handing the leftover (maybe negative) out one per slot from
 // the left, so the widths sum to exactly `W`.
@@ -267,34 +232,27 @@ inline void weight_split(int W, int n, int xs[], int ws[]) {
     }
 }
 
-// All ten buttons, row by row. An empty slot gets no rect, so a tap there hits nothing.
+// All buttons, row by row. An empty slot gets no rect, so a tap there hits nothing.
 inline BoxRects portrait2_rects(int available_width, int available_height) {
     const Portrait2 m = portrait2(available_width, available_height, 1.0f);  // density irrelevant
     const int pad    = static_cast<int>(std::floor(m.x * 1.5f + 0.5f));   // round(1.5X) — the inset
     const int cell_h = static_cast<int>(std::floor(m.x * 33.0f + 0.5f));  // round(33X) — each row's height
 
     const int content_w = available_width - 2 * pad;  // every row shares this
-    int x2[2], w2[2];  weight_split(content_w, 2, x2, w2);  // row 0: two wide slots
-    int x4[4], w4[4];  weight_split(content_w, 4, x4, w4);  // rows 1–3: four square slots
+    int x4[4], w4[4];  weight_split(content_w, 4, x4, w4);  // rows: four square slots
 
     BoxRects box;
     auto push = [&](Button b, int col_x, int col_w, int row) {
         box.r[box.count++] = {b, pad + col_x, pad + row * cell_h, col_w, cell_h};
     };
-    // Row 0: L Shift | R Shift
-    push(Button::L_SHIFT, x2[0], w2[0], 0);
-    push(Button::R_SHIFT, x2[1], w2[1], 0);
-    // Row 1: [empty] ↑ B A
-    push(Button::DPAD_UP, x4[1], w4[1], 1);
-    push(Button::B,       x4[2], w4[2], 1);
-    push(Button::A,       x4[3], w4[3], 1);
-    // Row 2: ← ↓ → [empty]
-    push(Button::DPAD_LEFT,  x4[0], w4[0], 2);
-    push(Button::DPAD_DOWN,  x4[1], w4[1], 2);
-    push(Button::DPAD_RIGHT, x4[2], w4[2], 2);
-    // Row 3: [empty] Sel Sta [empty]
-    push(Button::SELECT, x4[1], w4[1], 3);
-    push(Button::START,  x4[2], w4[2], 3);
+    // Row 0: [empty] ↑ B A
+    push(Button::DPAD_UP, x4[1], w4[1], 0);
+    push(Button::B,       x4[2], w4[2], 0);
+    push(Button::A,       x4[3], w4[3], 0);
+    // Row 1: ← ↓ → [empty]
+    push(Button::DPAD_LEFT,  x4[0], w4[0], 1);
+    push(Button::DPAD_DOWN,  x4[1], w4[1], 1);
+    push(Button::DPAD_RIGHT, x4[2], w4[2], 1);
     return box;
 }
 

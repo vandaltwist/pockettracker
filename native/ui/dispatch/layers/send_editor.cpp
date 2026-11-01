@@ -28,10 +28,10 @@ GestureResult InputDispatcher::send_editor_layer(Gesture g) {
         case Gesture::B: close_send_editor(); break;
 
         // Heard while dialled; the screen underneath stops its own audition.
-        case Gesture::START:
-        case Gesture::A_START:
+        case Gesture::X:
+        case Gesture::X_A:
         case Gesture::STOP_PREVIEW:
-        case Gesture::SELECT:
+        case Gesture::Y:
             return GestureResult::PASS;
 
         // R+DPAD included: the editor is not a cell in the screen grid.

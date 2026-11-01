@@ -14,6 +14,7 @@
 #include "songcore/host.h"
 #include "songcore/midi_map.h"
 #include "ui/app_state.h"
+#include "ui/buttons.h"
 #include "ui/clipboard.h"
 #include "ui/cursor.h"
 #include "ui/dispatch/gesture.h"
@@ -75,7 +76,8 @@ class InputDispatcher {
     // ⚠️ It goes false on the frame that must be drawn: the caller owes the active→idle edge a redraw.
     // A new screen-changing timer belongs in this expression.
     bool has_pending_timed_work() const {
-        return statusDismissAtMs_ != 0 || browserStatusDismissAtMs_ != 0 || autosavePending_;
+        return statusDismissAtMs_ != 0 || browserStatusDismissAtMs_ != 0 || autosavePending_ ||
+               s_.copy_flash_active();   // the copy dot keeps fading until it is gone
     }
 
     // ── The lifecycle: what only the shell knows. The autosave is otherwise internal ──
@@ -125,12 +127,54 @@ class InputDispatcher {
     // A went down or up, whatever it then does.
     void on_a_held(bool down) { s_.aHeld = down; }
 
-    // A+START: audition the instrument on the three instrument screens and TABLE.
-    void on_a_start();
-
-    // A went down on a cell the mapper defers. Records the instant: the sample editor's chop tap is
-    // aimed by ear at the playhead, and the release comes a reaction time later.
+    // A deferred to release: records the playhead now, since it will have moved by release.
     void on_a_deferred();
+
+    // X: play/stop — the transport.
+    void on_button_x();
+
+    // Y: SHIFT — alone it is the cell help (the old SELECT); with a direction it changes screen.
+    void on_button_y();
+
+    // SHIFT + PLAY: play the song from the cursor (all tracks).
+    void on_y_x();
+
+    // SHIFT alone: open or close the cell help panel.
+    void on_help_toggle() {
+        // ⚠️ A layer that wants SHIFT itself (the keyboard's abort) takes it first; the help panel is
+        // only the fallback, which is what lets eq/theme/send keep PASSing Gesture::Y.
+        if (route(Gesture::Y)) return;
+        s_.helpOpen = !s_.helpOpen;
+    }
+
+    // OPTION+SHIFT: MUTE the cursor's track; OPTION+PLAY: SOLO it; the three together: clear both.
+    // Armed on the press: releasing OPTION first keeps it, releasing SHIFT/PLAY first reverts it.
+    void on_mute_chord(bool solo);
+    void on_mute_clear();
+    bool mute_chord_armed() const { return muteChordArmed_; }
+    void on_mute_chord_commit();
+    void on_mute_chord_revert();
+
+    // Y + A: SHIFT + OPTION → selection mode.
+    void on_y_a();
+
+    // Y + B: SHIFT + EDIT → selection mode.
+    void on_y_b();
+
+    // Y + DPAD: move between screens / cycle sort / zoom / step section.
+    void on_y_up();
+    void on_y_down();
+    void on_y_left();
+    void on_y_right();
+
+    // X + A: audition the instrument on the instrument screens and TABLE.
+    void on_x_a();
+
+    // X + B: arm delete in the file browser.
+    void on_x_b();
+
+    // A + Y + B: deep-clone the chain/phrase under the cursor into free slots.
+    void on_a_y_b();
 
     // ── B + D-pad: which item am I looking at? ───────────────────────────────────────────────────
     // B+LEFT/RIGHT cycle the current phrase / chain / table / groove; B+UP/DOWN page SONG.
@@ -139,59 +183,15 @@ class InputDispatcher {
     void on_b_up();
     void on_b_down();
 
-    // ── R + D-pad: move between screens ──────────────────────────────────────────────────────────
-    void on_r_up();
-    void on_r_down();
-    void on_r_left();
-    void on_r_right();
+    // Whether the mapper deferred this press to the release.
+    bool a_pressed_alone() const { return aPressedAlone_; }
+    void set_a_pressed_alone(bool v) { aPressedAlone_ = v; }
 
-    // ── R + A/B: MUTE and SOLO (SONG and MIXER) ──────────────────────────────────────────────────
-    // Acts on the press; undone if its own button comes up before R.
-    // R+B: toggle MUTE on the cursor's channel, or every channel in the selection.
-    void on_r_b();
-    // R+A: toggle SOLO, same targeting.
-    void on_r_a();
-    // R down or up — the arming half of MIDI learn ("hold R, turn a knob").
-    void on_r_held(bool down);
-    // Another button went down while R is held: a combo, so this hold never learns.
-    void on_r_combo_press();
+    // True when the SAMPLE EDITOR screen is up.
+    bool is_on_sample_editor() const { return s_.currentScreen == ScreenType::SAMPLE_EDITOR; }
 
-    // R came up first: the chord's changes stand.
-    void on_r_combo_commit();
-    // A/B came up first: every track's mute and solo back the way the chord found them.
-    void on_r_combo_revert();
-
-    // ── L: selection and the clipboard ───────────────────────────────────────────────────────────
-    // L+B: enter selection, then widen it CELL → ROW → SCREEN on each tap inside 500 ms.
-    void on_l_b();
-    // L+A: cut inside a selection, paste outside one.
-    void on_l_a();
-    // L+R: leave selection mode.
-    void on_l_r();
-    // L+B+A: deep-clone the chain/phrase under the cursor into free slots.
-    void on_l_b_a();
-    // L + a direction: fill rows from the selection's top row (or the cursor's cell on PHRASE).
-    // RIGHT walks the spacings, LEFT the even spreads, UP rolls random values, DOWN scatters.
-    void on_l_up();
-    void on_l_down();
-    void on_l_left();
-    void on_l_right();
-
-    // ── SELECT + … : the file browser's verbs ────────────────────────────────────────────────────
-    // SELECT+A: rename the file/folder under the cursor (opens the keyboard).
-    void on_select_a();
-    // SELECT+B: arm the delete confirm; never deletes on the press itself.
-    void on_select_b();
-    // SELECT+R: create a folder here (opens the keyboard).
-    void on_select_r();
-
-    // ── The plain buttons ────────────────────────────────────────────────────────────────────────
-    // B inside a selection copies it and exits.
-    void on_button_b();
-    void on_button_a();
-    // Bare SELECT raises help (per SETTINGS > HELP) and aborts the keyboard. Called on the release,
-    // only when nothing else was pressed meanwhile.
-    void on_select();
+    // Bouton physique (0=A, 1=B, 2=X, 3=Y) assigne a un role logique, depuis settings.json.
+    int physical_for_role(Role role) const;
 
     // A button went down: put help away (the compact panel on any press but SELECT, the overlay on any).
     void on_help_dismiss();
@@ -199,13 +199,24 @@ class InputDispatcher {
     bool help_full_open() const { return s_.helpFull; }
     // The mapper closes the overlay on any press and consumes it, so nothing reaches this.
     GestureResult help_layer(Gesture) { return GestureResult::TAKEN; }
-    // START: play/stop; what it plays depends on the screen.
-    void on_start();
 
-    // LIVE on SONG: L+START queues the cursor row as one scene, R+START silences the cursor's channel.
-    // Below SONG, R+START plays the song from the row you came through; L+START does nothing.
-    void on_l_start();
-    void on_r_start();
+    // B inside a selection copies it and exits.
+    void on_button_b();
+    void on_button_a();
+
+    // Any plain press silences an audition; whether this screen has one is decided here.
+    void on_stop_preview();
+
+    // Asked by the mapper on every plain A: does this cell's A open something while A+DPAD / A+B mean
+    // something else? Then A waits for its release and any A-combo cancels it.
+    bool defer_a_to_release() const;
+
+    // Asked by the mapper on every plain B: wait for the release? True in the EQ editor and wherever
+    // R+B is a mute (a B a frame ahead of its R must still become the chord).
+    bool defer_b_to_release() const;
+
+    // For the top-strip readout ("PHR:2x3").
+    const Clipboard& clipboard() const { return clip_; }
 
   private:
     // The gate every LIVE gesture asks: LIVE mode, on SONG, nothing on top.
@@ -223,24 +234,10 @@ class InputDispatcher {
 
   public:
 
-    // Any plain press silences an audition; whether this screen has one is decided here.
-    void on_stop_preview();
+    // Poll the engine's capture peak/length into the sample editor state (live meter).
+    void refresh_sample_record();
 
-    // Asked by the mapper on every plain A: does this cell's A open something while A+DPAD / A+B mean
-    // something else? Then A waits for its release and any A-combo cancels it.
-    bool defer_a_to_release() const;
-
-    // Asked by the mapper on every plain B: wait for the release? True in the EQ editor and wherever
-    // R+B is a mute (a B a frame ahead of its R must still become the chord).
-    bool defer_b_to_release() const;
-
-    // For the top-strip readout ("PHR:2x3").
-    const Clipboard& clipboard() const { return clip_; }
-
-    // ── Opening the sub-screens (the shell uses these at start-up too) ───────────────────────────
-
-    // Show the browser in `directory`, filtered; `purpose` is what A does with the pick. Captures
-    // `previousScreen` (where B returns).
+    // ── Opening the sub-screens (the shell uses these at start-up too) ───────────
     void open_file_browser(AppState::BrowserPurpose purpose, const std::string& directory,
                            const std::vector<std::string>& extensions);
 
@@ -403,14 +400,14 @@ class InputDispatcher {
     // else the cursor's.
     void mute_solo_targets(int (&out)[8], int& count) const;
     void toggle_mute_solo(bool solo);
-    // Every track audible again (L+R's mute rung).
+    // Every track audible again (the three-button chord's rung).
     void restore_full_playback();
-    // Do R+A/R+B mean MUTE/SOLO here — and so must B be held?
+    // Is the chord a MUTE/SOLO on this screen? Asked before acting, so a dialog is never edited under.
     bool mute_solo_chord_live() const;
+    bool muteChordArmed_ = false;
     // L+R's recency flag: the selection's state folded into one number, watched for a change. Run from
     // `set_now()` and at the top of `toggle_mute_solo()`, so the order follows the press.
     unsigned selection_signature() const;
-    void     run_selection_recency();
     unsigned selectionSig_ = 0;
 
     SongEditorModule       song_{};
@@ -432,6 +429,7 @@ class InputDispatcher {
 
     // The A still held inserted the PHRASE note under the cursor, so an A+B now acts on an empty cell.
     bool         insertHeld_ = false;
+    bool         aPressedAlone_ = false;
 
     // L + direction on PHRASE: the phrase before the first press (`base`, the undo), the fill laid over
     // it (`placed`), and that with any random roll (`shown`).
@@ -446,7 +444,6 @@ class InputDispatcher {
     };
     FillMemory    fill_{};
     songcore::Rng fillRng_{};
-    void phrase_fill(Gesture g);
 
     // Where the first A of an A,A landed; it counts only if the cursor did not move.
     bool         hasInsertPos_ = false;
@@ -751,6 +748,8 @@ class InputDispatcher {
     void browser_cycle_sort(int delta);
     // Move the cursor, keeping the window around it; `page` is LEFT/RIGHT's jump.
     void browser_move_cursor(int delta, bool page);
+    // LEFT / RIGHT in the list: the first or the last entry.
+    void browser_jump_to_edge(bool bottom);
     // A: open a folder, go up, or load the file — per `browserPurpose`.
     void browser_confirm();
     // The selection's paths, without "..".
@@ -859,8 +858,8 @@ class InputDispatcher {
     // Outside one L+A pastes into item `pasteTarget`, and A+B is the cell's own delete.
     GestureResult grid_clipboard(Gesture g, ClipFn clip, int pasteTarget);
 
-    // A on an empty cell: insert the item last edited, and arm A,A. On PHRASE, the NOTE column only;
-    // A on a filled note auditions it.
+    // A on an empty cell: insert the item last edited, and arm A,A. On PHRASE, every column has its
+    // own cache (note+pitch group, volume, instrument, FX pair); A on a filled cell only copies.
     void song_insert();
     void chain_insert();
     void phrase_insert();
@@ -872,6 +871,10 @@ class InputDispatcher {
     void chain_insert_next();
     void phrase_next_instrument();
     void arm_double_tap();
+    // A under a selection: copy the whole block, end the selection, light the copy dot.
+    GestureResult copy_selection(ClipFn clip);
+    // The copy flash: a few lit pixels at the top-right of the cell A just copied (ui/helpers.h).
+    void flash_copied_cell();
     // Was the first A of this A,A an insert on this same cell? Consumes the arm.
     bool take_double_tap();
 
@@ -964,6 +967,13 @@ class InputDispatcher {
     void open_sample_editor();
     // B on an unmodified sample: free the undo, drop the scratch slots, go back.
     void close_sample_editor();
+
+    // Row 5 REC toggle: start/stop recording, then install into a new sample slot.
+    void handle_record_toggle();
+
+    // Re-read the capture inputs (a USB mic plugged in after the editor opened is not in the list read at
+    // open) and drop a selection that vanished. Called whenever the INPUT cell is used.
+    void refresh_input_devices();
 
     // Build the editor's session from the sample the engine holds; separate because the editor's LOAD
     // re-enters on different audio. ⚠️ Must not touch `previousScreen` (the editor's return target).

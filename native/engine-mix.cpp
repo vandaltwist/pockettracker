@@ -335,6 +335,8 @@ float AudioEngine::mixTrackBuffer(V& v, int t, float* buf, const BlockMix& c, bo
 
     float trackPeakL = 0.0f, trackPeakR = 0.0f;
     if (c.octaWanted) trackWasActive[t] = true;
+    // The track's dry sum for OCTA - or for an internal REC of this track (P1..P8).
+    const bool tapThis = c.octaWanted || c.recordTap == t;
     for (int i = 0; i < c.numFrames; i++) {
         float outL = buf[i * 2];
         float outR = buf[i * 2 + 1];
@@ -345,7 +347,7 @@ float AudioEngine::mixTrackBuffer(V& v, int t, float* buf, const BlockMix& c, bo
             c.output[i * 2]     += outL;
             c.output[i * 2 + 1] += outR;
         }
-        if (c.octaWanted) {
+        if (tapThis) {
             trackWaveAccumL[t][i] += outL;
             trackWaveAccumR[t][i] += outR;
         }
@@ -401,6 +403,20 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
     captureTrackScopes(b);
     mixBuses(b);
     mixMaster(b);
+
+    // Internal REC (P1..P8 / M1): push this block into the take. A track was summed into its OCTA
+    // accumulator by the voice mixers above; the master is what just left mixMaster().
+    if (b.recordTap >= 0) {
+        if (b.recordTap == 8) {
+            for (int i = 0; i < numFrames; ++i) {
+                recordTapL[i] = output[i * 2];
+                recordTapR[i] = output[i * 2 + 1];
+            }
+            captureWriteImpl(recordTapL, recordTapR, numFrames);
+        } else {
+            captureWriteImpl(trackWaveAccumL[b.recordTap], trackWaveAccumR[b.recordTap], numFrames);
+        }
+    }
 
     globalFrameCounter.store(b.startFrame + numFrames, std::memory_order_relaxed);
 }
@@ -478,12 +494,18 @@ void AudioEngine::clearBlockScratch(BlockMix& b) {
     b.spectrumWanted = !b.offlineRender && (nowMsec - lastSpectrumReadMs.load(std::memory_order_relaxed))      < CAPTURE_IDLE_MS;
     const size_t frameBytes     = (size_t)b.numFrames * sizeof(float);
 
+    // Internal REC (P1..P8 / M1): which bus this block taps. A track rides the OCTA accumulators
+    // (zeroed below); the master uses this small scratch, filled after mixMaster().
+    b.recordTap = b.offlineRender ? -1 : recordTapTrack.load(std::memory_order_relaxed);
+    const bool tapTrack = b.recordTap >= 0 && b.recordTap < 8;
+    if (b.recordTap == 8) { memset(recordTapL, 0, frameBytes); memset(recordTapR, 0, frameBytes); }
+
     memset(revSendBufL, 0, frameBytes); memset(revSendBufR, 0, frameBytes);
     memset(dlySendBufL, 0, frameBytes); memset(dlySendBufR, 0, frameBytes);
 
-    // The OCTA accumulators (64 KB+) only while OCTA is shown.
+    // The OCTA accumulators (64 KB+) only while OCTA is shown - or while a track is being resampled.
     memset(trackWasActive, 0, sizeof(trackWasActive));
-    if (b.octaWanted) {
+    if (b.octaWanted || tapTrack) {
         for (int t = 0; t < TRACK_WAVEFORM_COUNT; t++) {
             memset(trackWaveAccumL[t], 0, frameBytes);
             memset(trackWaveAccumR[t], 0, frameBytes);
@@ -991,8 +1013,9 @@ void AudioEngine::mixSamplerPieceAs(Voice& voice, const BlockMix& b, int from, i
     const bool metered = trackId >= 0 && trackId < 8;
     float peakL = metered ? framePeaksPerTrackL[trackId] : 0.0f;
     float peakR = metered ? framePeaksPerTrackR[trackId] : 0.0f;
-    // The OCTA scopes: tracks 0-7 and the preview lane, only while the screen is asking.
-    const bool   scoped    = b.octaWanted && trackId >= 0 && trackId < TRACK_WAVEFORM_COUNT;
+    // The OCTA scopes - or an internal REC of this track (P1..P8): tracks 0-7 and the preview lane.
+    const bool   scoped    = (b.octaWanted || b.recordTap == trackId) &&
+                             trackId >= 0 && trackId < TRACK_WAVEFORM_COUNT;
     float* const scopeL    = scoped ? trackWaveAccumL[trackId] : nullptr;
     float* const scopeR    = scoped ? trackWaveAccumR[trackId] : nullptr;
     bool         scopeLive = false;

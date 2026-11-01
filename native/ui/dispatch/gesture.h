@@ -6,17 +6,14 @@ namespace pt::ui {
 
 enum class Gesture {
     DPAD_UP, DPAD_DOWN, DPAD_LEFT, DPAD_RIGHT,
+    X, Y, A, B,
+    X_A, X_B, A_Y_B, Y_X,
+    Y_A, Y_B,
     A_UP, A_DOWN, A_LEFT, A_RIGHT,
-    A_B, A_A, A_RELEASE, A_START,
+    A_B, A_A, A_RELEASE,
     B_UP, B_DOWN, B_LEFT, B_RIGHT,
-    R_UP, R_DOWN, R_LEFT, R_RIGHT,
-    R_A, R_B,
-    L_A, L_B, L_R, L_B_A,
-    L_UP, L_DOWN, L_LEFT, L_RIGHT,
-    SELECT_A, SELECT_B, SELECT_R,
-    A, B, SELECT, START,
-    L_START, R_START,
-    STOP_PREVIEW,   // any plain press: silence the audition
+    Y_UP, Y_DOWN, Y_LEFT, Y_RIGHT,
+    STOP_PREVIEW,
 };
 
 // What a layer or screen did with a gesture. ⚠️ A layer answers TAKEN even for one it ignores, so nothing

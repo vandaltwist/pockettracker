@@ -27,6 +27,8 @@ enum class InstrumentCell {
     PATCH,
     // sampler
     SLICE, LOOP, START, LOOP_START, END, LOOP_END, REVERSE,
+    // granular (MOONGRANULAR)
+    GRAIN_SIZE, GRAIN_DENSITY, GRAIN_PITCH, SCAN_POS, GRAIN_DIR,
     // EXTERNAL
     MIDI_CHANNEL, MIDI_BANK, MIDI_PROGRAM, MIDI_LENGTH, CC_NUMBER, CC_VALUE, MIDI_BEND,
 };
@@ -102,12 +104,30 @@ inline constexpr InstrumentRow EXTERNAL[] = {
     {K::SPACER},                                         // 13
     {K::SINGLE, C::MIDI_BEND},                           // 14
 };
+// Granular (MOONGRANULAR): sampler-like source + grain params.
+inline constexpr InstrumentRow GRANULAR[] = {
+    {K::NAME, C::TYPE, C::SOURCE_LOAD, C::SOURCE_EDIT},  //  0
+    {K::SINGLE, C::NAME},                                //  1
+    {K::TRIPLE, C::ROOT, C::DETUNE, C::TIC},             //  2
+    {K::TRIPLE, C::VOL, C::TSP, C::PAN},                 //  3
+    {K::SPACER},                                         //  4
+    {K::SOURCE, C::PRESET_SAVE, C::PRESET_LOAD},         //  5
+    {K::SPACER},                                         //  6
+    {K::DUAL, C::GRAIN_SIZE, C::GRAIN_DENSITY},          //  7
+    {K::DUAL, C::GRAIN_PITCH, C::SCAN_POS},              //  8
+    {K::SINGLE, C::GRAIN_DIR},                           //  9
+    {K::SPACER},                                         // 10
+    {K::DUAL, C::REV, C::DEL},                           // 11
+    {K::DUAL, C::EQ, C::SLICE},                          // 12
+};
+
 }  // namespace instrument_rows
 
 inline int instrument_row_count(songcore::InstrumentType type) {
     switch (type) {
         case songcore::InstrumentType::SOUNDFONT: return static_cast<int>(std::size(instrument_rows::SOUNDFONT));
         case songcore::InstrumentType::EXTERNAL:  return static_cast<int>(std::size(instrument_rows::EXTERNAL));
+        case songcore::InstrumentType::GRANULAR:  return static_cast<int>(std::size(instrument_rows::GRANULAR));
         case songcore::InstrumentType::SAMPLER:   break;
     }
     return static_cast<int>(std::size(instrument_rows::SAMPLER));
@@ -120,6 +140,7 @@ inline InstrumentRow instrument_row(songcore::InstrumentType type, int row) {
     switch (type) {
         case songcore::InstrumentType::SOUNDFONT: return instrument_rows::SOUNDFONT[r];
         case songcore::InstrumentType::EXTERNAL:  return instrument_rows::EXTERNAL[r];
+        case songcore::InstrumentType::GRANULAR:  return instrument_rows::GRANULAR[r];
         case songcore::InstrumentType::SAMPLER:   break;
     }
     return instrument_rows::SAMPLER[r];

@@ -10,10 +10,7 @@
 
 #include "app.h"
 #include "windows/asio-audio-engine.h"
-#include "audio-backend.h"
-
-class AudioEngine;
-class SdlAudioEngine;
+#include "sdl/sdl-audio-engine.h"
 
 namespace ptshell {
 
@@ -33,6 +30,15 @@ class WindowsAudioOutputs : public AudioBackend, public AudioOutputSelector {
     int  sampleRate() const override { return current().sampleRate(); }
     OutputLatency outputLatency() const override { return current().outputLatency(); }
     bool deviceLost() const override { return current().deviceLost(); }
+
+    // Audio input capture is handled by the system (SDL) backend — ASIO output switching does not
+    // affect capture. Delegate so SETTINGS / SAMPLE EDITOR can list and open input devices.
+    bool openCapture(int deviceIndex) override { return system_.openCapture(deviceIndex); }
+    void closeCapture() override { system_.closeCapture(); }
+    int  captureWrite(const float* left, const float* right, int frames) override {
+        return system_.captureWrite(left, right, frames);
+    }
+    void listInputDevices(std::vector<std::string>& out) override { system_.listInputDevices(out); }
 
   private:
     AudioBackend&       current();

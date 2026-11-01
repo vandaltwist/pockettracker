@@ -10,6 +10,8 @@
 // answers `none()` there.
 
 #include <cstdint>
+#include <array>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -117,8 +119,47 @@ struct SampleEditorState {
     bool isModified       = false;
     bool showConfirmClose = false;
 
+    // ── Record ───────────────────────────────────────────────────────────────────────────────────
+    // The editor is recording input audio into a new sample. REC draws lit; INPUT picks the device.
+    bool recordActive = false;
+    bool recordFailed  = false;   // last record attempt failed (shown in the REC cell)
+    float recordLevel  = 0.0f;    // live input peak (0..1) while recording
+    float recordPan   = 0.0f;    // stereo pan of input (-1..1)
+    float recordBass  = 0.0f;    // bass energy (0..1)
+    float recordHigh  = 0.0f;    // high-freq energy (0..1)
+    int   recordFrames = 0;       // frames captured so far
+    int   recordSkipFrames = 0;   // frames of the count-in, dropped from the take (0 = DIRECT)
+    int   lastRecordLength = 0;   // for accumulating viz
+    std::vector<float> recWaveL;   // live waveform (min/max pairs) L
+    std::vector<float> recWaveR;   // live waveform (min/max pairs) R
+    std::vector<float> recThick;   // per-bin thickness (0..1)
+    std::string recordInputDevice;   // selected input device name ("" = none/OFF)
+    std::vector<std::string> audioInputDevices;   // input device names for the INPUT cell
+
+    // ── Topographic record visualizer (courbes de niveau L/R) ────────────────────────────────────
+    // Grille dB : [bande][colonne], colonne la plus récente à droite. -100 = silence.
+    // Colonnes glissent vers la gauche à chaque tick d'analyse, nouveau son apparaît à droite.
+    int   recVizBands     = 40;   // bandes fréquences log (200 Hz → 5 kHz)
+    int   recVizCols      = 100;  // colonnes temps (≈ 30 s d'historique)
+    float recVizHistory   = 30.0f;// s d'historique total
+    float recVizTimePow   = 2.5f; // compression du temps (plus grand = passé plus compressé)
+    float recVizFade      = 3.0f; // dB d'estompage par frame
+    float recVizFmin      = 200.0f;
+    float recVizFmax      = 5000.0f;
+    int   recVizFftSize   = 1024; // taille FFT (puissance de 2)
+    int   recVizAnalyzeEvery = 3; // frames entre deux analyses
+    std::array<float, 4> recVizThresh = {{-20.0f, -40.0f, -60.0f, -80.0f}}; // seuils dB
+    int   recVizFrameCounter = 0; // compteur pour le throttling d'analyse
+    bool  recVizDirty     = true; // grille modifiée, redraw requis
+    std::vector<float> recSpecL;  // bands*cols dB, canal L
+    std::vector<float> recSpecR;  // bands*cols dB, canal R
+
     // 0..1 while the sample sounds, −1 when not: the playhead line.
     float playbackPosition = -1.0f;
+
+    // Boucle de pré-écoute (cellule LOOP, rangée RECORD) : le sample boucle jusqu'à ce qu'on rappuie sur X.
+    bool loopPreview = false;
+
 
     // ── Derived ──────────────────────────────────────────────────────────────────────────────────
 
@@ -205,7 +246,7 @@ public:
     static constexpr int HEIGHT = 480;   // full-screen: no top strip, no right bar
 
     // The waveform panel, under the three header rows.
-    static constexpr int WAVEFORM_Y = 73;
+    static constexpr int WAVEFORM_Y = 85;
     static constexpr int WAVEFORM_H = 155;
     static constexpr int WAVEFORM_W = 620;
 
@@ -262,6 +303,21 @@ public:
 private:
     // The wave, the S/E edges, slice boundaries and the playhead.
     void draw_waveform(Canvas& c, int x, int y, const SampleEditorState& s, const Theme& t) const;
+
+    // Topographic record visualizer: L/R contour panels (replaces the record waveform while recording).
+    void draw_rec_viz(Canvas& c, int x, int y, const SampleEditorState& s, const Theme& t) const;
+
+    // Marching squares: extract contour segments for one threshold from a bands×cols grid.
+    // `grid` indexed [band*cols + col], value in dB. Segments emitted in logical (col, band) space.
+    struct VizSeg { float x0, y0, x1, y1; };
+    static void marching_squares(const std::vector<float>& grid, int bands, int cols,
+                                 float threshold, std::vector<VizSeg>& out);
+
+    // Draw a thin line between two points using 1px fills (canvas has no line primitive).
+    static void draw_thin_line(Canvas& c, float x0, float y0, float x1, float y1, Argb color);
+
+    // Time → x with logarithmic compression of the past (now at right, past compressed to left).
+    static float viz_tx(int col, int cols, float historySec, float timePow, float left, float width);
 
     // B on a modified sample.
     void draw_confirm_dialog(Canvas& c, int x, int y, const Theme& t) const;

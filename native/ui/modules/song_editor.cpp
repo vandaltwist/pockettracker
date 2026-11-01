@@ -56,7 +56,7 @@ void SongEditorModule::draw_row(Canvas& c, int x, int y, int row_index, int abso
     const int textY = dataRowY + TEXT_PADDING;
 
     // Left to right: RowCells joins a selected run across the gutters only in layout order.
-    RowCells cells(c, textY, t);
+    RowCells cells(c, textY, t, absolute_row == s.cursorRow ? s.cursorFlashAlpha : 0);
 
     // Column 0 is a gutter the cursor cannot reach; its number still lights on the cursor row.
     c.draw_text(hex2(absolute_row), stepX, textY,

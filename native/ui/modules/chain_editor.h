@@ -27,6 +27,9 @@ struct ChainEditorState {
     bool selectionMode = false;
     std::function<bool(int, int)> isCellSelected = [](int, int) { return false; };
     Theme theme = theme_classic();
+
+    // A's copy confirmation: 0..255, lit at the cursor cell's top-right and faded out (ui/helpers.h).
+    int cursorFlashAlpha = 0;
 };
 
 struct ChainInputResult {

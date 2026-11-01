@@ -50,11 +50,7 @@ bool InputDispatcher::defer_a_to_release() const {
 
 bool InputDispatcher::defer_b_to_release() const {
     // The EQ editor: B is both CLOSE and the slot-cycle modifier, and only the release says which.
-    if (eq_open()) return true;
-
-    // ⚠️ And wherever R+B is a MUTE: a B landing a frame before its R would copy and close the
-    // selection, and the chord would mute one channel instead of eight.
-    return mute_solo_chord_live();
+    return eq_open();
 }
 
 // ─── Cells that open on release, and the EQ editor ───────────────────────────────────────────────

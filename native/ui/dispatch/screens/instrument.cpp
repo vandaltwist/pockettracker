@@ -103,11 +103,11 @@ GestureResult InputDispatcher::mods_screen(Gesture g) {
     }
 }
 
-// A+START auditions at the root on the preview lane until the next plain press, over a running song too.
+// X+A auditions at the root on the preview lane until the next plain press, over a running song too.
 // The lane borrows the fader of the song cell you came through.
 GestureResult InputDispatcher::instrument_audition(Gesture g) {
     switch (g) {
-        case Gesture::A_START:
+        case Gesture::X_A:
             host_.set_preview_track(audition_track());
             host_.preview_instrument(s_.currentInstrument);
             return GestureResult::TAKEN;

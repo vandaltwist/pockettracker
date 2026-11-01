@@ -7,6 +7,7 @@
 
 #include "ui/helpers.h"
 #include "ui/modules/confirm_dialog.h"
+#include "ui/modules/rec_viz.h"
 
 namespace pt::ui {
 
@@ -74,7 +75,7 @@ const std::vector<std::string>& SampleEditorModule::ops_row2() {
     return v;
 }
 
-int SampleEditorModule::content_y(int row) { return (row - 8) * ROW_HEIGHT + 228; }
+int SampleEditorModule::content_y(int row) { return (row - 8) * 20 + 240; }
 
 // ─── The sparse row map ──────────────────────────────────────────────────────────────────────────
 
@@ -82,7 +83,8 @@ int SampleEditorModule::row_above(int row, int slice_method) {
     switch (row) {
         case 0:  return 0;
         case 1:  return 19;   // wrap to the last row
-        case 8:  return 2;
+        case 5:  return 2;    // RECORD row: above is PITCH/DURATION/BIT
+        case 8:  return 5;    // from SELECTION, above is RECORD
         case 10: return 8;
         case 13: return (slice_method == SLICE_OFF) ? 10 : 11;
         case 16: return 14;
@@ -93,7 +95,8 @@ int SampleEditorModule::row_above(int row, int slice_method) {
 
 int SampleEditorModule::row_below(int row, int slice_method) {
     switch (row) {
-        case 2:  return 8;
+        case 2:  return 5;    // from PITCH/DURATION/BIT, below is RECORD
+        case 5:  return 8;    // RECORD row: below is SELECTION
         case 8:  return 10;
         case 10: return (slice_method == SLICE_OFF) ? 13 : 11;
         case 11: return 13;
@@ -106,7 +109,9 @@ int SampleEditorModule::row_below(int row, int slice_method) {
 
 int SampleEditorModule::max_col_for_row(int row, int slice_method) {
     if (row == 1 || row == 2) return 2;
-    if (row >= 3 && row <= 8) return 1;          // the selection's two edges (START / END)
+    if (row == 5) return 4;          // RECORD: REC / INPUT / SET
+    if (row >= 3 && row <= 7) return 1;          // the selection's two edges (START / END)
+    if (row == 8) return 2;                      // START / END / LOOP checkbox
     if (row == 10) return slice_has_parameter(slice_method) ? 1 : 0;
     if (row == 11) return 1;
     if (row == 13 || row == 14) return 5;        // six ops per row
@@ -336,7 +341,7 @@ void SampleEditorModule::draw(Canvas& c, int x, int y, const SampleEditorState& 
     // ── Header, then rows 1 and 2, then the waveform ─────────────────────────────────────────────
     {
         const int ty = y + 5 + TEXT_PADDING;
-        c.draw_text("SAMPLE EDITOR", x + 10, ty, t.textTitle, CHAR_SPACING, FONT_SCALE);
+        c.draw_text("MOONSET", x + 10, ty, t.textTitle, CHAR_SPACING, FONT_SCALE);
         // BPM sits left of the rate and length it is derived from; six columns cap it at 999.
         c.draw_text(s.bpm_display(), x + 245, ty, t.textParam, CHAR_SPACING, FONT_SCALE);
         c.draw_text(std::to_string(s.sampleRate) + "Hz", x + 360, ty, t.textParam, CHAR_SPACING, FONT_SCALE);
@@ -344,7 +349,7 @@ void SampleEditorModule::draw(Canvas& c, int x, int y, const SampleEditorState& 
     }
 
     {   // Row 1 — ZOOM / SOURCE / RATE
-        const int  ry  = y + 26;
+        const int  ry  = y + 20;
         const bool cur = (s.cursorRow == 1);
         // A mono sample reads MONO whatever the mode (the cell is read-only there).
         const std::string source = s.hasStereoData ? at(source_values(), s.sourceMode) : "MONO";
@@ -355,13 +360,58 @@ void SampleEditorModule::draw(Canvas& c, int x, int y, const SampleEditorState& 
     }
 
     {   // Row 2 — PITCH / DURATION / BIT
-        const int  ry  = y + 47;
+        const int  ry  = y + 40;
         const bool cur = (s.cursorRow == 2);
         const std::string pitch = (s.pitchSemitones >= 0 ? "+" : "") + std::to_string(s.pitchSemitones);
         draw_label_3val(c, x, ry + TEXT_PADDING, cur, s.cursorCol, t,
                         "PITCH",    pitch,                                  0,
                         "DURATION", at(duration_values(), s.durationIndex), 1,
                         "BIT",      std::to_string(s.bitDepth),             2);
+    }
+
+    {   // Row 5 — RECORD: REC toggle + INPUT device selector
+        const int  ry  = y + 60;
+        const bool cur = (s.cursorRow == 5);
+        const int ty = ry + TEXT_PADDING;
+        const bool     onRecCell = (cur && s.cursorCol == 0);
+        const uint32_t recInk = s.recordActive
+            ? (s.recordLevel > 0.01f ? 0xFFFF0000u : 0xFFFFAA00u)   // red if sound, amber if silent
+            : t.textValue;
+        c.draw_text("RECORD", x + 10, ty, onRecCell ? cursor_mark_ink(t) : t.textParam,
+                    CHAR_SPACING, FONT_SCALE);
+        if (s.recordActive && !s.recordFailed && s.recordFrames >= s.recordSkipFrames) {
+            // « REC » puis le temps COLLÉ et plus petit : la cellule reste dans sa place devant INPUT.
+            char tb[24];
+            std::snprintf(tb, sizeof(tb), "%.1fs", (s.recordFrames - s.recordSkipFrames) / 48000.0f);
+            const std::string timeStr = tb;
+            const int recX = x + 175, fs2 = FONT_SCALE - 1, cs2 = 1, gap = 3;
+            const int wRec = Canvas::text_width("REC", CHAR_SPACING, FONT_SCALE);
+            const int wAll = wRec + gap + Canvas::text_width(timeStr, cs2, fs2);
+            if (onRecCell)
+                c.fill_rect(recX - CHAR_SPACING, ty - TEXT_PADDING, wAll + 2 * CHAR_SPACING, ROW_HEIGHT,
+                            t.rowCursor);
+            const uint32_t ink = onRecCell ? cursor_cell_ink(t) : recInk;
+            c.draw_text("REC", recX, ty, ink, CHAR_SPACING, FONT_SCALE);
+            c.draw_text(timeStr, recX + wRec + gap, ty + (FONT_SCALE - fs2) * 5 / 2, ink, cs2, fs2);
+        } else {
+            const std::string recText = s.recordFailed ? std::string("FAILED")
+                                      : s.recordActive ? std::string("COUNT-IN")
+                                                       : std::string("REC");
+            draw_cursor_cell(c, recText, x + 175, ty, onRecCell, recInk, t);
+        }
+        std::string inputName = s.recordInputDevice.empty() ? "DEF" : s.recordInputDevice.substr(0, 3);
+        while (!inputName.empty() && inputName.back() == ' ') inputName.pop_back();   // "M1 MASTER" -> "M1"
+        c.draw_text("INPUT", x + 335, ty, cur && s.cursorCol == 1 ? cursor_mark_ink(t) : t.textParam,
+                    CHAR_SPACING, FONT_SCALE);
+        draw_cursor_cell(c, inputName, x + 410, ty, cur && s.cursorCol == 1, t.textValue, t);
+        c.draw_text("SET", x + 535, ty, cur && s.cursorCol == 2 ? cursor_mark_ink(t) : t.textParam,
+                    CHAR_SPACING, FONT_SCALE);
+        draw_cursor_cell(c, rec_viz().menuOpen() ? "ON" : "OFF", x + 590, ty,
+                         cur && s.cursorCol == 2, t.textValue, t);
+        c.draw_text("LOOP", x + 650, ty, cur && s.cursorCol == 3 ? cursor_mark_ink(t) : t.textParam,
+                    CHAR_SPACING, FONT_SCALE);
+        draw_cursor_cell(c, s.loopPreview ? "ON" : "OFF", x + 710, ty,
+                          cur && s.cursorCol == 3, t.textValue, t);
     }
 
     draw_waveform(c, x, y + WAVEFORM_Y, s, t);
@@ -376,6 +426,10 @@ void SampleEditorModule::draw(Canvas& c, int x, int y, const SampleEditorState& 
                          t.textValue, t);
         draw_cursor_cell(c, hex_padded(s.selectionEnd, 8), x + 335, ty, cur && s.cursorCol == 1,
                          t.textValue, t);
+        c.draw_text("LOOP", x + 490, ty, cur && s.cursorCol == 2 ? cursor_mark_ink(t) : t.textParam,
+                    CHAR_SPACING, FONT_SCALE);
+        draw_cursor_cell(c, s.loopPreview ? "ON" : "OFF", x + 545, ty, cur && s.cursorCol == 2,
+                          t.textValue, t);
     }
 
     {   // Row 10 — the slice METHOD, and its one parameter (SENS or BY, depending)
@@ -462,8 +516,6 @@ void SampleEditorModule::draw_waveform(Canvas& c, int x, int y, const SampleEdit
                                        const Theme& t) const {
     const int wfLeft  = x + 10;
     const int wfRight = wfLeft + WAVEFORM_W;
-    // The last column inside the panel. Marks test against the edge and draw here, so an
-    // end-of-view mark shows.
     const int wfLast  = wfRight - 1;
     const int midY    = y + WAVEFORM_H / 2;
 
@@ -474,14 +526,20 @@ void SampleEditorModule::draw_waveform(Canvas& c, int x, int y, const SampleEdit
     const int64_t viewLen   = std::max<int64_t>(s.view_end() - viewStart, 1);
     const float   viewLenF  = static_cast<float>(viewLen);
 
-    // Frame → pixel, for every mark on the panel.
     auto frame_x = [&](float frame) {
         return static_cast<float>(wfLeft) +
                ((frame - static_cast<float>(viewStart)) / viewLenF) * static_cast<float>(WAVEFORM_W);
     };
 
-    // ── The wave itself: one vertical rule per bin, from its min to its max ──────────────────────
-    if (s.waveformData.size() >= 2) {
+    if (s.recordActive || rec_viz().menuOpen()) {
+        draw_rec_viz(c, wfLeft, y, s, t);
+
+        // Tête de lecture : un simple filet sur le bord droit (= présent), qui ne masque plus les courbes.
+        if (s.recordActive)
+            c.fill_rect(wfRight - 2, y, 2, WAVEFORM_H, t.textPlayhead);
+
+        return;   // viz (seul ou avec son menu de réglages en overlay) occupe tout le panneau
+    } else if (s.waveformData.size() >= 2) {
         const int   bins  = static_cast<int>(s.waveformData.size()) / 2;
         const float halfH = WAVEFORM_H / 2.0f;
         for (int i = 0; i < bins; ++i) {
@@ -578,6 +636,18 @@ void SampleEditorModule::draw_waveform(Canvas& c, int x, int y, const SampleEdit
     }
 }
 
+// ─── Record visualizer (courbes de niveau L/R) ─────────────────────────────────────────────────
+// Tout le calcul (FFT, contours, dessin) vit dans rec_viz.h. L'audio l'alimente avec
+// `pt::ui::rec_viz().push(left, right, frames)` ; ici on ne fait que le dessiner.
+
+void SampleEditorModule::draw_rec_viz(Canvas& c, int x, int y, const SampleEditorState&,
+                                      const Theme&) const {
+    RecViz& v = rec_viz();
+    v.update();   // consomme l'audio reçu : 1 pas par 50 ms
+    // Texte du visualiseur un cran plus petit que le reste de l'écran (plus d'air autour des courbes).
+    v.draw(c, x, y, WAVEFORM_W, WAVEFORM_H, CHAR_SPACING, std::max(1, FONT_SCALE - 1));
+}
+
 void SampleEditorModule::draw_confirm_dialog(Canvas& c, int x, int y, const Theme& t) const {
     // Covers the editor. ⚠️ So it is not in `modal_backdrop_active`: the bars must not dim either.
     c.fill_rect(x, y, WIDTH, HEIGHT, t.background);
@@ -620,9 +690,29 @@ CursorContext SampleEditorModule::cursor_context(const SampleEditorState& s) con
                 default: return cc::none();
             }
 
-        // Rows 3..8: A+DPAD drags a selection edge — the dispatcher's nudge_selection_edge.
-        case 3: case 4: case 5: case 6: case 7: case 8:
+        case 5:
+            switch (s.cursorCol) {
+                case 0: return cc::toggle_binary(s.recordActive);   // REC toggle
+                case 1: {
+                    // ⚠️ DEFAULT is the empty choice and stays IN the list, so the cycle can come back
+                    // to it — otherwise a device, once picked, could never be cleared.
+                    std::vector<std::string> devices{"DEFAULT"};
+                    devices.insert(devices.end(), s.audioInputDevices.begin(), s.audioInputDevices.end());
+                    return cc::toggle_ternary(s.recordInputDevice.empty() ? "DEFAULT" : s.recordInputDevice,
+                                              devices);
+                }
+                case 2: return cc::toggle_binary(rec_viz().menuOpen());
+                case 3: return cc::toggle_binary(s.loopPreview);            // LOOP
+                default: return cc::none();
+            }
+
+        // Rows 3,4,6,7: A+DPAD drags a selection edge — the dispatcher's nudge_selection_edge.
+        case 3: case 4: case 6: case 7:
             return cc::none();
+
+        case 8:
+            if (s.cursorCol == 2) return cc::toggle_binary(s.loopPreview);   // LOOP checkbox
+            return cc::none();   // START / END are dragged, not stepped
 
         case 10:
             switch (s.cursorCol) {
@@ -707,6 +797,27 @@ SampleEditorInputResult SampleEditorModule::handle_input(SampleEditorState& s,
                 }
                 default: break;
             }
+            break;
+
+        case 5:
+            switch (s.cursorCol) {
+                case 0: s.recordActive = (v == 1);  r.modified = true; break;   // REC toggle via arrow keys
+                case 1: {
+                    // Cycle through input device names; "DEFAULT"/index 0 clears.
+                    if (v <= 0 || v > static_cast<int>(s.audioInputDevices.size()))
+                        s.recordInputDevice.clear();
+                    else
+                        s.recordInputDevice = s.audioInputDevices[static_cast<size_t>(v - 1)];
+                    r.modified = true;
+                    break;
+                }
+                case 3: s.loopPreview = (v == 1); r.modified = true; break;
+                default: break;
+            }
+            break;
+
+        case 8:
+            if (s.cursorCol == 2) { s.loopPreview = (v == 1); r.modified = true; }
             break;
 
         case 10:

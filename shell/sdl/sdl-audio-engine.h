@@ -10,6 +10,10 @@
 
 #include <SDL.h>
 
+#include <atomic>
+#include <string>
+#include <vector>
+
 #include "audio-backend.h"
 
 class AudioEngine;
@@ -42,8 +46,16 @@ class SdlAudioEngine : public AudioBackend {
     // loaded samples are pitched for the rate in force.
     void pin_rate(int hz) { pinnedRate_ = hz; }
 
+    // ── Capture ───────────────────────────────────────────────────────────────────────────────────
+    bool openCapture(int deviceIndex) override;
+    void closeCapture() override;
+    void shutdownCapture();
+    int  captureWrite(const float* left, const float* right, int frames) override;
+    void listInputDevices(std::vector<std::string>& out) override;
+
   private:
     static void SDLCALL audioCallback(void* userdata, Uint8* out, int lenBytes);
+    static void SDLCALL captureCallback(void* userdata, Uint8* stream, int lenBytes);
 
     AudioEngine*      core_         = nullptr;
     SDL_AudioDeviceID device_       = 0;
@@ -51,6 +63,22 @@ class SdlAudioEngine : public AudioBackend {
     int               channels_     = 0;
     int               bufferFrames_ = 0;  // what the device chose
     int               pinnedRate_   = 0;
+
+    // Capture device and its sink into AudioEngine's record buffer.
+    SDL_AudioDeviceID captureDevice_ = 0;
+    std::string       captureKey_;               // which input the open capture belongs to ("" = none)
+    // Linux: the capture cards read from /proc/asound/cards by the last listInputDevices(), in the order
+    // the INPUT cell shows them. SDL's own list is a snapshot taken at start-up, so a USB mic plugged in
+    // later never reaches it.
+    std::vector<int>         inputCardNum_;
+    std::vector<std::string> inputCardId_;
+    int               captureRate_   = 0;
+    int               captureChannels = 0;
+    SDL_AudioFormat   captureFormat_ = AUDIO_S16SYS;
+    double            capPos_ = 0.0;
+    std::atomic<int>   capCb_{0}, capFrames_{0};
+    std::atomic<float> capPeak_{0.0f};
+    float             capPrevL_ = 0.0f, capPrevR_ = 0.0f;
 };
 
 #endif  // POCKETTRACKER_SDL_AUDIO_ENGINE_H

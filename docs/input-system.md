@@ -1,8 +1,12 @@
 # Input System
 
-Every button has one job: A edits, B picks which item you are looking at, L handles the clipboard
-and R moves between screens. One generic input handler serves every screen, so the same kind of value behaves the same
-way wherever you meet it.
+Four buttons: **OPTION**, **EDIT**, **SHIFT** and **PLAY**. OPTION cancels, EDIT validates and edits,
+SHIFT modifies, PLAY runs the transport. One generic input handler serves every screen, so the same
+kind of value behaves the same way wherever you meet it.
+
+⚠️ The rest of this page uses the role names the code uses, because they are the ones on screen and in
+the source: **A = EDIT**, **B = OPTION**, **Y = SHIFT**, **X = PLAY**. The old L / R / SELECT / START
+buttons no longer exist.
 
 ---
 
@@ -14,30 +18,51 @@ way wherever you meet it.
 D-PAD:    W (up) / S (down) / A (left) / D (right)
           Arrow keys also work
 
-A button: K or Enter
-B button: J or Escape
-L button: U (left shoulder/modifier)
-R button: I (right shoulder/modifier)
-SELECT:   Left Shift
-START:    Spacebar
+OPTION:   M or Escape
+EDIT:     J or Enter
+SHIFT:    N
+PLAY:     K
 ```
 
 ### Physical Gamepad
 
 ```
 D-PAD:    Physical D-pad
-A/B:      A and B face buttons (X/Y also map to A/B)
-L/R:      L1 / R1 shoulder buttons
-SELECT:   SELECT (SDL's "back" button)
-START:    START
+A/B/X/Y:  the four face buttons - A is OPTION, B is EDIT, X is PLAY, Y is SHIFT
 ```
 
-**L2/R2 and the analog sticks are not mapped.** Everything the app does is reachable from the ten
+**L2/R2 and the analog sticks are not mapped.** Everything the app does is reachable from the eight
 buttons above, and a trigger or a drifting stick therefore does nothing rather than something
 surprising.
 
-On Android the hardware **Back** key is always **B**, whatever else you rebind — B is the app's
-universal cancel, so Back closes the file browser, aborts the keyboard and leaves an editor.
+On Android the hardware **Back** key is always **OPTION** (A), whatever else you rebind — OPTION is the
+app's universal cancel, so Back closes the file browser, aborts the keyboard and leaves an editor.
+
+### The chords at a glance
+
+| Chord | What it does |
+|---|---|
+| D-PAD | move the cursor |
+| SHIFT + D-PAD | change screen |
+| EDIT | validate / edit / insert on an empty cell |
+| OPTION | cancel / exit |
+| EDIT + OPTION | delete / cut / reset to the default |
+| EDIT + D-PAD | edit: LEFT/RIGHT by 1, UP/DOWN by 16 |
+| OPTION + D-PAD | previous/next item, page the song |
+| EDIT, EDIT | insert the next unused item |
+| SHIFT + EDIT | paste (interpolate inside a selection) |
+| SHIFT + OPTION | start a selection |
+| SHIFT + OPTION, then EDIT | clone |
+| OPTION, then SHIFT | mute the cursor's track |
+| OPTION + PLAY | solo the cursor's track |
+| OPTION + SHIFT + PLAY | clear every mute and solo |
+| PLAY | play / stop |
+| SHIFT + PLAY | play the song from the cursor |
+| EDIT + PLAY | audition |
+| SHIFT alone | help for the cell under the cursor |
+
+⚠️ OPTION+SHIFT and SHIFT+OPTION are different chords: OPTION **first** mutes, SHIFT **first** starts a
+selection. Release OPTION first to keep a mute or a solo, SHIFT or PLAY first to put the mix back.
 
 Keyboard and gamepad work simultaneously.
 
@@ -53,12 +78,12 @@ for the schema, the key-name spellings and the 8BitDo/XInput case that makes A a
 ## Design Philosophy
 
 **Modifier roles:**
-- **A button** = "Edit this value" (hold for increment/decrement)
-- **B button** = "Which item am I looking at" (previous/next phrase, chain, instrument…)
-- **L button** = "Clipboard and selection"
-- **R button** = "Navigate screens"
-- **SELECT** = "What is this?" — help for the cell under the cursor, and the modifier for rename, delete
-  and new folder in the file browser
+- **EDIT (A)** = "Edit this value" (hold for increment/decrement), and the yes / enter answer
+- **OPTION (B)** = "Which item am I looking at" (previous/next phrase, chain, instrument…), and the
+  no / exit answer
+- **SHIFT (Y)** = "Clipboard, selection and screens" — with a direction it moves between screens, with
+  EDIT it pastes, with OPTION it starts a selection
+- **PLAY (X)** = the transport: play / stop, and an audition with EDIT
 
 This creates a consistent, learnable pattern where:
 - You don't memorize different controls per screen
@@ -75,18 +100,18 @@ This creates a consistent, learnable pattern where:
 - **DOWN at last row** - Wraps to row 0
 
 ### Basic Actions
-- **A button** - Insert value on empty cell
-- **B button** - Cancel / back / copy a selection
-- **SELECT** - Shows help for the cell under the cursor: the visualizer strip at the top of the screen
-  becomes three lines describing it, and any other button puts it away. In the file browser it is the
-  modifier for the rename / delete / new-folder chords instead, and it cancels the keyboard overlay.
-  ⚠️ SELECT does **not** delete — clearing a value is always **A + B**.
-- **START** - Play/Stop sequencer
+- **EDIT (A)** - Insert value on empty cell
+- **OPTION (B)** - Cancel / back
+- **EDIT + OPTION** - Delete / cut the value under the cursor
+- **SHIFT alone** - Shows help for the cell under the cursor: the visualizer strip at the top of the
+  screen becomes three lines describing it, and any other button puts it away. It also cancels the
+  keyboard overlay.
+- **PLAY (X)** - Play/Stop sequencer
 
 ### Key Repeat
-- Hold D-PAD, A+DPAD, or B+DPAD for continuous input: 400 ms delay, then repeats that speed up from
-  64 ms to 32 ms apart. Both numbers can be changed in `config.json` (`repeat`)
-- The modifiers are re-read as the repeat fires, so pressing A while UP is already repeating turns a
+- Hold D-PAD, EDIT+DPAD, or OPTION+DPAD for continuous input: 400 ms delay, then repeats that speed up
+  from 64 ms to 32 ms apart. Both numbers can be changed in `config.json` (`repeat`)
+- The modifiers are re-read as the repeat fires, so pressing EDIT while UP is already repeating turns a
   cursor move into a value edit without letting go.
 
 ---

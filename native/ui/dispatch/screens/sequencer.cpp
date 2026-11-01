@@ -1,5 +1,6 @@
-// SONG, CHAIN, PHRASE and TABLE: their buttons — A on an empty cell inserts, A,A inserts the next
-// unused item, L+B+A clones, B+DPAD changes what is on screen — and the selection's clipboard they share.
+// SONG, CHAIN, PHRASE and TABLE: their buttons — A on a filled cell copies it and lights the copy dot,
+// A on an empty one inserts the cache, A,A inserts the next unused item, A+Y+B clones, B+DPAD changes
+// what is on screen — and the selection's clipboard they share.
 
 #include "ui/dispatch/dispatch_common.h"
 
@@ -63,8 +64,20 @@ std::set<int> used_chain_ids(const Project& p) {
 // ─── The buttons ─────────────────────────────────────────────────────────────────────────────────
 
 GestureResult InputDispatcher::song_screen(Gesture g) {
+    // Tampon : la cellule courante non vide est memorisee a chaque action (y compris un simple clic).
+    {
+        const Project& p = *s_.project;
+        const int trackIndex = s_.cursorColumn - 1;
+        if (trackIndex >= 0 && trackIndex < static_cast<int>(p.tracks.size())) {
+            const songcore::Track& t = p.tracks[static_cast<size_t>(trackIndex)];
+            if (s_.cursorRow < static_cast<int>(t.chainRefs.size()) &&
+                t.chainRefs[static_cast<size_t>(s_.cursorRow)] >= 0)
+                s_.songClipboard = t.chainRefs[static_cast<size_t>(s_.cursorRow)];
+        }
+    }
     switch (g) {
         case Gesture::A:
+            if (s_.selection.active) return copy_selection(&InputDispatcher::song_clip);
             if (open_sub_screen_at_cursor(/*peek=*/false)) return GestureResult::TAKEN;
             song_insert();
             return GestureResult::TAKEN;
@@ -95,20 +108,14 @@ GestureResult InputDispatcher::song_screen(Gesture g) {
             scroll_song_to_row(s_, s_.cursorRow);
             return GestureResult::TAKEN;
 
-        case Gesture::L_B_A:
+        case Gesture::A_Y_B:
             song_clone_chain();
             return GestureResult::PASS;   // the body ends the selection
 
-        // LIVE mode's three launches. Outside LIVE, START is the transport and the two chords do nothing.
-        case Gesture::START:
+        // X launches the cell in LIVE mode; outside LIVE it is the transport (play/stop).
+        case Gesture::X:
             if (!live_song_gesture()) return GestureResult::PASS;
             live_launch_cell();
-            return GestureResult::TAKEN;
-        case Gesture::L_START:
-            if (live_song_gesture()) live_launch_row();
-            return GestureResult::TAKEN;
-        case Gesture::R_START:
-            if (live_song_gesture()) live_stop_track();
             return GestureResult::TAKEN;
 
         default:
@@ -117,11 +124,44 @@ GestureResult InputDispatcher::song_screen(Gesture g) {
 }
 
 GestureResult InputDispatcher::chain_screen(Gesture g) {
+    // Tampon : la cellule courante non vide est memorisee.
+    {
+        Project& p = host_.edit_project();
+        Chain& c = p.chains[static_cast<size_t>(s_.currentChain)];
+        const int row = s_.cursorRow;
+        const int col = s_.cursorColumn;
+        if (col == 1 && row < static_cast<int>(c.phraseRefs.size()) &&
+            c.phraseRefs[static_cast<size_t>(row)] >= 0)
+            s_.chainClipboard = c.phraseRefs[static_cast<size_t>(row)];
+    }
     switch (g) {
-        case Gesture::A:
-            if (open_sub_screen_at_cursor(/*peek=*/false)) return GestureResult::TAKEN;
-            chain_insert();
+        case Gesture::A: {
+            if (s_.selection.active) return copy_selection(&InputDispatcher::chain_clip);
+            Project& p = host_.edit_project();
+            Chain& c = p.chains[static_cast<size_t>(s_.currentChain)];
+            const int row = s_.cursorRow;
+            if (row >= static_cast<int>(c.phraseRefs.size())) return GestureResult::TAKEN;
+            if (c.phraseRefs[static_cast<size_t>(row)] >= 0) {
+                // A filled row copies as one cell, from ANY of its columns (the row number included):
+                // the phrase and its transpose. Nothing is written, and A,A stays unarmed.
+                s_.chainClipboard          = c.phraseRefs[static_cast<size_t>(row)];
+                s_.chainClipboardTranspose = c.transposeValues[static_cast<size_t>(row)];
+                s_.lastEditedPhrase        = s_.chainClipboard;
+                s_.lastEditedTranspose     = s_.chainClipboardTranspose;
+                flash_copied_cell();
+                set_status(s_, "CHAIN COPIE", true);
+            } else if (s_.chainClipboard >= 0) {
+                // An empty row pastes the whole cached row, whichever of its columns A is on.
+                c.phraseRefs[static_cast<size_t>(row)]      = s_.chainClipboard;
+                c.transposeValues[static_cast<size_t>(row)] = s_.chainClipboardTranspose;
+                mark_modified();
+                arm_double_tap();   // un second appui insere la phrase suivante libre
+                set_status(s_, "CHAIN COLLE", true);
+            } else {
+                set_status(s_, "RIEN DANS LE CACHE", false);
+            }
             return GestureResult::TAKEN;
+        }
 
         case Gesture::A_A:
             if (take_double_tap()) chain_insert_next();
@@ -139,7 +179,7 @@ GestureResult InputDispatcher::chain_screen(Gesture g) {
         case Gesture::B_UP:   song_relative_b_vertical(-1); return GestureResult::TAKEN;
         case Gesture::B_DOWN: song_relative_b_vertical(+1); return GestureResult::TAKEN;
 
-        case Gesture::L_B_A:
+        case Gesture::A_Y_B:
             chain_clone_phrase();
             return GestureResult::PASS;   // the body ends the selection
 
@@ -149,8 +189,17 @@ GestureResult InputDispatcher::chain_screen(Gesture g) {
 }
 
 GestureResult InputDispatcher::phrase_screen(Gesture g) {
+    // Tampon : la cellule courante non vide est memorisee.
+    {
+        Project& p = host_.edit_project();
+        Phrase& ph = p.phrases[static_cast<size_t>(s_.currentPhrase)];
+        const int row = s_.cursorRow;
+        if (row < static_cast<int>(ph.steps.size()) && songcore::step_has_note(ph.steps[static_cast<size_t>(row)]))
+            s_.phraseClipboard = songcore::note_to_midi(ph.steps[static_cast<size_t>(row)].note);
+    }
     switch (g) {
         case Gesture::A:
+            if (s_.selection.active) return copy_selection(&InputDispatcher::phrase_clip);
             if (open_sub_screen_at_cursor(/*peek=*/false)) return GestureResult::TAKEN;
             if (fx_insert_last(/*peek=*/false)) return GestureResult::TAKEN;
             phrase_insert();
@@ -184,16 +233,9 @@ GestureResult InputDispatcher::phrase_screen(Gesture g) {
             if (phrase_put_note_off()) return GestureResult::TAKEN;
             return grid_clipboard(g, &InputDispatcher::phrase_clip, s_.currentPhrase);
 
-        case Gesture::L_B_A:
+        case Gesture::A_Y_B:
             phrase_clone();
             return GestureResult::PASS;   // the body ends the selection
-
-        case Gesture::L_UP:
-        case Gesture::L_DOWN:
-        case Gesture::L_LEFT:
-        case Gesture::L_RIGHT:
-            phrase_fill(g);
-            return GestureResult::TAKEN;
 
         // Only stops what it can start: a held-A preview, when the setting is on.
         case Gesture::STOP_PREVIEW:
@@ -227,8 +269,8 @@ GestureResult InputDispatcher::table_screen(Gesture g) {
             s_.lastEditedTable = s_.currentTable;
             return GestureResult::TAKEN;
 
-        // A+START auditions through the table on screen (instrument N owns table N).
-        case Gesture::A_START:
+        // X+A auditions through the table on screen (instrument N owns table N).
+        case Gesture::X_A:
             host_.set_preview_track(audition_track());
             host_.preview_instrument(s_.currentTable, /*tableIdOverride=*/s_.currentTable);
             return GestureResult::TAKEN;
@@ -243,16 +285,25 @@ GestureResult InputDispatcher::table_screen(Gesture g) {
 
 // ─── The selection's clipboard ───────────────────────────────────────────────────────────────────
 
+// A under an active selection: the block is the cell. Copy it whole — every value it covers — end the
+// selection and light the copy dot, exactly as B does inside a selection.
+GestureResult InputDispatcher::copy_selection(ClipFn clip) {
+    (this->*clip)(ClipOp::COPY, s_.selection.bounds());
+    s_.selection.exit();
+    flash_copied_cell();
+    return GestureResult::TAKEN;
+}
+
 GestureResult InputDispatcher::grid_clipboard(Gesture g, ClipFn clip, int pasteTarget) {
     const GridCursor& cursor = *grid();  // only the four grid screens call this
     switch (g) {
-        case Gesture::L_B:
+        case Gesture::Y_B:
             s_.selection.handle_select_b(now_ms_, s_.*cursor.row, s_.*cursor.column,
                                          cursor.maxColumn, cursor.maxRow);
             return GestureResult::TAKEN;
 
-        // Inside a selection: B copies, A+B deletes, L+A cuts — and each ends it. Outside one, B does
-        // nothing, A+B is the cell's own delete, and L+A pastes.
+        // Inside a selection: B copies, A+B deletes, Y+A cuts — and each ends it. Outside one, B does
+        // nothing, A+B is the cell's own delete, and Y+A pastes.
         case Gesture::B:
             if (!s_.selection.active) return GestureResult::TAKEN;
             (this->*clip)(ClipOp::COPY, s_.selection.bounds());
@@ -266,7 +317,7 @@ GestureResult InputDispatcher::grid_clipboard(Gesture g, ClipFn clip, int pasteT
             s_.selection.exit();
             return GestureResult::TAKEN;
 
-        case Gesture::L_A: {
+        case Gesture::Y_A: {
             if (s_.selection.active) {
                 (this->*clip)(ClipOp::CUT, s_.selection.bounds());
                 mark_modified();
@@ -372,7 +423,13 @@ void InputDispatcher::song_insert() {
     songcore::Track& track = host_.edit_project().tracks[static_cast<size_t>(s_.cursorColumn - 1)];
     while (static_cast<int>(track.chainRefs.size()) <= s_.cursorRow) track.chainRefs.push_back(-1);
 
-    if (track.chainRefs[static_cast<size_t>(s_.cursorRow)] != -1) return;
+    // A on a filled cell only refreshes the insert cache: the project is untouched and A,A stays unarmed.
+    const int ref = track.chainRefs[static_cast<size_t>(s_.cursorRow)];
+    if (ref != -1) {
+        s_.lastEditedChain = ref;
+        flash_copied_cell();
+        return;
+    }
     track.chainRefs[static_cast<size_t>(s_.cursorRow)] = s_.lastEditedChain;
     mark_modified();
     arm_double_tap();   // a second press inserts the next UNUSED chain
@@ -397,7 +454,14 @@ void InputDispatcher::song_insert_next() {
 void InputDispatcher::chain_insert() {
     hasInsertPos_ = false;
     Chain& chain = host_.edit_project().chains[static_cast<size_t>(s_.currentChain)];
-    if (chain.phraseRefs[static_cast<size_t>(s_.cursorRow)] != -1) return;
+    // A on a filled phrase cell only refreshes the insert cache (phrase + transpose).
+    const int ref = chain.phraseRefs[static_cast<size_t>(s_.cursorRow)];
+    if (ref != -1) {
+        s_.lastEditedPhrase    = ref;
+        s_.lastEditedTranspose = chain.transposeValues[static_cast<size_t>(s_.cursorRow)];
+        flash_copied_cell();
+        return;
+    }
     chain.phraseRefs[static_cast<size_t>(s_.cursorRow)]      = s_.lastEditedPhrase;
     chain.transposeValues[static_cast<size_t>(s_.cursorRow)] = s_.lastEditedTranspose;
     mark_modified();
@@ -421,70 +485,73 @@ void InputDispatcher::chain_insert_next() {
 
 void InputDispatcher::phrase_insert() {
     hasInsertPos_ = false;
-    if (s_.cursorColumn != 1 || s_.selection.active) return;   // the NOTE column only
+    if (s_.selection.active) return;
+    const int col = s_.cursorColumn;
+    if (col < 1 || col > 9) return;   // column 0 is the row number, not a cell
 
-    Phrase& ph = host_.edit_project().phrases[static_cast<size_t>(s_.currentPhrase)];
-    PhraseEditorState ps{ph};
-    ps.cursorRow    = s_.cursorRow;
-    ps.cursorColumn = s_.cursorColumn;
-    // A on an existing note inserts nothing, but holding it is how you listen.
-    if (phrase_.cursor_context(ps).capabilities.isEmpty) {
-        songcore::PhraseStep& step = ph.steps[static_cast<size_t>(s_.cursorRow)];
-        step.note       = s_.lastEditedNote;
-        step.instrument = s_.lastEditedInstrument;
-        step.volume     = s_.lastEditedVolume;
-        mark_modified();
-        arm_double_tap();   // a second press keeps the note and re-points it at the next FREE instrument
-        insertHeld_ = true;
+    Phrase&              ph   = host_.edit_project().phrases[static_cast<size_t>(s_.currentPhrase)];
+    songcore::PhraseStep& step = ph.steps[static_cast<size_t>(s_.cursorRow)];
+
+    // NOTE: the cell is the whole note — pitch, instrument and volume travel with it.
+    if (col == 1) {
+        PhraseEditorState ps{ph};
+        ps.cursorRow    = s_.cursorRow;
+        ps.cursorColumn = col;
+        // A on an existing note inserts nothing, but holding it is how you listen — and it refreshes
+        // the insert cache with that row's note, instrument and volume. Nothing is written, nothing is
+        // armed.
+        if (phrase_.cursor_context(ps).capabilities.isEmpty) {
+            step.note       = s_.lastEditedNote;
+            step.instrument = s_.lastEditedInstrument;
+            step.volume     = s_.lastEditedVolume;
+            mark_modified();
+            arm_double_tap();   // a second press keeps the note and re-points it at the next FREE instrument
+            insertHeld_ = true;
+        } else if (songcore::step_has_note(step)) {
+            // An OFF has no pitch to remember, so it leaves the cache alone.
+            s_.lastEditedNote       = step.note;
+            s_.lastEditedInstrument = step.instrument;
+            s_.lastEditedVolume     = step.volume;
+            flash_copied_cell();
+        }
+        preview_held_note();
+        return;
     }
-    preview_held_note();
+
+    // VOLUME and INSTRUMENT belong to the row's note: A copies them off a row that plays, and pastes
+    // them onto one that does not (the dimmed pair).
+    if (col == 2 || col == 3) {
+        if (songcore::step_has_note(step)) {
+            if (col == 2) s_.lastEditedVolume     = step.volume;
+            else          s_.lastEditedInstrument = step.instrument;
+            flash_copied_cell();
+        } else {
+            if (col == 2) step.volume     = s_.lastEditedVolume;
+            else          step.instrument = s_.lastEditedInstrument;
+            mark_modified();
+        }
+        return;
+    }
+
+    // The FX pair: A on EITHER half of a slot moves the type and its value together.
+    const int slot = (col - 4) / 2;
+    int& type  = slot == 0 ? step.fx1Type : slot == 1 ? step.fx2Type : step.fx3Type;
+    int& value = slot == 0 ? step.fx1Value : slot == 1 ? step.fx2Value : step.fx3Value;
+    if (type != songcore::FX_NONE) {
+        s_.lastEditedFxType  = type;
+        s_.lastEditedFxValue = value;
+        flash_copied_cell();
+    } else if (s_.lastEditedFxType != songcore::FX_NONE) {
+        type  = s_.lastEditedFxType;
+        value = s_.lastEditedFxValue;
+        mark_modified();
+        remember_fx_at_cursor();
+    }
 }
 
-void InputDispatcher::phrase_fill(Gesture g) {
-    FillRange range;
-    if (s_.selection.active) {
-        const SelectionBounds b = s_.selection.bounds();
-        range = {b.topLeftRow, b.bottomRightRow, std::max(1, b.topLeftColumn), b.bottomRightColumn,
-                 /*wholeUnit=*/false};
-    } else {
-        if (s_.cursorColumn < 1) return;   // the row number is not a cell
-        range = {s_.cursorRow, 15, s_.cursorColumn, s_.cursorColumn, /*wholeUnit=*/true};
-    }
-
-    Project&          p  = host_.edit_project();
-    songcore::Phrase& ph = p.phrases[static_cast<size_t>(s_.currentPhrase)];
-    if (!fill_.live || fill_.phraseId != s_.currentPhrase || !(fill_.range == range) ||
-        !fill_same_steps(fill_.shown, ph))
-        fill_ = FillMemory{true, s_.currentPhrase, range, ph, ph, ph, 0};
-
-    switch (g) {
-        case Gesture::L_LEFT:
-        case Gesture::L_RIGHT: {
-            // A line each, both laid over `base`: the other button's stop is replaced, never added to.
-            const bool             spread = g == Gesture::L_LEFT;
-            const std::vector<int> stops  = spread ? fill_spread_stops(fill_.base, range)
-                                                   : fill_stops(fill_.base, range);
-            if (fill_.spread != spread) fill_.stop = 0;
-            fill_.spread = spread;
-            fill_.stop   = (fill_.stop + 1) % static_cast<int>(stops.size());
-            const int at = stops[static_cast<size_t>(fill_.stop)];
-            fill_.placed = spread ? fill_spread(fill_.base, range, at) : fill_at_stop(fill_.base, range, at, p);
-            fill_.shown  = fill_.placed;
-            break;
-        }
-        case Gesture::L_DOWN:
-            fill_.stop   = 0;   // a scatter is on no stop: the next walk starts from "as it was"
-            fill_.placed = fill_scatter(fill_.base, range, fillRng_);
-            fill_.shown  = fill_.placed;
-            break;
-        default:
-            fill_.shown = fill_randomize(fill_.placed, range, p, fillRng_);
-            break;
-    }
-
-    if (fill_same_steps(fill_.shown, ph)) return;
-    ph.steps = fill_.shown.steps;
-    mark_modified();
+void InputDispatcher::flash_copied_cell() {
+    s_.copyFlash = AppState::CopyFlash{static_cast<int>(s_.currentScreen), s_.cursorRow,
+                                       s_.cursorColumn, s_.blinkPhaseMs};
 }
 
 bool InputDispatcher::phrase_put_note_off() {
@@ -719,7 +786,24 @@ CursorContext InputDispatcher::song_context() const {
 
 bool InputDispatcher::song_edit(const InputAction& action) {
     Project& p = host_.edit_project();
-    const SongInputResult r = song_.handle_input(p, s_.cursorRow, s_.cursorColumn, action);
+    const int trackIndex = s_.cursorColumn - 1;
+    const int row = s_.cursorRow;
+
+    // Tampon : si la cellule courante contient une chaine, on la memorise.
+    if (trackIndex >= 0 && trackIndex < static_cast<int>(p.tracks.size())) {
+        const songcore::Track& t = p.tracks[static_cast<size_t>(trackIndex)];
+        if (row < static_cast<int>(t.chainRefs.size()) && t.chainRefs[static_cast<size_t>(row)] >= 0)
+            s_.songClipboard = t.chainRefs[static_cast<size_t>(row)];
+    }
+
+    InputAction a = action;
+    // Creation d'une cellule vide : on reprend la derniere cellule cliquee.
+    if (a.type == ActionType::INSERT_DEFAULT && s_.songClipboard >= 0) {
+        a.type = ActionType::SET_VALUE;
+        a.value = s_.songClipboard;
+    }
+
+    const SongInputResult r = song_.handle_input(p, row, s_.cursorColumn, a);
     if (r.hasChain) s_.lastEditedChain = r.lastEditedChain;
     return r.modified;
 }
@@ -734,8 +818,18 @@ CursorContext InputDispatcher::chain_context() const {
 
 bool InputDispatcher::chain_edit(const InputAction& action) {
     Project& p = host_.edit_project();
-    const ChainInputResult r = chain_.handle_input(
-        p.chains[static_cast<size_t>(s_.currentChain)], s_.cursorRow, s_.cursorColumn, action);
+    Chain&   c = p.chains[static_cast<size_t>(s_.currentChain)];
+    const int row = s_.cursorRow;
+    const int col = s_.cursorColumn;
+    if (col == 1 && row < static_cast<int>(c.phraseRefs.size()) && c.phraseRefs[static_cast<size_t>(row)] >= 0)
+        s_.chainClipboard = c.phraseRefs[static_cast<size_t>(row)];
+
+    InputAction a = action;
+    if (a.type == ActionType::INSERT_DEFAULT && s_.chainClipboard >= 0) {
+        a.type = ActionType::SET_VALUE;
+        a.value = s_.chainClipboard;
+    }
+    const ChainInputResult r = chain_.handle_input(c, row, col, a);
     if (r.hasPhrase)    s_.lastEditedPhrase    = r.lastEditedPhrase;
     if (r.hasTranspose) s_.lastEditedTranspose = r.lastEditedTranspose;
     return r.modified;
@@ -756,7 +850,19 @@ CursorContext InputDispatcher::phrase_context() const {
 bool InputDispatcher::phrase_edit(const InputAction& action) {
     Project& p = host_.edit_project();
     Phrase& ph = p.phrases[static_cast<size_t>(s_.currentPhrase)];
-    const PhraseInputResult r = phrase_.handle_input(ph, s_.cursorRow, s_.cursorColumn, action);
+    const int row = s_.cursorRow;
+    const int col = s_.cursorColumn;
+    // Tampon : si la cellule courante contient une note, on la memorise.
+    if (row < static_cast<int>(ph.steps.size())) {
+        const songcore::PhraseStep& st = ph.steps[static_cast<size_t>(row)];
+        if (songcore::step_has_note(st)) s_.phraseClipboard = songcore::note_to_midi(st.note);
+    }
+    InputAction a = action;
+    if (a.type == ActionType::INSERT_DEFAULT && s_.phraseClipboard >= 0) {
+        a.type = ActionType::SET_VALUE;
+        a.value = s_.phraseClipboard;
+    }
+    const PhraseInputResult r = phrase_.handle_input(ph, row, col, a);
     if (!r.modified) return false;
     remember_fx_at_cursor();
     insertHeld_ = false;
@@ -789,9 +895,21 @@ CursorContext InputDispatcher::table_context() const {
 
 bool InputDispatcher::table_edit(const InputAction& action) {
     Project& p = host_.edit_project();
+    songcore::Table& t = p.tables[static_cast<size_t>(s_.currentTable)];
+    const int row = s_.tableCursorRow;
+    const int col = s_.tableCursorColumn;
+    if (row >= 0 && row < static_cast<int>(t.rows.size())) {
+        const songcore::TableRow& r = t.rows[static_cast<size_t>(row)];
+        if (col == 1) s_.tableClipboard = r.transpose;
+        else if (col == 2 && r.volume >= 0) s_.tableClipboard = r.volume;
+    }
+    InputAction a = action;
+    if (a.type == ActionType::INSERT_DEFAULT && s_.tableClipboard >= 0 && (col == 1 || col == 2)) {
+        a.type = ActionType::SET_VALUE;
+        a.value = s_.tableClipboard;
+    }
     const bool modified = table_
-        .handle_input(p.tables[static_cast<size_t>(s_.currentTable)], s_.tableCursorRow,
-                      s_.tableCursorColumn, action)
+        .handle_input(t, row, col, a)
         .modified;
     if (modified) remember_fx_at_cursor();
     return modified;

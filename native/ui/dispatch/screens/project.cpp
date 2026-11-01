@@ -102,6 +102,8 @@ void InputDispatcher::project_action() {
         case ProjectRow::SYSTEM:
             // Into SETTINGS, which owns no column, so R+UP later returns to the main-row screen.
             s_.settingsReturnScreen = s_.currentScreen;
+            host_.listInputDevices(s_.settings.audioInputDevices);
+            s_.settings.audioInputIndex = 0;
             go_to_screen(s_, {ScreenType::SETTINGS, s_.previousColumn});
             break;
 
@@ -176,6 +178,16 @@ void InputDispatcher::settings_action() {
     switch (static_cast<SettingsRow>(s_.settingsCursorRow)) {
         case SettingsRow::THEME:
             open_theme_editor();
+            break;
+
+        case SettingsRow::BTN_MAP:
+            if (s_.settingsCursorColumn == 3) {
+                s_.settings.btnEdit   = 0;
+                s_.settings.btnOption = 1;
+                s_.settings.btnPlay   = 2;
+                s_.settings.btnShift  = 3;
+                set_status(s_, "MAPPING RESET", true);
+            }
             break;
 
         case SettingsRow::TEMPLATE: {

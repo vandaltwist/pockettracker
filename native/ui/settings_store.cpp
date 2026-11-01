@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "ui/modules/rec_viz.h"   // the VIZ / SAMPLE-REC menu's params — the singleton the module edits
 #include "ui/theme_io.h"
 #include "vendor/nlohmann/json.hpp"
 
@@ -30,7 +31,14 @@ std::string get_string(const json& j, const char* key, const std::string& fallba
     return it->get<std::string>();
 }
 
+float get_float(const json& j, const char* key, float fallback) {
+    const auto it = j.find(key);
+    if (it == j.end() || !it->is_number()) return fallback;
+    return it->get<float>();
+}
+
 int clamp(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
+float clampf(float v, float lo, float hi) { return v < lo ? lo : (v > hi ? hi : v); }
 
 constexpr int VISUALIZER_COUNT = 6;   // VisualizerType — SCOPE … SPECTRUM_PEAKS
 
@@ -53,6 +61,21 @@ bool load_settings(FileSystem& fs, SettingsValues& values, Theme& theme) {
     values.traceEnabled       = get_bool(j, "trace",              values.traceEnabled);
 
     values.abxyIndex          = clamp(get_int(j, "abxy", values.abxyIndex), 0, 2);
+    values.btnEdit            = clamp(get_int(j, "btnEdit",   values.btnEdit),   0, 3);
+    values.btnOption          = clamp(get_int(j, "btnOption", values.btnOption), 0, 3);
+    values.btnPlay            = clamp(get_int(j, "btnPlay",   values.btnPlay),   0, 3);
+    values.btnShift           = clamp(get_int(j, "btnShift",  values.btnShift),  0, 3);
+    values.btnMapSel          = clamp(get_int(j, "btnMapSel", values.btnMapSel), 0, 3);
+
+    // Migration one-shot : remet le mappage aux valeurs par defaut pour les anciens settings.
+    const int sv = get_int(j, "settingsVersion", 0);
+    if (sv < 3) {
+        values.btnEdit   = 0;
+        values.btnOption = 1;
+        values.btnPlay   = 2;
+        values.btnShift  = 3;
+    }
+    values.settingsVersion = (sv < 3) ? 3 : sv;
     values.touchButtonsWithPad = get_bool(j, "touchButtonsWithPad", values.touchButtonsWithPad);
 
     values.metronomeEnabled   = get_bool(j, "metronome", values.metronomeEnabled);
@@ -79,6 +102,41 @@ bool load_settings(FileSystem& fs, SettingsValues& values, Theme& theme) {
     values.audioOutput  = get_string(j, "audio_output", values.audioOutput);   // a driver name
 
     values.autosaveResumeAuto = get_bool(j, "autosaveResumeAuto", values.autosaveResumeAuto);
+
+    // ── The sample editor's INPUT cell and its SET menu (VIZ / SAMPLE-REC) ───────────────────────
+    // Kept so a take keeps its look and its source between launches. The menu edits rec_viz(); these
+    // keys mirror it. Absent or out of range: that field keeps the module's own default.
+    values.recordInput = get_string(j, "record_input", values.recordInput);
+
+    auto read_params = [&](const json& o, RecViz::Params& r) {
+        r.axis   = get_int(o, "axis", static_cast<int>(r.axis)) == 1 ? RecViz::Axis::Freq
+                                                                    : RecViz::Axis::Pan;
+        r.gate   = clampf(get_float(o, "gate",     r.gate),     -90.f, -10.f);
+        r.timePow = clampf(get_float(o, "time",    r.timePow),   1.5f,  3.5f);
+        r.bass   = clampf(get_float(o, "bass",     r.bass),      0.f,  40.f);
+        r.fall   = clampf(get_float(o, "trail",    r.fall),      0.5f,  6.f);
+        r.spread = clampf(get_float(o, "spread",   r.spread),    0.5f,  8.f);
+        r.micGainDb = clampf(get_float(o, "mic_gain", r.micGainDb), 0.f, 36.f);
+        r.startMode = clamp(get_int(o, "start",   r.startMode), 0, 4);
+        r.clickOn   = get_bool(o, "click",        r.clickOn);
+        r.recordMaxSeconds = clamp(get_int(o, "duration", r.recordMaxSeconds), 0, 600);
+    };
+
+    if (const auto it = j.find("rec"); it != j.end() && it->is_object()) {
+        read_params(*it, rec_viz().p);
+    }
+    if (const auto it = j.find("rec_presets"); it != j.end() && it->is_array()) {
+        int i = 0;
+        for (const auto& e : *it) {
+            if (i >= RecViz::PRESET_N) break;
+            if (e.is_object()) {
+                RecViz::Params q = rec_viz().preset(i);
+                read_params(e, q);
+                rec_viz().setPresetData(i, q, true);
+            }
+            ++i;
+        }
+    }
 
     // ── The device rows, read and written on every platform even where not shown ─────────────────
     // ⚠️ Android's prefs import writes these keys before boot; a key one side writes and the other drops
@@ -118,6 +176,12 @@ std::string serialize_settings(const SettingsValues& values, const Theme& theme)
     j["rememberFolder"]     = values.rememberFolder;
     j["navSongRelative"]    = values.navSongRelative;
     j["abxy"]               = values.abxyIndex;            // 0 AUTO, 1 XBOX, 2 NINTENDO
+    j["btnEdit"]            = values.btnEdit;              // 0=A, 1=B, 2=X, 3=Y
+    j["btnOption"]          = values.btnOption;
+    j["btnPlay"]            = values.btnPlay;
+    j["btnShift"]           = values.btnShift;
+    j["btnMapSel"]          = values.btnMapSel;
+    j["settingsVersion"]     = values.settingsVersion;
     j["touchButtonsWithPad"] = values.touchButtonsWithPad;
     j["metronome"]          = values.metronomeEnabled;
     j["metronomeVolume"]    = values.metronomeVolume;
@@ -147,6 +211,24 @@ std::string serialize_settings(const SettingsValues& values, const Theme& theme)
 
     j["theme"]    = theme.name;   // for older builds
     j["appTheme"] = json::parse(serialize_theme(theme), nullptr, /*allow_exceptions=*/false);
+
+    // The sample editor's INPUT cell, and its SET menu as it stands right now.
+    j["record_input"] = values.recordInput;
+
+    auto write_params = [](const RecViz::Params& r) {
+        return json{{"axis", static_cast<int>(r.axis)}, {"gate", r.gate},      {"time", r.timePow},
+                    {"bass", r.bass},                   {"trail", r.fall},      {"spread", r.spread},
+                    {"mic_gain", r.micGainDb},          {"start", r.startMode}, {"click", r.clickOn},
+                    {"duration", r.recordMaxSeconds}};
+    };
+    j["rec"] = write_params(rec_viz().p);
+
+    json presets = json::array();
+    for (int i = 0; i < RecViz::PRESET_N; ++i) {
+        if (rec_viz().presetUsed(i)) presets.push_back(write_params(rec_viz().preset(i)));
+        else presets.push_back(nullptr);
+    }
+    j["rec_presets"] = presets;
 
     return j.dump(2) + "\n";
 }

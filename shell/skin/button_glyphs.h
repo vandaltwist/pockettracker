@@ -29,10 +29,8 @@ inline ButtonLabel label_of(pt::ui::Button b) {
         case Button::DPAD_RIGHT: return {{pt::ui::CP_ARROW_RIGHT}, 1};
         case Button::A:          return {{'A'}, 1};
         case Button::B:          return {{'B'}, 1};
-        case Button::L_SHIFT:    return {{'L'}, 1};
-        case Button::R_SHIFT:    return {{'R'}, 1};
-        case Button::SELECT:     return {{'S', 'E', 'L'}, 3};
-        case Button::START:      return {{'S', 'T', 'A'}, 3};
+        case Button::X:          return {{'X'}, 1};
+        case Button::Y:          return {{'Y'}, 1};
         default:                 return {{'?'}, 1};
     }
 }

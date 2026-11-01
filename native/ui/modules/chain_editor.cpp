@@ -43,7 +43,7 @@ void ChainEditorModule::draw_row(Canvas& c, int x, int y, int index, const Chain
     const int textY = dataRowY + TEXT_PADDING;
 
     // Left to right: RowCells joins a selected run across the gutters only in layout order.
-    RowCells cells(c, textY, t);
+    RowCells cells(c, textY, t, index == s.cursorRow ? s.cursorFlashAlpha : 0);
 
     const auto cur = [&](int col) { return index == s.cursorRow && s.cursorColumn == col; };
     const auto sel = [&](int col) { return s.selectionMode && s.isCellSelected(index, col); };

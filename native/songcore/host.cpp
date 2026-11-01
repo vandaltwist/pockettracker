@@ -402,6 +402,52 @@ bool SongcoreHost::load_soundfont(int id, const std::string& path) {
     return true;
 }
 
+bool SongcoreHost::record_capture(int id, int skipFrames, float gainDb) {
+    if (!engine_ || id < 0 || id >= POOL_INSTRUMENTS) return false;
+    if (!engine_->isRecording()) return false;
+
+    // Stop the capture and grab the buffer.
+    engine_->stopRecord();
+
+    // Reuse the instrument's current sample slot when possible, so a new recording
+    // overwrites the previous one instead of consuming another slot.
+    Instrument& ins0 = project_.instruments[static_cast<size_t>(id)];
+    int slot = (ins0.sampleId >= 0 && ins0.sampleId < 256) ? ins0.sampleId : -1;
+    if (slot < 0) {
+        for (int s = 0; s < 256; ++s) {
+            if (engine_->getSampleLength(s) == 0) { slot = s; break; }
+        }
+    }
+    if (slot < 0) return false;   // no free slot
+
+    // Switch the instrument to SAMPLER and give it the new slot.
+    set_instrument_type(id, songcore::InstrumentType::SAMPLER);
+    Instrument& ins = project_.instruments[static_cast<size_t>(id)];
+    ins.sampleId = slot;
+
+    // Install the recorded PCM into the slot.
+    if (!engine_->installRecord(slot, skipFrames, gainDb)) return false;
+
+    push_instrument(id);
+    return true;
+}
+
+bool SongcoreHost::start_record(int deviceIndex) {
+    if (!engine_) return false;
+    return engine_->startRecord(deviceIndex);
+}
+
+int SongcoreHost::begin_count_in(int beats, bool click) {
+    if (!engine_) return 0;
+    return engine_->startCountIn(beats, frames_per_quarter(), click);
+}
+
+bool SongcoreHost::stop_record() {
+    if (!engine_) return false;
+    engine_->stopRecord();
+    return true;
+}
+
 bool SongcoreHost::last_load_ran_out_of_memory() const {
     return engine_ && engine_->lastLoadFailure() == AudioEngine::LoadFailure::OUT_OF_MEMORY;
 }

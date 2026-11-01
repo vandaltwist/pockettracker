@@ -473,7 +473,8 @@ void set_instrument_type(Engine* engine, Project& project, int id, InstrumentTyp
     ins.instrumentType = newType;
 
     // ⚠️ Two independent tests, not an if/else: EXTERNAL owns neither source and must free both.
-    if (newType != InstrumentType::SAMPLER) {
+    // GRANULAR is sampler-like: it keeps the sample source (it transforms it).
+    if (newType != InstrumentType::SAMPLER && newType != InstrumentType::GRANULAR) {
         ins.sampleFilePath.reset();
         if (engine) engine->clearSample(id);
         routing.sampleRateRatio[id] = 1.0f;

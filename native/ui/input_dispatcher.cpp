@@ -25,7 +25,6 @@ void InputDispatcher::set_now(long long now_ms) {
     run_midi_hotplug();                 // before the dismiss, so its message is seen this frame
     run_due_status_dismiss();
     run_instrument_entry_push();
-    run_selection_recency();
     run_mapped_cc_dirty();
     // What a live MIDI key plays: on PHRASE the instrument of the note under the cursor, else the one
     // last picked, on the SONG cursor's track. Every frame; the host republishes only on a change.
@@ -96,6 +95,28 @@ void InputDispatcher::run_instrument_entry_push() {
         if (s_.currentScreen == ScreenType::INSTRUMENT)
             host_.push_instrument(std::min(127, std::max(0, s_.currentInstrument)), /*refreshSounding=*/false);
         lastScreenSeen_ = s_.currentScreen;
+    }
+}
+
+void InputDispatcher::sync_last_edited_on_screen_switch(ScreenType from, ScreenType to) {
+    // Capture the departing screen's cursor ref into lastEdited*, apply to the arriving screen's current*.
+    switch (from) {
+        case ScreenType::SONG:    s_.lastEditedSongRow    = s_.cursorRow; break;
+        case ScreenType::CHAIN:   s_.lastEditedChain    = s_.currentChain; break;
+        case ScreenType::PHRASE:  s_.lastEditedPhrase   = s_.currentPhrase; break;
+        case ScreenType::TABLE:   s_.lastEditedTable    = s_.currentTable; break;
+        case ScreenType::GROOVE:  s_.lastEditedGroove   = s_.currentGroove; break;
+        case ScreenType::SCALE:   s_.lastEditedScale    = s_.currentScale; break;
+        default: break;
+    }
+    switch (to) {
+        case ScreenType::SONG:    s_.cursorRow = s_.lastEditedSongRow; break;
+        case ScreenType::CHAIN:   s_.currentChain   = s_.lastEditedChain; break;
+        case ScreenType::PHRASE:  s_.currentPhrase  = s_.lastEditedPhrase; break;
+        case ScreenType::TABLE:   s_.currentTable   = s_.lastEditedTable; break;
+        case ScreenType::GROOVE:  s_.currentGroove  = s_.lastEditedGroove; break;
+        case ScreenType::SCALE:   s_.currentScale   = s_.lastEditedScale; break;
+        default: break;
     }
 }
 
@@ -216,6 +237,12 @@ bool InputDispatcher::on_globals_screen() const {
            s_.sendEditor.isOpen;
 }
 
+int InputDispatcher::physical_for_role(Role role) const {
+    const int v[4] = {s_.settings.btnEdit, s_.settings.btnOption, s_.settings.btnPlay,
+                      s_.settings.btnShift};
+    return clamp(v[static_cast<size_t>(role)], 0, 3);
+}
+
 CursorContext InputDispatcher::cursor_context() const {
     const ScreenHandler* h = screen();
     if (!h || !h->context) return cc::none();
@@ -256,18 +283,6 @@ void InputDispatcher::run_mapped_cc_dirty() {
     mappedCcSeen_ = writes;
 
     mark_dirty_and_arm_autosave();   // once a frame, however many messages
-}
-
-// ─── MIDI learn — hold R, turn a knob ────────────────────────────────────────────────────────────
-
-void InputDispatcher::on_r_held(bool down) {
-    rAloneSinceMs_ = down ? now_ms_ : -1;
-    if (!down) host_.set_midi_learn_armed(false);   // at once; arming waits for `set_now`
-}
-
-void InputDispatcher::on_r_combo_press() {
-    rAloneSinceMs_ = -1;
-    host_.set_midi_learn_armed(false);
 }
 
 songcore::MapTarget InputDispatcher::map_target() const {

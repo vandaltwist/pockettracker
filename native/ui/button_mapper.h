@@ -2,6 +2,22 @@
 
 // The combo matrix: a button event plus the modifiers held at that instant → one named handler.
 // A template so a test can drive it with a recording stub; in the app `Dispatcher` is `InputDispatcher`.
+//
+// ── The M8 layout ────────────────────────────────────────────────────────────────────────────────
+// Four buttons, printed OPTION / EDIT / SHIFT / PLAY, arriving as A / B / Y / X:
+//
+//     OPTION = A = M     CANCEL / EXIT        → the dispatcher's historical `b` handlers
+//     EDIT   = B = J     CONFIRM / EDIT       → the dispatcher's historical `a` handlers
+//     SHIFT  = Y = N     the modifier         → `y`
+//     PLAY   = X = K     the transport        → `x`
+//
+// ⚠️ Every `a` and `b` below is a ROLE, not a physical button: `role_of()` trades A and B on the way in
+// and `m.a`/`m.b` with it. The whole screen layer (ui/dispatch/) therefore stays on one convention —
+// `Gesture::A` is EDIT (validate, edit, insert) and `Gesture::B` is OPTION (cancel, exit, which item) —
+// and a screen never has to know which physical button sent it.
+//
+// ⚠️ The mods INCLUDE the button being pressed (shell/sdl/sdl-input.cpp sets the flag before queueing),
+// so a plain press tests the OTHER roles only: `!m.a && !m.y && !m.x` for OPTION, never `!m.b`.
 
 #include "ui/buttons.h"
 
@@ -11,72 +27,68 @@ namespace pt::ui {
 
 // The mapper's memory between events.
 struct MapperState {
-    uint64_t lastAPress = 0;   // the A,A window
-
-    // A went down on a cell whose A opens something but whose A+DPAD / A+B means something else: the
-    // open waits for A's release, and any A-combo meanwhile cancels it.
-    bool aPressedAlone = false;
-
-    // The same for B where it both closes and is a modifier (the EQ editor's slot cycle).
-    bool bPressedAlone = false;
-
-    // R+A / R+B changed the mix on the press; R released first keeps it, A/B first reverts it.
-    bool rComboArmed = false;
-
-    // SELECT went down alone; any other press clears it, so help fires on release only for a bare tap
-    // (on the file browser SELECT is a modifier).
-    bool selectPressedAlone = false;
+    uint64_t lastAPress = 0;   // the EDIT,EDIT window
 };
 
-// ⚠️ The order of the checks is the specification: most specific first, each arm returns. L+B+A before
-// L+A, A+B before A, R+A / R+B before A and B.
+// ⚠️ The order of the checks is the specification: most specific first, each arm returns. EDIT+SHIFT+
+// OPTION before SHIFT+EDIT and SHIFT+OPTION, EDIT+OPTION before EDIT, EDIT+DPAD before EDIT.
 // ⚠️ Modifiers come from the event, never a poll: a frame's events arrive at once, and a poll would
-// see the frame's end (B-then-A in one frame would delete on the B press).
+// see the frame's end (OPTION-then-EDIT in one frame would cancel on the OPTION press).
 template <class Dispatcher>
 void handle_button(const ButtonEvent& e, Dispatcher& d, MapperState& ms, uint64_t now) {
-    const ButtonMods& m = e.mods;
+    // Quel role logique le bouton physique e.button joue-t-il, selon le mappage reglage (settings) ?
+    // Seuls les boutons faces A/B/X/Y sont remappables ; un D-pad reste tel quel.
+    Role roleOfPhysical[4];
+    for (int r = 0; r < 4; ++r)
+        roleOfPhysical[d.physical_for_role(static_cast<Role>(r))] = static_cast<Role>(r);
+    const int face = face_index(e.button);
+    const Button button = (face >= 0)
+        ? role_button(roleOfPhysical[static_cast<size_t>(face)])
+        : e.button;
 
-    // R's state for MIDI learn ("hold R, turn a knob"). ⚠️ Above every early return, or R could stay held.
-    if (e.button == Button::R_SHIFT) d.on_r_held(e.action == ButtonAction::PRESSED);
-    // A press with R held is a combo (R+DPAD switches screens): that hold never learns.
-    else if (e.action == ButtonAction::PRESSED && m.r) d.on_r_combo_press();
-    // A's state for what is drawn while it is held. Above every early return too.
-    if (e.button == Button::A) d.on_a_held(e.action == ButtonAction::PRESSED);
+    // Les modificateurs se lisent sur le bouton physique de chaque role (et non sur le bouton presse).
+    auto mod_held = [](const ButtonMods& mods, int physical) {
+        switch (physical) {
+            case 0: return mods.a;
+            case 1: return mods.b;
+            case 2: return mods.x;
+            default: return mods.y;
+        }
+    };
+    ButtonMods m{
+        mod_held(e.mods, d.physical_for_role(Role::EDIT)),
+        mod_held(e.mods, d.physical_for_role(Role::OPTION)),
+        mod_held(e.mods, d.physical_for_role(Role::PLAY)),
+        mod_held(e.mods, d.physical_for_role(Role::SHIFT)),
+    };
+
+    // EDIT's state for what is drawn while it is held. Above every early return too.
+    if (button == Button::A) d.on_a_held(e.action == ButtonAction::PRESSED);
 
     // ── Release ──────────────────────────────────────────────────────────────────────────────────
     if (e.action != ButtonAction::PRESSED) {
-        // The mute/solo chord ends on a release and consumes it (an armed A must not reach
-        // `on_a_released()`). On the A/B release, `m.r` is "is R still down?".
-        if (ms.rComboArmed) {
-            if (e.button == Button::R_SHIFT) {
-                ms.rComboArmed = false;
-                d.on_r_combo_commit();
+        // A MUTE/SOLO chord ends on a release: OPTION up first keeps what it did, SHIFT or PLAY up
+        // first puts the mix back.
+        if (d.mute_chord_armed()) {
+            if (button == Button::B) {
+                d.on_mute_chord_commit();
                 return;
             }
-            if ((e.button == Button::A || e.button == Button::B) && m.r) {
-                ms.rComboArmed = false;
-                d.on_r_combo_revert();
+            if (button == Button::Y || button == Button::X) {
+                d.on_mute_chord_revert();
                 return;
             }
         }
-        if (e.button == Button::A) {
-            if (ms.aPressedAlone) {   // no A-combo intervened: the deferred A fires now
-                ms.aPressedAlone = false;
+        if (button == Button::A) {
+            if (d.a_pressed_alone()) {
+                d.set_a_pressed_alone(false);
                 d.on_button_a();
             }
-            d.on_a_released();        // the FX helper commits here
+            d.on_a_released();   // the FX helper commits here
         }
-        if (e.button == Button::B) {
-            if (ms.bPressedAlone) {
-                ms.bPressedAlone = false;
-                d.on_button_b();
-            }
-        }
-        if (e.button == Button::SELECT) {
-            if (ms.selectPressedAlone) {
-                ms.selectPressedAlone = false;
-                d.on_select();
-            }
+        if (button == Button::B) {
+            // OPTION deferred to release (EQ editor): fire it now.
+            if (d.defer_b_to_release()) d.on_button_b();
         }
         return;
     }
@@ -84,129 +96,105 @@ void handle_button(const ButtonEvent& e, Dispatcher& d, MapperState& ms, uint64_
     // The full help overlay: any press closes it and is consumed — it covers the editor, so a press
     // falling through would edit a cell nobody can see. An audition is still silenced.
     if (d.help_full_open()) {
-        ms.selectPressedAlone = false;
         d.on_help_dismiss();
-        if (e.button != Button::START && !m.a) d.on_stop_preview();
+        if (!m.a) d.on_stop_preview();
         return;
     }
 
-    // Any press but SELECT puts the compact panel away and falls through — it swallows nothing.
-    if (e.button != Button::SELECT) {
-        ms.selectPressedAlone = false;   // SELECT is a modifier here, not a tap
-        d.on_help_dismiss();
-    }
-
-    // Any plain press silences an audition; START and A-combos (edits stay audible) do not.
-    if (e.button != Button::START && !m.a) d.on_stop_preview();
-
-    // ── A + … ────────────────────────────────────────────────────────────────────────────────────
-    if (m.a && !m.l && !m.r) {
-        switch (e.button) {
-            // Each cancels the deferred A: it was a combo.
-            case Button::B:          ms.aPressedAlone = false; d.on_a_b();     return;   // delete / reset
-            case Button::DPAD_UP:    ms.aPressedAlone = false; d.on_a_up();    return;   // +16 / +1 octave (or the FX helper)
-            case Button::DPAD_DOWN:  ms.aPressedAlone = false; d.on_a_down();  return;   // −16 / −1 octave
-            case Button::DPAD_RIGHT: ms.aPressedAlone = false; d.on_a_right(); return;   // +1
-            case Button::DPAD_LEFT:  ms.aPressedAlone = false; d.on_a_left();  return;   // −1
-            case Button::START:      ms.aPressedAlone = false; d.on_a_start(); return;   // audition
-            default: break;
-        }
-    }
-
-    // ── SELECT + … : the file browser's chords ───────────────────────────────────────────────────
-    // ⚠️ The mods include the button being pressed: on SELECT+R, R's press has already set `m.r`.
-    if (m.select && !m.l && (!m.r || e.button == Button::R_SHIFT)) {
-        switch (e.button) {
-            case Button::A:       d.on_select_a(); return;   // rename     (opens the keyboard)
-            case Button::B:       d.on_select_b(); return;   // delete     (arms the confirm)
-            case Button::R_SHIFT: d.on_select_r(); return;   // new folder (opens the keyboard)
-            default: break;
-        }
-    }
-
-    // ── B + DPAD: which item ─────────────────────────────────────────────────────────────────────
-    if (m.b && !m.l && !m.r && !m.a) {
-        switch (e.button) {
-            // Each cancels the deferred B, or B+RIGHT in the EQ editor would close it on release.
-            case Button::DPAD_LEFT:  ms.bPressedAlone = false; d.on_b_left();  return;   // prev item / EQ slot −1
-            case Button::DPAD_RIGHT: ms.bPressedAlone = false; d.on_b_right(); return;   // next item / EQ slot +1
-            case Button::DPAD_UP:    ms.bPressedAlone = false; d.on_b_up();    return;   // SONG / pool: page up
-            case Button::DPAD_DOWN:  ms.bPressedAlone = false; d.on_b_down();  return;   // SONG / pool: page down
-            default: break;
-        }
-    }
-
-    // ── L+R: leave selection mode ────────────────────────────────────────────────────────────────
-    if (m.l && m.r) {
-        switch (e.button) {
-            case Button::SELECT:   // reserved: consumed, not passed down
-            case Button::A:
-            case Button::B:       return;
-            case Button::L_SHIFT:
-            case Button::R_SHIFT: d.on_l_r(); return;
-            default: break;
-        }
-    }
-
-    // ── L+B+A: clone — before L+A, which would paste ─────────────────────────────────────────────
-    if (m.l && m.b && !m.r && e.button == Button::A) {
-        d.on_l_b_a();
+    // ── SHIFT alone: the cell help (the old SELECT) ───────────────────────────────────────────────
+    // ⚠️ Before `on_help_dismiss()`: that clears the panel on every press, so a toggle after it could
+    // only ever open. SHIFT does nothing else alone — its jobs are all with another button.
+    if (button == Button::Y && !m.a && !m.b && !m.x) {
+        d.on_help_toggle();
         return;
     }
 
-    // ── L + … : selection and the clipboard ──────────────────────────────────────────────────────
-    if (m.l && !m.r) {
-        switch (e.button) {
-            case Button::A:     d.on_l_a(); return;   // cut (in a selection) / paste (outside one)
-            case Button::B:     d.on_l_b(); return;   // enter selection, then widen it
-            case Button::START: d.on_l_start(); return;   // LIVE's row queue; never play/stop
-            default: break;
+    // Any press puts the panel away and falls through — it swallows nothing.
+    d.on_help_dismiss();
+
+    // Any plain press silences an audition; EDIT-combos (edits stay audible) do not.
+    if (!m.a) d.on_stop_preview();
+
+    // ── EDIT + SHIFT + OPTION: clone — before everything else ─────────────────────────────────────
+    if (m.a && m.y && m.b && button == Button::A) {
+        d.on_a_y_b();
+        return;
+    }
+
+    // ── SHIFT + EDIT: paste (interpolate in a selection) ──────────────────────────────────────────
+    if (m.y && m.a && button == Button::A) {
+        d.on_y_a();
+        return;
+    }
+
+    // ── SHIFT + OPTION: selection mode ────────────────────────────────────────────────────────────
+    if (m.y && m.b && button == Button::B) {
+        d.on_y_b();
+        return;
+    }
+
+    // ── OPTION + SHIFT: MUTE (OPTION was down first — SHIFT first is the selection above) ─────────
+    if (button == Button::Y && m.b && !m.a) {
+        d.on_mute_chord(/*solo=*/false);
+        return;
+    }
+
+    // ── OPTION + SHIFT + PLAY: every track audible again ─────────────────────────────────────────
+    if (button == Button::X && m.b && m.y && !m.a) {
+        d.on_mute_clear();
+        return;
+    }
+
+    // ── OPTION + PLAY: SOLO ──────────────────────────────────────────────────────────────────────
+    if (button == Button::X && m.b && !m.y && !m.a) {
+        d.on_mute_chord(/*solo=*/true);
+        return;
+    }
+
+    // ── EDIT + … ──────────────────────────────────────────────────────────────────────────────────
+    if (m.a && !m.y) {
+        // EDIT+OPTION: delete / cut / reset — whichever of the two came second.
+        if (m.b) {
+            d.on_a_b();
+            return;
         }
-        // L + a direction fills rows — L alone, so a held clipboard chord cannot fire it.
-        if (!m.a && !m.b && !m.select) {
-            switch (e.button) {
-                case Button::DPAD_UP:    d.on_l_up();    return;
-                case Button::DPAD_DOWN:  d.on_l_down();  return;
-                case Button::DPAD_LEFT:  d.on_l_left();  return;
-                case Button::DPAD_RIGHT: d.on_l_right(); return;
-                default: break;
-            }
+        switch (button) {
+            case Button::DPAD_UP:    d.on_a_up();    return;   // +16 / +1 octave
+            case Button::DPAD_DOWN:  d.on_a_down();  return;   // −16 / −1 octave
+            case Button::DPAD_RIGHT: d.on_a_right(); return;   // +1
+            case Button::DPAD_LEFT:  d.on_a_left();  return;   // −1
+            case Button::X:          d.on_x_a();     return;   // EDIT+PLAY: audition
+            default: break;
         }
     }
 
-    // ── R + DPAD: move between screens ───────────────────────────────────────────────────────────
-    if (m.r && !m.l) {
-        switch (e.button) {
-            case Button::DPAD_UP:    d.on_r_up();    return;
-            case Button::DPAD_DOWN:  d.on_r_down();  return;
-            case Button::DPAD_LEFT:  d.on_r_left();  return;
-            case Button::DPAD_RIGHT: d.on_r_right(); return;
-            // MUTE and SOLO. ⚠️ Both arm the latch even where nothing happens: a chord armed on SONG
-            // and released on MIXER must still be closed out.
-            case Button::A:          d.on_r_a(); ms.rComboArmed = true; return;
-            case Button::B:          ms.bPressedAlone = false; d.on_r_b(); ms.rComboArmed = true; return;
-            // ⚠️ R arriving second: half the time B lands first. Where R+B mutes, B is held
-            // (`defer_b_to_release`) so it can still be claimed here — `bPressedAlone`, not `m.b`,
-            // because a B that already acted must not also be a chord.
-            case Button::R_SHIFT:
-                if (ms.bPressedAlone) {
-                    ms.bPressedAlone = false;
-                    d.on_r_b();
-                    ms.rComboArmed = true;
-                }
-                return;
-            case Button::START:      d.on_r_start(); return;   // LIVE's stop; the song from below SONG
+    // ── OPTION + DPAD: which item / page ─────────────────────────────────────────────────────────
+    if (m.b && !m.a && !m.y) {
+        switch (button) {
+            case Button::DPAD_LEFT:  d.on_b_left();  return;   // prev item / EQ slot −1
+            case Button::DPAD_RIGHT: d.on_b_right(); return;   // next item / EQ slot +1
+            case Button::DPAD_UP:    d.on_b_up();    return;   // SONG / pool: page up
+            case Button::DPAD_DOWN:  d.on_b_down();  return;   // SONG / pool: page down
             default: break;
         }
     }
 
-    // ── A, and the A,A double-tap (300 ms) ───────────────────────────────────────────────────────
-    if (e.button == Button::A && !m.l && !m.r) {
-        // Defer first; a deferred cell is never a double-tap cell, so the window is cleared.
+    // ── SHIFT + DPAD: move between screens / cycle sort / zoom / step section ─────────────────────
+    if (m.y && !m.a && !m.b) {
+        switch (button) {
+            case Button::DPAD_UP:    d.on_y_up();    return;
+            case Button::DPAD_DOWN:  d.on_y_down();  return;
+            case Button::DPAD_LEFT:  d.on_y_left();  return;
+            case Button::DPAD_RIGHT: d.on_y_right(); return;
+            default: break;
+        }
+    }
+
+    // ── EDIT, and the EDIT,EDIT double-tap (300 ms) ───────────────────────────────────────────────
+    if (button == Button::A && !m.y && !m.b) {
         if (d.defer_a_to_release()) {
-            ms.aPressedAlone = true;
-            ms.lastAPress    = 0;
-            d.on_a_deferred();   // a deferred tap aimed at the playhead reads it now
+            d.set_a_pressed_alone(true);
+            d.on_a_deferred();
             return;
         }
         if (now - ms.lastAPress < 300) {
@@ -219,27 +207,35 @@ void handle_button(const ButtonEvent& e, Dispatcher& d, MapperState& ms, uint64_
         return;
     }
 
-    // ── B ────────────────────────────────────────────────────────────────────────────────────────
-    if (e.button == Button::B && !m.l && !m.r && !m.a) {
-        if (d.defer_b_to_release()) {
-            ms.bPressedAlone = true;
-            return;
-        }
+    // ── PLAY + OPTION: arm delete (file browser) ─────────────────────────────────────────────────
+    if (m.x && !m.a && !m.y && button == Button::B) {
+        d.on_x_b();
+        return;
+    }
+
+    // ── OPTION alone: cancel / exit ───────────────────────────────────────────────────────────────
+    if (button == Button::B && !m.a && !m.y && !m.x) {
+        if (d.defer_b_to_release()) return;
         d.on_button_b();
         return;
     }
 
-    // Before the no-modifier guard: SELECT's own press sets `m.select`. SELECT only arms here.
-    if (e.button == Button::SELECT && !m.l && !m.r && !m.a && !m.b) {
-        ms.selectPressedAlone = true;
+    // ── PLAY alone: the transport ────────────────────────────────────────────────────────────────
+    if (button == Button::X && !m.a && !m.b && !m.y) {
+        d.on_button_x();
         return;
     }
-    if (e.button == Button::START && !m.l && !m.r && !m.a && !m.b && !m.select) { d.on_start(); return; }
+
+    // ── SHIFT + PLAY: play the song from the cursor ───────────────────────────────────────────────
+    if (button == Button::X && m.y && !m.a && !m.b) {
+        d.on_y_x();
+        return;
+    }
 
     // ── The plain D-pad ──────────────────────────────────────────────────────────────────────────
-    if (m.l || m.r || m.a || m.b || m.select) return;
+    if (m.a || m.b || m.x || m.y) return;
 
-    switch (e.button) {
+    switch (button) {
         case Button::DPAD_UP:    d.on_dpad_up();    break;
         case Button::DPAD_DOWN:  d.on_dpad_down();  break;
         case Button::DPAD_LEFT:  d.on_dpad_left();  break;

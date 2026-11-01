@@ -42,7 +42,7 @@ std::string confirm_dialog_title(ConfirmDialogState::Kind kind) {
 }
 
 void draw_confirm_box(Canvas& c, const std::string& title, const Theme& t) {
-    const std::string instruction = "A=YES  B=NO";
+    const std::string instruction = "EDIT=YES OPT=NO";
 
     draw_modal_box(c, BOX_X, BOX_Y, BOX_W, BOX_H, t);
 

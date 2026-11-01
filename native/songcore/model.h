@@ -56,19 +56,26 @@ inline std::string default_table_name(int id)      { return "TBL"  + hex2(id); }
 enum class ModType { NONE, AHD, ADSR, LFO, DRUM, TRIG, TRACKING, SCALAR };
 enum class ModDest {
     NONE, VOLUME, PAN, PITCH, FINE_PITCH, FILTER_CUTOFF, FILTER_RES,
-    SAMPLE_START, MOD_AMT, MOD_RATE, MOD_BOTH
+    SAMPLE_START, MOD_AMT, MOD_RATE, MOD_BOTH,
+    // Granular (MOONGRANULAR) �?" grain params and scan position.
+    GRAIN_SIZE, GRAIN_PITCH, GRAIN_DENSITY, GRAIN_COUNT, SCAN_POS,
+    ENV_ATTACK, ENV_DECAY, ENV_SUS, ENV_REL,
+    LFO_RATE, LFO_DEPTH
 };
 // SAMPLER and SOUNDFONT play in the engine; EXTERNAL leaves as MIDI (midi_out.h).
 // ⚠️ EXTERNAL STAYS LAST: a build without MIDI hides it by cycling over one type fewer.
-enum class InstrumentType { SAMPLER, SOUNDFONT, EXTERNAL };
+enum class InstrumentType { SAMPLER, GRANULAR, SOUNDFONT, EXTERNAL };
 
 // Each enum's names, in enum order: index 0 also answers for an out-of-range value.
 inline constexpr const char* MOD_TYPE_NAMES[] = {"NONE", "AHD", "ADSR", "LFO", "DRUM", "TRIG",
                                                  "TRACKING", "SCALAR"};
 inline constexpr const char* MOD_DEST_NAMES[] = {"NONE", "VOLUME", "PAN", "PITCH", "FINE_PITCH",
                                                  "FILTER_CUTOFF", "FILTER_RES", "SAMPLE_START",
-                                                 "MOD_AMT", "MOD_RATE", "MOD_BOTH"};
-inline constexpr const char* INSTRUMENT_TYPE_NAMES[] = {"SAMPLER", "SOUNDFONT", "EXTERNAL"};
+                                                 "MOD_AMT", "MOD_RATE", "MOD_BOTH",
+                                                 "GRAIN_SIZE", "GRAIN_PITCH", "GRAIN_DENSITY", "GRAIN_COUNT", "SCAN_POS",
+                                                 "ENV_ATTACK", "ENV_DECAY", "ENV_SUS", "ENV_REL",
+                                                 "LFO_RATE", "LFO_DEPTH"};
+inline constexpr const char* INSTRUMENT_TYPE_NAMES[] = {"SAMPLER", "MOONGRANULAR", "SOUNDFONT", "EXTERNAL"};
 
 // ⚠️ Display names, not the serialised ones above — swapping them widens the UI or breaks the file.
 // DRUM plays as AHD and TRIG as ADSR; TRK has no engine implementation yet; SCL's `amount` IS the
@@ -76,7 +83,9 @@ inline constexpr const char* INSTRUMENT_TYPE_NAMES[] = {"SAMPLER", "SOUNDFONT", 
 inline constexpr const char* MOD_TYPE_DISPLAY_NAMES[] = {"---", "AHD", "ADSR", "LFO", "DRUM", "TRIG",
                                                          "TRK", "SCL"};
 inline constexpr const char* MOD_DEST_DISPLAY_NAMES[] = {"---", "VOL", "PAN", "PITCH", "FINE", "CUT",
-                                                         "RES", "STA", "MOD A", "MOD R", "MOD B"};
+                                                        "RES", "STA", "MOD A", "MOD R", "MOD B",
+                                                        "G-SZ", "G-PT", "G-DN", "G-CN", "SCAN",
+                                                        "A", "D", "S", "R", "LFO R", "LFO D"};
 
 template <typename E, size_t N>
 inline const char* enum_name(E e, const char* const (&names)[N]) {
@@ -98,6 +107,8 @@ inline const char* mod_dest_display_name(ModDest d) { return enum_name(d, MOD_DE
 inline bool mod_type_from_name(const std::string& s, ModType& out) { return enum_from_name(s, MOD_TYPE_NAMES, out); }
 inline bool mod_dest_from_name(const std::string& s, ModDest& out) { return enum_from_name(s, MOD_DEST_NAMES, out); }
 inline bool instrument_type_from_name(const std::string& s, InstrumentType& out) {
+    // ⚠️ "MOONSET" was the v0.9.9.1-era GRANULAR display name, so files saved then still load.
+    if (s == "MOONSET") { out = InstrumentType::GRANULAR; return true; }
     return enum_from_name(s, INSTRUMENT_TYPE_NAMES, out);
 }
 
@@ -395,6 +406,26 @@ struct Instrument {
     int midiBendRange = MIDI_BEND_RANGE_DEFAULT;
     std::vector<MidiCcSlot> midiCC = std::vector<MidiCcSlot>(MIDI_CC_SLOTS);
 
+    // Granular (MOONGRANULAR): grains scheduled from the sample buffer. 0..255 byte params, like the
+    // sampler cells; the DSP path (Phase B) consumes them. Stored here so they persist and modulate.
+    struct GranularParams {
+        int grainSize     = 0x40;   // grain length
+        int grainDensity  = 0x80;   // grains per second
+        int grainPitch    = 0x80;   // per-grain pitch (0x80 = unity)
+        int grainCount    = 0x20;   // polyphony of grains
+        bool grainReverse = false;  // scan direction
+        int scanPos       = 0x00;   // read head position (0..255)
+        int scanSpeed     = 0x40;   // scan advance per grain
+        int envAttack     = 0x08;
+        int envDecay      = 0x20;
+        int envSustain    = 0xC0;
+        int envRelease     = 0x20;
+        int lfoRate       = 0x40;
+        int lfoDepth      = 0x00;
+        int lfoTarget     = 0;      // index into the granular param list above
+        int lfoShape      = 0;      // 0 sine, 1 tri, 2 saw, 3 square
+    } granular{};
+
     Instrument() = default;
     explicit Instrument(int id_) : id(id_), name(default_instrument_name(id_)) {}
 };
@@ -414,7 +445,7 @@ inline bool instrument_has_default_name(const Instrument& ins) {
 // ⚠️ A null `sampleFilePath` alone is not "free": a SoundFont instrument has one too.
 inline bool instrument_is_free(const Instrument& ins) {
     return !ins.sampleFilePath.has_value() && !ins.soundfontPath.has_value() &&
-           ins.instrumentType == InstrumentType::SAMPLER;
+           (ins.instrumentType == InstrumentType::SAMPLER || ins.instrumentType == InstrumentType::GRANULAR);
 }
 
 /** Does this instrument's event stream leave the process? Both consumers ask this one predicate, so

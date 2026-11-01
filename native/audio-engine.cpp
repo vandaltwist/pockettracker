@@ -2,6 +2,7 @@
 // EQ, meters and scopes, the bus setters, the offline render and the metronome. The sample pool,
 // the SoundFont bank, the table walk and the block itself are in the engine-*.cpp files beside it.
 #include "audio-engine.h"
+#include "audio-backend.h"
 #include "kissfft/kiss_fftr.h"
 #include "mods/mod-runner.h"
 #include "mods/modules/pitch-slide-module.h"
@@ -13,6 +14,9 @@
 #define PT_HAS_SSE_DENORMAL_CTRL 1
 #include <pmmintrin.h>  // FTZ/DAZ MXCSR macros for setFlushToZeroForCurrentThread
 #endif
+
+// Max seconds of record before auto-stop (guard against RAM runaway). Default 60s, overridable via VIZ SETTINGS > DURATION.
+int AudioEngine::MAX_RECORD_SECONDS = 60;
 
 SoundfontVoice sfVoices[SF_VOICE_COUNT];
 
@@ -51,9 +55,171 @@ void AudioEngine::setDeviceSampleRate(int sr) {
     busReplayRequested.store(true, std::memory_order_release);
 }
 
+// ─── Record ──────────────────────────────────────────────────────────────────────────────────────
+
+bool AudioEngine::startRecord(int deviceIndex) {
+    if (recordActive.load(std::memory_order_relaxed)) return false;   // already recording
+    // P1..P8 / M1: the app's own buses, no capture device to open.
+    const bool internalTap = deviceIndex >= INTERNAL_INPUT_BASE;
+    if (!internalTap && !backend_) return false;
+
+    // Free any previous record buffer.
+    if (recordBufL) { delete[] recordBufL; recordBufL = nullptr; }
+    if (recordBufR) { delete[] recordBufR; recordBufR = nullptr; }
+    recordCapacity = 0;
+    recordLength_.store(0, std::memory_order_relaxed);
+
+    // Allocate: 60 s @ 48 kHz stereo = ~27.6 MB mono / ~55 MB stereo. Guard against runaway.
+    const int maxFrames = SAMPLE_RATE * MAX_RECORD_SECONDS;
+    recordBufL = new (std::nothrow) float[maxFrames];
+    if (!recordBufL) return false;
+    recordBufR = new (std::nothrow) float[maxFrames];
+    if (!recordBufR) {
+        delete[] recordBufL;
+        recordBufL = nullptr;
+        return false;
+    }
+    recordCapacity   = maxFrames;
+    recordDeviceIndex = deviceIndex;
+
+    if (!internalTap && !backend_->openCapture(deviceIndex)) {
+        delete[] recordBufL; recordBufL = nullptr;
+        delete[] recordBufR; recordBufR = nullptr;
+        recordCapacity = 0;
+        recordDeviceIndex = -1;
+        return false;
+    }
+
+    // The audio thread starts copying this bus on its next block.
+    recordTapTrack.store(internalTap ? deviceIndex - INTERNAL_INPUT_BASE : -1, std::memory_order_release);
+    recordActive.store(true, std::memory_order_release);
+    recordPeak_.store(0.0f, std::memory_order_relaxed);
+    return true;
+}
+
+void AudioEngine::stopRecord() {
+    if (!recordActive.load(std::memory_order_relaxed)) return;
+    recordTapTrack.store(-1, std::memory_order_release);   // nothing more into the take
+    recordActive.store(false, std::memory_order_release);
+    // A count-in still ringing ends with the take.
+    if (countInEnd.load(std::memory_order_relaxed) >= 0) {
+        countInEnd.store(-1, std::memory_order_relaxed);
+        stopMetronome();
+    }
+    if (backend_) backend_->closeCapture();
+}
+
+int AudioEngine::startCountIn(int beats, int64_t framesPerBeat, bool click) {
+    if (beats <= 0 || framesPerBeat <= 0 || !recordActive.load(std::memory_order_relaxed)) return 0;
+    const int     lead  = click ? 512 : 0;   // the first click lands a block ahead, never in the past
+    const int64_t count = static_cast<int64_t>(beats) * framesPerBeat;
+    if (click) {
+        const int64_t start = globalFrameCounter.load(std::memory_order_relaxed) + lead;
+        countInEnd.store(start + count, std::memory_order_relaxed);
+        startMetronome(start, framesPerBeat);
+    }
+    const int64_t skip = static_cast<int64_t>(recordLength_.load(std::memory_order_relaxed)) + lead + count;
+    return static_cast<int>(std::min<int64_t>(skip, 0x7fffffff));
+}
+
+void AudioEngine::captureWriteImpl(const float* left, const float* right, int frames) {
+    if (!recordActive.load(std::memory_order_relaxed)) return;
+    if (!recordBufL || frames <= 0) return;
+
+    const int curLen = recordLength_.load(std::memory_order_relaxed);
+    const int space = recordCapacity - curLen;
+    const int write = std::min(frames, space);
+    if (write <= 0) return;   // buffer full
+
+    // Track the input peak for the live level meter.
+    float peak = 0.0f;
+    for (int i = 0; i < write; ++i) {
+        float a = left[i]; if (a < 0) a = -a;
+        if (a > peak) peak = a;
+        if (right) { float b = right[i]; if (b < 0) b = -b; if (b > peak) peak = b; }
+    }
+    recordPeak_.store(peak, std::memory_order_relaxed);
+
+    std::memcpy(recordBufL + curLen, left, static_cast<size_t>(write) * sizeof(float));
+    if (recordBufR && right) {
+        std::memcpy(recordBufR + curLen, right, static_cast<size_t>(write) * sizeof(float));
+    } else if (recordBufR) {
+        // Mono input: mirror to right.
+        for (int i = 0; i < write; ++i) recordBufR[curLen + i] = left[i];
+    }
+    recordLength_.store(curLen + write, std::memory_order_relaxed);
+}
+
+void AudioEngine::listInputDevices(std::vector<std::string>& out) {
+    out.clear();
+    if (backend_) backend_->listInputDevices(out);
+    // The app's own buses, always last and always in this order: P1..P8 then the master. Recording
+    // one of them resamples what the engine plays - no cable, no microphone, no ALSA round trip.
+    for (int t = 1; t <= 8; ++t) out.push_back("P" + std::to_string(t));
+    out.push_back("M1 MASTER");
+}
+
+bool AudioEngine::installRecord(int id, int skipFrames, float gainDb) {
+    const int total = recordLength_.load(std::memory_order_relaxed);
+    if (id < 0 || id >= 256) return false;
+    if (total <= 0 || !recordBufL) return false;
+    const int skip = std::max(0, std::min(skipFrames, total));
+    const int rl   = total - skip;
+    if (rl <= 0) return false;
+    const float gain = (gainDb == 0.0f) ? 1.0f : std::pow(10.0f, gainDb / 20.0f);
+
+    std::unique_lock<std::mutex> lock(sampleEditMutex);
+
+    // Allocate new buffers.
+    float* newL = new (std::nothrow) float[rl];
+    float* newR = nullptr;
+    if (!newL) return false;
+    if (recordBufR) {
+        newR = new (std::nothrow) float[rl];
+        if (!newR) {
+            delete[] newL;
+            return false;
+        }
+    }
+
+    auto copyGained = [&](float* dst, const float* src) {
+        if (gain == 1.0f) { std::memcpy(dst, src, static_cast<size_t>(rl) * sizeof(float)); return; }
+        for (int i = 0; i < rl; ++i) {
+            const float v = src[i] * gain;
+            dst[i] = v > 1.0f ? 1.0f : (v < -1.0f ? -1.0f : v);
+        }
+    };
+    copyGained(newL, recordBufL + skip);
+    if (newR && recordBufR) {
+        copyGained(newR, recordBufR + skip);
+    } else if (newR) {
+        for (int i = 0; i < rl; ++i) newR[i] = newL[i];
+    }
+
+    // Free any existing buffer in this slot first.
+    if (samples[id]) delete[] samples[id];
+    if (samplesRight[id]) delete[] samplesRight[id];
+    // Comme le reste du moteur : delete PUIS nullptr, sinon le prochain delete[] (edition, undo, autre
+    // record dans ce slot) libere deux fois le meme bloc -> "double free or corruption".
+    delete[] sampleBackups[id];        sampleBackups[id] = nullptr;
+    delete[] sampleBackupsRight[id];   sampleBackupsRight[id] = nullptr;
+    sampleBackupLengths[id] = 0;
+
+    samples[id].store(newL, std::memory_order_release);
+    samplesRight[id].store(newR, std::memory_order_release);
+    sampleLengths[id].store(rl, std::memory_order_release);
+    sampleGen[id].fetch_add(1);
+    sampleBitDepth[id] = 16;
+    sampleIsFloat[id] = true;
+
+    return true;
+}
+
 AudioEngine::~AudioEngine() {
     // ⚠️ First: a background preset load captures `this`.
     discardSoundfontLoad();
+
+    stopRecord();
 
     // The backend is destroyed before the engine, so no callback runs during this.
     for (int i = 0; i < 256; i++) {
@@ -67,6 +233,8 @@ AudioEngine::~AudioEngine() {
     delete[] sampleClipboardRight;
     delete[] fxPreviewBackup;
     delete[] fxPreviewBackupRight;
+    delete[] recordBufL;
+    delete[] recordBufR;
 }
 
 
@@ -898,9 +1066,25 @@ void AudioEngine::renderMetronome(float* output, int numFrames, int channelCount
 
     if (metroEpoch_ < 0 || metroBeatFrames_ <= 0) return;   // nothing is playing
 
+    // A record's count-in clicks whatever the metronome setting says, and stops exactly where the take
+    // starts: no click on the downbeat itself, that instant is the take's first frame.
+    float countGain = 0.0f;
+    const int64_t countEnd = countInEnd.load(std::memory_order_relaxed);
+    if (countEnd >= 0) {
+        const int64_t remain = countEnd - blockStartFrame;
+        if (remain <= 0) {
+            countInEnd.store(-1, std::memory_order_relaxed);
+            metronomeEpoch.store(-1, std::memory_order_relaxed);
+            metroClickPos_ = -1;
+            return;
+        }
+        if (remain < numFrames) numFrames = static_cast<int>(remain);
+        countGain = 0.7f;
+    }
+
     // The grid walks while silent, so switching on mid-take waits for the next beat.
-    const float gain = metronomeOn.load(std::memory_order_relaxed)
-                     ? metronomeGain.load(std::memory_order_relaxed) : 0.0f;
+    const float gain = std::max(countGain, metronomeOn.load(std::memory_order_relaxed)
+                                           ? metronomeGain.load(std::memory_order_relaxed) : 0.0f);
     if (gain <= 0.0f) {
         metroClickPos_ = -1;
         const int64_t ahead = blockStartFrame + numFrames - (metroEpoch_ + metroIndex_ * metroBeatFrames_);

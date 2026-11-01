@@ -36,9 +36,9 @@ GestureResult InputDispatcher::eq_layer(Gesture g) {
             break;
 
         // The transport and the audition are how an edit is heard while it is dialled.
-        case Gesture::START:
-        case Gesture::A_START:
-        case Gesture::SELECT:
+        case Gesture::X:
+        case Gesture::X_A:
+        case Gesture::Y:
             return GestureResult::PASS;
 
         // A plain A included: the editor's vocabulary is A+DPAD, A+B and B.

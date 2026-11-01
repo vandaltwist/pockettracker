@@ -288,6 +288,29 @@ class SongcoreHost {
     // An .sf2/.sf3 → instrument `id`, which becomes a SOUNDFONT slot.
     bool load_soundfont(int id, const std::string& path);
 
+    // Capture the last record buffer into instrument `id` as a new sampler slot.
+    // Returns true on success; the instrument is switched to SAMPLER if needed.
+    // `skipFrames` (the count-in) is dropped from the start; `gainDb` is the MIC GAIN.
+    bool record_capture(int id, int skipFrames = 0, float gainDb = 0.0f);
+
+    // Start recording on `deviceIndex`. Delegates to the engine/backend.
+    bool start_record(int deviceIndex);
+    // Right after start_record: `beats` quarter notes of count-in at the project's tempo, clicking if `click`.
+    // Returns the frames installRecord must skip (0 = start now).
+    int  begin_count_in(int beats, bool click);
+    // Stop a capture in progress. Delegates to the engine/backend.
+    bool stop_record();
+    int  record_length() const { return engine_ ? engine_->recordLength() : 0; }
+    float record_peak() const { return engine_ ? engine_->recordPeak() : 0.0f; }
+    const float* record_buffer_l() const { return engine_ ? engine_->recordBufferL() : nullptr; }
+    const float* record_buffer_r() const { return engine_ ? engine_->recordBufferR() : nullptr; }
+    bool is_recording() const { return engine_ && engine_->isRecording(); }
+
+    // Fill `out` with input device names the platform sees.
+    void listInputDevices(std::vector<std::string>& out) {
+        if (engine_) engine_->listInputDevices(out);
+    }
+
     // The last media load failed for lack of memory rather than a bad file.
     bool last_load_ran_out_of_memory() const;
 
@@ -311,6 +334,14 @@ class SongcoreHost {
 
     // The file's rate; 44100 for an empty slot (sample_edit.h).
     int sample_rate_of(int id) const { return original_sample_rate(engine_, routing_, id); }
+    void get_sample_data(int id, std::vector<float>& L, std::vector<float>& R) const {
+        if (!engine_) return;
+        const int len = engine_->getSampleLength(id);
+        if (len <= 0) return;
+        L.assign(len, 0.0f); R.assign(len, 0.0f);
+        engine_->getSampleData(id, L.data());
+        engine_->getSampleDataRight(id, R.data());
+    }
 
     // 0..1 while the sample sounds, else −1 — the waveform's playhead.
     float sample_playback_position(int id) const;

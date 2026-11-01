@@ -33,6 +33,9 @@ struct PhraseEditorState {
     std::function<bool(int, int)> isCellSelected = [](int, int) { return false; };
     Theme                   theme = theme_classic();
 
+    // A's copy confirmation: 0..255, lit at the cursor cell's top-right and faded out (ui/helpers.h).
+    int cursorFlashAlpha = 0;
+
     // How far up EFFECT_TYPES an FX-type cell may step (cc::effect_type).
     int effectTypeCount = songcore::EFFECT_TYPE_COUNT;
 

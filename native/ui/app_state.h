@@ -113,6 +113,13 @@ struct AppState {
     int currentPhrase     = 0;
     int currentChain      = 0;
     int currentInstrument = 0;
+    // Tampon (clipboard) par section : derniere cellule non vide cliquee.
+    int songClipboard   = -1;
+    int chainClipboard  = -1;
+    int chainClipboardTranspose = 0;   // transpose de la cellule chaine mise en cache
+    int phraseClipboard = -1;
+    int tableClipboard  = -1;
+    int poolClipboard   = -1;
     int currentTable      = 0;
     int currentGroove     = 0;
     int currentScale      = 0;   // which of the 16 slots the SCALE screen is showing, 0-15
@@ -129,6 +136,33 @@ struct AppState {
 
     // The queue markers' blink phase, 0..999 ms — handed in so a headless screenshot is repeatable.
     int blinkPhaseMs = 0;
+
+    // ── A's copy confirmation ────────────────────────────────────────────────────────────────────
+    // A on a filled grid cell copies it into the insert cache and lights a few pixels at the top-right
+    // of its cursor bar; they fade out. Nothing touches the project. `startMs` is `blinkPhaseMs` at the
+    // copy, so the fade stays inside one 1000 ms cycle.
+    struct CopyFlash {
+        int screen  = -1;   // static_cast<int>(ScreenType); -1 = never copied
+        int row     = -1;
+        int column  = -1;
+        int startMs = 0;
+    };
+    CopyFlash copyFlash{};
+
+    static constexpr int COPY_FLASH_MS  = 520;   // lit, then gone: about half a second
+    static constexpr int COPY_FLASH_LIT = 150;   // full brightness before the fade starts
+
+    int copy_flash_elapsed() const { return (blinkPhaseMs - copyFlash.startMs + 1000) % 1000; }
+    bool copy_flash_active() const {
+        return copyFlash.screen >= 0 && copy_flash_elapsed() < COPY_FLASH_MS;
+    }
+    // 0..255: full, then a linear fade.
+    int copy_flash_alpha() const {
+        if (!copy_flash_active()) return 0;
+        const int elapsed = copy_flash_elapsed();
+        if (elapsed <= COPY_FLASH_LIT) return 255;
+        return 255 * (COPY_FLASH_MS - elapsed) / (COPY_FLASH_MS - COPY_FLASH_LIT);
+    }
 
     // The TABLE row a voice is on, per FX column (−1 = not running). Read off the voice: a table runs
     // on its own clock, each column separately (ui/engine_feed.h).
@@ -301,9 +335,12 @@ struct AppState {
     int64_t freeRamBytes = 0;
 
     // ── "Last edited": where A,A searches from, and the defaults an insert takes ─────────────────
-    int           lastEditedPhrase     = 0;
-    int           lastEditedChain      = 0;
-    int           lastEditedTable      = 0;
+    int           lastEditedSongRow   = 0;
+    int           lastEditedPhrase    = 0;
+    int           lastEditedChain     = 0;
+    int           lastEditedTable     = 0;
+    int           lastEditedGroove    = 0;
+    int           lastEditedScale     = 0;
     int           lastEditedInstrument = 0;
     int           lastEditedTranspose  = 0;
     songcore::Note lastEditedNote      = songcore::Note::C4();

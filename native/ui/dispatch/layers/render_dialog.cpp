@@ -23,9 +23,9 @@ GestureResult InputDispatcher::render_dialog_layer(Gesture g) {
         case Gesture::A_LEFT:  render_dialog_edit(-1); break;
         case Gesture::A_RIGHT: render_dialog_edit(+1); break;
 
-        // R+UP/DOWN move the range to the previous or next part of the song.
-        case Gesture::R_UP:   render_dialog_step_section(-1); break;
-        case Gesture::R_DOWN: render_dialog_step_section(+1); break;
+        // Y+UP/DOWN move the range to the previous or next part of the song.
+        case Gesture::Y_UP:   render_dialog_step_section(-1); break;
+        case Gesture::Y_DOWN: render_dialog_step_section(+1); break;
 
         // A fires from the RENDER row alone; the rows above are A+DPAD.
         case Gesture::A:

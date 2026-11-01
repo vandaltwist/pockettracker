@@ -51,6 +51,18 @@ struct SettingsValues {
     // How the pad's face buttons are printed: 0 AUTO, 1 XBOX, 2 NINTENDO (ui::AbxyLayout).
     int  abxyIndex          = 0;
 
+    // Mapping des fonctions sur les boutons physiques (0=A, 1=B, 2=X, 3=Y).
+    // Default : EDIT=A, OPTION=B, PLAY=X, SHIFT=Y.
+    int  btnEdit   = 0;
+    int  btnOption = 1;
+    int  btnPlay   = 2;
+    int  btnShift  = 3;
+    // Fonction en cours de configuration sur la ligne BTN MAP (colonne 1).
+    int  btnMapSel = 0;
+
+    // Version du schema de settings (migration one-shot du mappage).
+    int  settingsVersion = 3;
+
     // On-screen buttons even with a pad attached. Its own flag: the layout list changes length with
     // a pad, so an index would change meaning.
     bool touchButtonsWithPad = false;
@@ -112,6 +124,17 @@ struct SettingsValues {
     std::string audioOutput   = "SYSTEM";
     int         audioOutIndex = 0;
     int         audioOutCount = 1;
+
+    // ── The sample editor's INPUT cell — the source REC captures from ────────────────────────────
+    // The device name ("P3", "M1 MASTER", "USB …"); "" = DEFAULT. ⚠️ A name, never an index: the
+    // list is rebuilt from the cards plugged in at boot, and the engine's own buses always come last.
+    std::string recordInput;
+
+    // AUDIO IN: the input device used for recording. Persisted as the name string.
+    std::string audioInputDevice = "OFF";
+    int         audioInputIndex  = 0;
+    int         audioInputCount  = 1;
+    std::vector<std::string> audioInputDevices;
 
     // ⚠️ VISUALIZER lives on the theme (`Theme::visualizerType`), carried across a theme change.
 

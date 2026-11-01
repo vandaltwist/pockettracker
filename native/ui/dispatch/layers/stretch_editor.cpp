@@ -1,5 +1,5 @@
 // The TSTRETCH box: SYNC's stretch settings over the sample editor, raised by A on the TSTRETCH cell.
-// It owns the buttons while it is up, but lets SELECT through — its cells have help.
+// It owns the buttons while it is up, but lets Y through — its cells have help.
 
 #include "ui/dispatch/dispatch_common.h"
 
@@ -29,13 +29,13 @@ GestureResult InputDispatcher::stretch_editor_layer(Gesture g) {
             }
             break;
 
-        // The editor's own START: it plays the sample as these settings would leave it.
-        case Gesture::START: sample_editor_audition(); break;
+        // The editor's own X: it plays the sample as these settings would leave it.
+        case Gesture::X: sample_editor_audition(); break;
 
         // The settings stay for APPLY on the FX row.
         case Gesture::B: se.stretchOpen = false; break;
 
-        case Gesture::SELECT:
+        case Gesture::Y:
             return GestureResult::PASS;
 
         default: break;

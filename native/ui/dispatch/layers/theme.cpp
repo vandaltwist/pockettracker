@@ -32,18 +32,15 @@ GestureResult InputDispatcher::theme_layer(Gesture g) {
         // ⚠️ No "are you sure": the live theme is the applied theme.
         case Gesture::B: close_theme_editor(); break;
 
-        // On a colour row: L+A locks it against a roll, R+A re-rolls it alone.
-        case Gesture::L_A: {
+        // On a colour row: Y+A locks it against a roll.
+// R+A re-rolls was removed with the shoulder buttons.
+        case Gesture::Y_A: {
             const int color = theme_color_index(es.cursorRow);
             if (color >= 0) es.locks.toggle(color);
             break;
         }
-        case Gesture::R_A:
-            if (theme_color_index(es.cursorRow) >= 0) theme_roll_palette(/*rowOnly=*/true);
-            break;
-
-        case Gesture::START:
-        case Gesture::SELECT:
+        case Gesture::X:
+        case Gesture::Y:
             return GestureResult::PASS;
 
         default: break;

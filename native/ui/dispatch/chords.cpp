@@ -1,4 +1,4 @@
-// The held-button chords: A, B, R and L with the D-pad, delete, MUTE and SOLO. The screen's handler is
+// The held-button chords: A, B and Y with the D-pad, delete, MUTE and SOLO. The screen's handler is
 // asked first (ui/dispatch/screens/); what is here runs when it passes the gesture on.
 
 #include "ui/dispatch/dispatch_common.h"
@@ -70,107 +70,10 @@ void InputDispatcher::on_b_right() { route(Gesture::B_RIGHT); }
 void InputDispatcher::on_b_up()    { route(Gesture::B_UP); }
 void InputDispatcher::on_b_down()  { route(Gesture::B_DOWN); }
 
-// ─── R + D-pad: move between screens — except on the modals ──────────────────────────────────────
+// ─── OPTION + SHIFT / OPTION + PLAY: MUTE and SOLO ───────────────────────────────────────────────
 //
-// ⚠️ The modals (browser, sample editor, EQ) answer R+DPAD themselves: a popup is not a grid cell, and
-// falling through would leave its state live on another screen.
-
-void InputDispatcher::on_r_up() {
-    if (route(Gesture::R_UP)) return;
-    go_to_screen(s_, navigate_up(nav_state_of(s_)));
-    s_.selection.exit();   // a selection belongs to the screen it was made on
-}
-
-void InputDispatcher::on_r_down() {
-    if (route(Gesture::R_DOWN)) return;
-    go_to_screen(s_, navigate_down(nav_state_of(s_)));
-    s_.selection.exit();
-}
-
-// ─── R+LEFT/R+RIGHT: carry the edited item across screens ────────────────────────────────────────
-//
-// SONG over chain 04 → R+RIGHT lands on chain 04: the departing cursor's ref becomes lastEdited and the
-// arriving screen jumps to it. ⚠️ Horizontal moves only, and only when the screen changes.
-void InputDispatcher::sync_last_edited_on_screen_switch(ScreenType from, ScreenType to) {
-    const Project& p = *s_.project;
-
-    switch (from) {
-        case ScreenType::PHRASE:
-            // currentScreen is still PHRASE, so cursor_context() is its cell. A -1 is clamped on arrival.
-            if (!cursor_context().capabilities.isEmpty) {
-                s_.lastEditedInstrument = p.phrases[static_cast<size_t>(s_.currentPhrase)]
-                                              .steps[static_cast<size_t>(s_.cursorRow)]
-                                              .instrument;
-            }
-            break;
-
-        case ScreenType::CHAIN: {
-            const int ref = p.chains[static_cast<size_t>(s_.currentChain)]
-                                .phraseRefs[static_cast<size_t>(s_.cursorRow)];
-            if (ref >= 0) s_.lastEditedPhrase = ref;
-            break;
-        }
-
-        case ScreenType::SONG: {
-            // The column is the track, 1-based; a track's chainRefs may be shorter than 256 rows.
-            const auto& refs = p.tracks[static_cast<size_t>(s_.cursorColumn - 1)].chainRefs;
-            if (s_.cursorRow < static_cast<int>(refs.size()) &&
-                refs[static_cast<size_t>(s_.cursorRow)] >= 0) {
-                s_.lastEditedChain = refs[static_cast<size_t>(s_.cursorRow)];
-            }
-            break;
-        }
-
-        default:
-            break;
-    }
-
-    switch (to) {
-        case ScreenType::PHRASE: s_.currentPhrase = s_.lastEditedPhrase; break;
-        case ScreenType::CHAIN:  s_.currentChain  = s_.lastEditedChain;  break;
-        case ScreenType::INSTRUMENT: {
-            // Clamp into the pool and mirror the clamped value back, so a captured -1 lands on 00.
-            const int last          = static_cast<int>(p.instruments.size()) - 1;
-            s_.currentInstrument    = std::min(last, std::max(0, s_.lastEditedInstrument));
-            s_.lastEditedInstrument = s_.currentInstrument;
-            break;
-        }
-        default:
-            break;
-    }
-}
-
-void InputDispatcher::on_r_left() {
-    if (route(Gesture::R_LEFT)) return;
-    const NavResult r = navigate_left(nav_state_of(s_));
-    if (r.screen != s_.currentScreen) sync_last_edited_on_screen_switch(s_.currentScreen, r.screen);
-    go_to_screen(s_, r);
-    s_.selection.exit();
-}
-
-void InputDispatcher::on_r_right() {
-    if (route(Gesture::R_RIGHT)) return;
-    const NavResult r = navigate_right(nav_state_of(s_));
-    // ⚠️ The NAV = SONG gate before the sync: a refused press must leave nothing behind.
-    if (!song_relative_entry_allowed(s_, r.screen)) return;
-    if (r.screen != s_.currentScreen) sync_last_edited_on_screen_switch(s_.currentScreen, r.screen);
-    go_to_screen(s_, r);
-    s_.selection.exit();
-}
-
-// ─── L+B / L+A: the selection and the clipboard — only the four grid screens answer them ─────────
-
-void InputDispatcher::on_l_b() { route(Gesture::L_B); }
-
-// ─── L + D-pad: fill rows — PHRASE answers it ────────────────────────────────────────────────────
-
-void InputDispatcher::on_l_up()    { route(Gesture::L_UP); }
-void InputDispatcher::on_l_down()  { route(Gesture::L_DOWN); }
-void InputDispatcher::on_l_left()  { route(Gesture::L_LEFT); }
-void InputDispatcher::on_l_right() { route(Gesture::L_RIGHT); }
-void InputDispatcher::on_l_a() { route(Gesture::L_A); }
-
-// ─── R+A / R+B: MUTE and SOLO ────────────────────────────────────────────────────────────────────
+// The chord acts on the press and stays armed: releasing OPTION first keeps what it did, releasing
+// SHIFT or PLAY first puts the mix back. That is the M8 rule, and it is why OPTION is the arm.
 
 void InputDispatcher::mute_solo_targets(int (&out)[8], int& count) const {
     count = 0;
@@ -206,9 +109,6 @@ void InputDispatcher::mute_solo_targets(int (&out)[8], int& count) const {
 }
 
 void InputDispatcher::toggle_mute_solo(bool solo) {
-    // A selection made earlier in this batch of events must count as older than this toggle.
-    run_selection_recency();
-
     int targets[8];
     int count = 0;
     mute_solo_targets(targets, count);
@@ -248,31 +148,35 @@ void InputDispatcher::restore_full_playback() {
     host_.push_globals();
 }
 
-void InputDispatcher::on_r_b() {
-    if (route(Gesture::R_B)) return;
-    if (!mute_solo_chord_live()) return;
-    toggle_mute_solo(/*solo=*/false);
-}
-
-void InputDispatcher::on_r_a() {
-    if (route(Gesture::R_A)) return;
-    if (!mute_solo_chord_live()) return;
-    toggle_mute_solo(/*solo=*/true);
-}
-
-// Is R+A/R+B a MUTE/SOLO here? Asked by the chord and by the deferred B alike.
+// Is OPTION+SHIFT / OPTION+PLAY a MUTE/SOLO here?
 bool InputDispatcher::mute_solo_chord_live() const {
     if (top_layer()) return false;   // a modal owns the buttons while it is up
-    return s_.currentScreen == ScreenType::SONG || s_.currentScreen == ScreenType::MIXER;
+    return s_.currentScreen == ScreenType::SONG || s_.currentScreen == ScreenType::MIXER ||
+           s_.currentScreen == ScreenType::EFFECTS;
 }
 
-void InputDispatcher::on_r_combo_commit() {
-    // R came up first, so what the chord did stands; the next chord takes a fresh snapshot.
+void InputDispatcher::on_mute_chord(bool solo) {
+    if (!mute_solo_chord_live()) return;
+    toggle_mute_solo(solo);
+    muteChordArmed_ = mixSnapshot_.live;
+}
+
+void InputDispatcher::on_mute_clear() {
+    restore_full_playback();
+    muteChordArmed_  = false;
     mixSnapshot_.live = false;
 }
 
-void InputDispatcher::on_r_combo_revert() {
-    if (!mixSnapshot_.live) return;   // the chord armed on a screen that has no channels
+void InputDispatcher::on_mute_chord_commit() {
+    // OPTION came up first: what the chord did stands.
+    muteChordArmed_   = false;
+    mixSnapshot_.live = false;
+}
+
+void InputDispatcher::on_mute_chord_revert() {
+    if (!muteChordArmed_) return;
+    muteChordArmed_ = false;
+    if (!mixSnapshot_.live) return;
     Project& p = host_.edit_project();
     for (int ch = 0; ch < MIX_CHANNELS; ++ch) {
         const songcore::MixChannelFlags f = songcore::mix_channel_flags(p, ch);
@@ -282,75 +186,6 @@ void InputDispatcher::on_r_combo_revert() {
     }
     mixSnapshot_.live = false;
     host_.push_globals();
-}
-
-unsigned InputDispatcher::selection_signature() const {
-    unsigned h = clip_.has_data() ? 1u : 0u;
-    h = h * 31u + static_cast<unsigned>(clip_.type());
-    h = h * 31u + static_cast<unsigned>(clip_.width());
-    h = h * 31u + static_cast<unsigned>(clip_.height());
-    h = h * 31u + (s_.selection.active ? 1u : 0u);
-    if (s_.selection.active) {
-        const SelectionBounds b = s_.selection.bounds();
-        h = h * 31u + static_cast<unsigned>(b.topLeftRow);
-        h = h * 31u + static_cast<unsigned>(b.topLeftColumn);
-        h = h * 31u + static_cast<unsigned>(b.bottomRightRow);
-        h = h * 31u + static_cast<unsigned>(b.bottomRightColumn);
-    }
-    return h;
-}
-
-void InputDispatcher::run_selection_recency() {
-    const unsigned sig = selection_signature();
-    if (sig == selectionSig_) return;
-    selectionSig_    = sig;
-    s_.lastClearable = AppState::Clearable::SELECTION;
-}
-
-void InputDispatcher::on_l_r() {
-    if (route(Gesture::L_R)) return;
-
-    // One press clears one thing, newest first: the mix, or the selection with its buffer. ⚠️ A rung
-    // with nothing to clear falls through to the other, or L+R reads as dead.
-    const bool mix_touched = [&] {
-        Project& p = host_.edit_project();   // the resolver hands out pointers; nothing is written here
-        for (int ch = 0; ch < MIX_CHANNELS; ++ch) {
-            const songcore::MixChannelFlags f = songcore::mix_channel_flags(p, ch);
-            if (f.mute && (*f.mute || *f.solo)) return true;
-        }
-        return false;
-    }();
-
-    if (s_.lastClearable == AppState::Clearable::MUTE && mix_touched) {
-        restore_full_playback();
-        return;
-    }
-
-    // Inside a selection: leave it, keep the buffer. Outside: clear the buffer (the top strip's readout).
-    if (s_.selection.active) {
-        s_.selection.exit();   // buffer untouched
-        return;
-    }
-
-    const bool had_buffer = !clip_.info().empty();
-    clip_.clear();
-
-    // Nothing to clear here, but the mix has something: take it.
-    if (!had_buffer && mix_touched) restore_full_playback();
-}
-
-// ─── SELECT + A / B / R: the browser's file chords — only its handler answers them ───────────────
-
-void InputDispatcher::on_select_a() { route(Gesture::SELECT_A); }
-void InputDispatcher::on_select_b() { route(Gesture::SELECT_B); }
-void InputDispatcher::on_select_r() { route(Gesture::SELECT_R); }
-
-// ─── L+B+A: clone — SONG, CHAIN and PHRASE answer it ─────────────────────────────────────────────
-
-void InputDispatcher::on_l_b_a() {
-    if (route(Gesture::L_B_A)) return;
-    // Below the sites: on every screen the chord ends the selection, after any clone.
-    s_.selection.exit();
 }
 
 }  // namespace pt::ui

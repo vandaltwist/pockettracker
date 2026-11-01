@@ -15,12 +15,42 @@ enum class Button {
     DPAD_RIGHT,
     A,
     B,
-    L_SHIFT,
-    R_SHIFT,
-    SELECT,
-    START,
+    X,
+    Y,
     COUNT
 };
+
+// Le role logique d'un bouton physique : ce qu'il signifie pour le reste de l'app.
+// EDIT  = valider / editer / inserer      (Gesture::A)
+// OPTION = annuler / quitter / quel item  (Gesture::B)
+// PLAY  = transport                       (Gesture::X)
+// SHIFT = modificateur                    (Gesture::Y)
+enum class Role { EDIT, OPTION, PLAY, SHIFT };
+
+// Le bouton logique (Gesture) associe a chaque role.
+inline Button role_button(Role r) {
+    switch (r) {
+        case Role::EDIT:   return Button::A;
+        case Role::OPTION: return Button::B;
+        case Role::PLAY:   return Button::X;
+        case Role::SHIFT:  return Button::Y;
+    }
+    return Button::A;
+}
+
+// Index 0..3 d'un role, pour indexer le tableau de mappage role -> bouton physique (A=0,B=1,X=2,Y=3).
+inline int role_index(Role r) { return static_cast<int>(r); }
+
+// Index 0..3 d'un bouton face (A=0, B=1, X=2, Y=3), -1 pour un bouton D-pad.
+inline int face_index(Button b) {
+    switch (b) {
+        case Button::A: return 0;
+        case Button::B: return 1;
+        case Button::X: return 2;
+        case Button::Y: return 3;
+        default: return -1;
+    }
+}
 
 enum class ButtonAction { PRESSED, RELEASED };
 
@@ -38,10 +68,8 @@ inline const char* button_name(Button b) {
         case Button::DPAD_RIGHT: return "DPAD_RIGHT";
         case Button::A:          return "A";
         case Button::B:          return "B";
-        case Button::L_SHIFT:    return "L";
-        case Button::R_SHIFT:    return "R";
-        case Button::SELECT:     return "SELECT";
-        case Button::START:      return "START";
+        case Button::X:          return "X";
+        case Button::Y:          return "Y";
         case Button::COUNT:      break;
     }
     return "?";
@@ -72,7 +100,7 @@ inline bool button_from_name(const char* name, Button& out) {
 // The modifiers down at the event's instant. ⚠️ Never resolve a combo from held flags: they describe
 // the end of the frame. Key repeats snapshot their own.
 struct ButtonMods {
-    bool a = false, b = false, l = false, r = false, select = false;
+    bool a = false, b = false, x = false, y = false;
 };
 
 struct ButtonEvent {

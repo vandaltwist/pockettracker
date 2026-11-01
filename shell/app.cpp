@@ -172,6 +172,8 @@ int SDLCALL on_app_event(void* userdata, SDL_Event* e) {
     c->dispatch->flush_autosave();
 
     // 3. Settings: on Android the save after the loop runs only on a real destroy.
+    //    The sample editor's INPUT cell lives in its own state: copied in so it is saved with the rest.
+    c->state->settings.recordInput = c->state->sampleEditor.recordInputDevice;
     switch (ui::save_settings_if_changed(*c->filesystem, c->state->settings, c->state->theme)) {
         using SW = ui::SettingsWrite;
         case SW::UNCHANGED: break;
@@ -281,6 +283,10 @@ void load_settings_and_config(ui::FileSystem& filesystem, ui::AppState& state, S
                      filesystem.settings_path().c_str());
     }
 
+    // The sample editor's INPUT cell: the source picked last session ("" = DEFAULT). The device list
+    // itself is rebuilt on demand — an unplugged name then falls back to DEFAULT.
+    state.sampleEditor.recordInputDevice = state.settings.recordInput;
+
     // config.json: seeded only when absent (the template states every current value). The binding
     // defaults come from here — pt-ui cannot name an SDL key or pad button.
     if (ui::seed_config_template(filesystem, SdlInput::default_keyboard_bindings(),
@@ -387,29 +393,31 @@ void open_midi_ports(const AppConfig& cfg, SongcoreHost& host, ui::InputDispatch
 
 // The help banner. ASCII only: the console's encoding is not ours.
 void print_key_help() {
-    std::printf("\nWASD/arrows move   K/Enter = A   J/Esc = B   U/I = L/R   LShift = SELECT   SPACE = START   F10 quit\n");
-    std::printf("A+LEFT/RIGHT edit   A+UP/DOWN edit fast   A+B clear   A,A insert next unused\n");
-    std::printf("B+LEFT/RIGHT change WHICH phrase/chain/table   B+UP/DOWN page the song\n");
-    std::printf("L+B select (tap again to widen)   B copies   L+A cut/paste   L+R deselect   L+B+A clone\n");
-    std::printf("A+UP on an FX-TYPE column opens the effect picker - release A to choose\n");
-    std::printf("R+DPAD moves between screens: SONG CHAIN PHRASE INSTRUMENT TABLE MODS INST.POOL\n");
-    std::printf("                             GROOVE MIXER EFFECTS PROJECT SETTINGS\n");
-    std::printf("PROJECT: A on SAVE/LOAD/NEW, on EXPORT MIX/STEMS, on COMPACT SEQ/INST, on SETTINGS>, on EXIT\n");
-    std::printf("         A on NAME opens the keyboard; A+LEFT/RIGHT edits one character in place\n");
-    std::printf("         a confirm asks A=YES B=NO before anything destructive\n");
-    std::printf("START auditions the instrument on INSTRUMENT/POOL/MODS/TABLE - any button silences it\n");
-    std::printf("SELECT on the EFFECTS TIME row toggles delay sync (free ms <-> note divisions)\n");
-    std::printf("\nFILE BROWSER (A on INSTRUMENT's LOAD, or on the pool's NAME of an empty slot):\n");
-    std::printf("  A opens a folder or LOADS the file   B goes back   START auditions the file\n");
-    std::printf("  R+LEFT = up a directory   R+UP/DOWN = sort (name/date/size)   DPAD L/R = page\n");
-    std::printf("  SELECT+A rename   SELECT+B delete   SELECT+R new folder\n");
-    std::printf("  L+B select (again within 500ms = all)   B copies   L+A cut/paste   L+R cancel\n");
-    std::printf("KEYBOARD: DPAD picks a key   A types   B deletes   R+UP/DOWN = ABC/123 layout\n");
-    std::printf("          R+LEFT/RIGHT moves the text cursor   SELECT aborts   START applies\n");
-    std::printf("\nEQ EDITOR (A on any EQ cell: INSTRUMENT/POOL/MIXER master/EFFECTS REV+DLY/SAMPLE FX):\n");
-    std::printf("  DPAD UP/DOWN picks the param, LEFT/RIGHT the band   A+LEFT/RIGHT and A+UP/DOWN dial it\n");
-    std::printf("  A+B resets it   B+LEFT/RIGHT changes the EQ SLOT   B or SELECT closes\n");
-    std::printf("  START still auditions underneath, so you can sweep a band across a ringing note\n\n");
+    std::printf("\nOPTION/M = cancel   EDIT/J = validate   SHIFT/N = shift   PLAY/K = play   F10 quit\n");
+    std::printf("arrows/WASD move   EDIT+LEFT/RIGHT edit   EDIT+UP/DOWN edit fast   EDIT,EDIT insert next unused\n");
+    std::printf("EDIT+OPTION delete/cut   SHIFT+EDIT paste   SHIFT+OPTION selection   SHIFT+OPTION,EDIT clone\n");
+    std::printf("OPTION+LEFT/RIGHT change WHICH phrase/chain/table   OPTION+UP/DOWN page the song\n");
+    std::printf("EDIT+UP on an FX-TYPE column opens the effect picker - release EDIT to choose\n");
+    std::printf("SHIFT+DPAD moves between screens: SONG CHAIN PHRASE INSTRUMENT TABLE MODS INST.POOL\n");
+    std::printf("                                 GROOVE MIXER EFFECTS PROJECT SETTINGS\n");
+    std::printf("SHIFT+PLAY plays the song from the cursor   SHIFT alone = cell help\n");
+    std::printf("OPTION+SHIFT mute   OPTION+PLAY solo   OPTION+SHIFT+PLAY clear mutes and solos\n");
+    std::printf("PROJECT: EDIT on SAVE/LOAD/NEW, on EXPORT MIX/STEMS, on COMPACT SEQ/INST, on SETTINGS>, on EXIT\n");
+    std::printf("         EDIT on NAME opens the keyboard; EDIT+LEFT/RIGHT edits one character in place\n");
+    std::printf("         a confirm asks EDIT=YES OPTION=NO before anything destructive\n");
+    std::printf("EDIT+PLAY auditions the instrument on INSTRUMENT/POOL/MODS/TABLE - any button silences it\n");
+    std::printf("EDIT on the EFFECTS TIME row toggles delay sync (free ms <-> note divisions)\n");
+    std::printf("\nFILE BROWSER (EDIT on INSTRUMENT's LOAD, or on the pool's NAME of an empty slot):\n");
+    std::printf("  EDIT opens a folder or LOADS the file   OPTION quits   PLAY previews\n");
+    std::printf("  UP/DOWN move a row   LEFT/RIGHT top/bottom   OPTION+UP/DOWN eight at a time\n");
+    std::printf("  SHIFT+LEFT = up a directory   SHIFT+OPTION (or SHIFT+UP/DOWN) = sort name/date/size\n");
+    std::printf("  EDIT+OPTION delete   EDIT+PLAY rename   PLAY+OPTION new folder   SHIFT+EDIT cut/paste\n");
+    std::printf("KEYBOARD: DPAD picks a key   EDIT types   OPTION deletes   PLAY applies   SHIFT aborts\n");
+    std::printf("          SHIFT+UP/DOWN = ABC/123 layout   SHIFT+LEFT/RIGHT moves the text cursor\n");
+    std::printf("\nEQ EDITOR (EDIT on any EQ cell: INSTRUMENT/POOL/MIXER master/EFFECTS REV+DLY/SAMPLE FX):\n");
+    std::printf("  DPAD UP/DOWN picks the param, LEFT/RIGHT the band   EDIT+LEFT/RIGHT and EDIT+UP/DOWN dial it\n");
+    std::printf("  EDIT+OPTION resets it   OPTION+LEFT/RIGHT changes the EQ SLOT   OPTION closes\n");
+    std::printf("  PLAY still auditions underneath, so you can sweep a band across a ringing note\n\n");
 }
 
 // ─── The screen ──────────────────────────────────────────────────────────────────────────────────
@@ -939,6 +947,8 @@ void FrameLoop::handle_input(Uint64 now) {
 
     dispatch.set_now(static_cast<long long>(now));
 
+    dispatch.refresh_sample_record();
+
     ui::ButtonEvent be;
     while (input.poll(be)) {
         // ⚠️ Key repeat comes from input.tick(), with no SDL event behind it.
@@ -1038,9 +1048,9 @@ void FrameLoop::run_scripted_hooks(Uint64 now) {
     if ((autoplayMs || quitAfterMs) && firstFrameMs == 0) firstFrameMs = now;
     if (autoplayMs && !autoplayFired && now - firstFrameMs >= autoplayMs) {
         autoplayFired = true;
-        ui::handle_button({ui::Button::START, ui::ButtonAction::PRESSED, ui::ButtonMods{}}, dispatch,
+        ui::handle_button({ui::Button::X, ui::ButtonAction::PRESSED, ui::ButtonMods{}}, dispatch,
                           mapper, now);
-        std::printf("dev:     AUTOPLAY pressed START at %llu ms\n",
+        std::printf("dev:     AUTOPLAY pressed X at %llu ms\n",
                     static_cast<unsigned long long>(now - firstFrameMs));
         std::fflush(stdout);
     }
@@ -1162,8 +1172,11 @@ void FrameLoop::draw_frame(Uint64 now) {
         screen.video.invalidate_backbuffer(/*texture_lost=*/false);
         --resizeSettle;
     }
+    // ⚠️ A take running with the transport stopped is silent and takes no input: without this term the loop
+    // stops drawing as soon as the "RECORDING" status expires (~3 s) and the screen looks frozen until PLAY.
+    const bool recording = state.sampleEditor.recordActive;
     if (audible || audibleEdge || sawInput || !drewOnce || settling || metersFalling ||
-        timedWork || timedWorkEdge) {
+        timedWork || timedWorkEdge || recording) {
         layout.draw(screen.canvas, state);
         ++drawn;
 
@@ -1221,7 +1234,7 @@ void FrameLoop::print_status(Uint64 now) {
 // due, or animation steps twice in one frame and then not at all.
 void FrameLoop::pace_tick() {
     const Uint64 t    = SDL_GetTicks64();
-    const bool   busy = state.isPlaying || audibleEdge ||
+    const bool   busy = state.isPlaying || audibleEdge || state.sampleEditor.recordActive ||
                         (cfg.midiIn && cfg.midiIn->open_index() >= 0 && cfg.midiIn->polled()) ||
                         t - lastInputMs < QUIET_MS;
     Uint64 due = lastPollMs + (busy ? POLL_MS : POLL_IDLE_MS);
@@ -1450,6 +1463,7 @@ int run(const AppConfig& cfg) {
 
     // Saved once, here (a held A+UP repeats every 100 ms). Compared with the bytes on disk, not a dirty
     // flag, so an edit from any screen is saved.
+    state.settings.recordInput = state.sampleEditor.recordInputDevice;
     switch (ui::save_settings_if_changed(filesystem, state.settings, state.theme)) {
         using SW = ui::SettingsWrite;
         case SW::UNCHANGED: break;

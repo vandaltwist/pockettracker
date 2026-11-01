@@ -23,11 +23,10 @@ SDL_Rect to_sdl(const tl::LayoutRect& lr) { return SDL_Rect{lr.x, lr.y, lr.w, lr
 // against what loaded), the rest the plain square.
 SkinPiece piece_for(const Skin& skin, Button b, bool pressed) {
     switch (b) {
-        case Button::L_SHIFT:
-        case Button::R_SHIFT:
-            return pressed ? SkinPiece::BtnWidePressed : SkinPiece::BtnWideNormal;
         case Button::A:
-        case Button::B: {
+        case Button::B:
+        case Button::X:
+        case Button::Y: {
             const SkinPiece dark =
                 pressed ? SkinPiece::BtnSquarePressedDark : SkinPiece::BtnSquareNormalDark;
             if (skin.piece(dark)) return dark;
@@ -48,12 +47,10 @@ struct Portrait2Label {
 
 Portrait2Label label_for(Button b) {
     switch (b) {
-        case Button::L_SHIFT:    return {"L Shift",      false, true};
-        case Button::R_SHIFT:    return {"R Shift",      false, true};
         case Button::A:          return {"A",            true,  false};
         case Button::B:          return {"B",            true,  false};
-        case Button::SELECT:     return {"Sel",          false, false};
-        case Button::START:      return {"Start",        false, false};
+        case Button::X:          return {"X",            true,  false};
+        case Button::Y:          return {"Y",            true,  false};
         case Button::DPAD_UP:    return {"\xE2\x86\x91", true,  false};  // ↑ U+2191
         case Button::DPAD_DOWN:  return {"\xE2\x86\x93", true,  false};  // ↓ U+2193
         case Button::DPAD_LEFT:  return {"\xE2\x86\x90", true,  false};  // ← U+2190

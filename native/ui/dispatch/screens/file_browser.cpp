@@ -31,34 +31,35 @@ void end_selection(FileBrowserState& b) {
 GestureResult InputDispatcher::file_browser_screen(Gesture g) {
     FileBrowserState& fb = s_.fileBrowser;
     switch (g) {
-        // UP/DOWN move a row; LEFT/RIGHT page by a screenful.
+        // UP/DOWN move a row; LEFT/RIGHT jump to the top / bottom of the list.
         case Gesture::DPAD_UP:    browser_move_cursor(-1, /*page=*/false); break;
         case Gesture::DPAD_DOWN:  browser_move_cursor(+1, /*page=*/false); break;
-        case Gesture::DPAD_LEFT:  browser_move_cursor(-BROWSER_VISIBLE_ROWS, /*page=*/true); break;
-        case Gesture::DPAD_RIGHT: browser_move_cursor(+BROWSER_VISIBLE_ROWS, /*page=*/true); break;
+        case Gesture::DPAD_LEFT:  browser_jump_to_edge(/*bottom=*/false); break;
+        case Gesture::DPAD_RIGHT: browser_jump_to_edge(/*bottom=*/true);  break;
 
-        case Gesture::A:     browser_confirm(); break;
-        case Gesture::B:     browser_back(); break;
-        case Gesture::START: browser_audition(); break;
+        // OPTION + UP/DOWN: eight entries at a time.
+        case Gesture::B_UP:   browser_move_cursor(-8, /*page=*/true); break;
+        case Gesture::B_DOWN: browser_move_cursor(+8, /*page=*/true); break;
+
+        case Gesture::A:     browser_confirm(); break;    // EDIT: open a folder / load a file
+        case Gesture::B:     browser_back(); break;       // OPTION: quit the browser
+        case Gesture::X:     browser_audition(); break;   // PLAY: preview
 
         // An audition rings until stopped; scrolling must not stack them.
         case Gesture::STOP_PREVIEW: host_.stop_preview(); break;
 
-        // Help is the shared path's, which knows the panel has no room here.
-        case Gesture::SELECT: return GestureResult::PASS;
+        // SHIFT + OPTION: cycle the sort; SHIFT + UP/DOWN does the same either way.
+        case Gesture::Y_B:    browser_cycle_sort(+1); break;
+        case Gesture::Y_UP:   browser_cycle_sort(+1); break;
+        case Gesture::Y_DOWN: browser_cycle_sort(-1); break;
+        case Gesture::Y_LEFT: navigate_to_parent(fb, fs_); break;
 
-        // ⚠️ Not navigation: the browser is not a grid cell. Down a directory is A on a folder.
-        case Gesture::R_UP:   browser_cycle_sort(+1); break;
-        case Gesture::R_DOWN: browser_cycle_sort(-1); break;
-        case Gesture::R_LEFT: navigate_to_parent(fb, fs_); break;
+        case Gesture::Y_A: browser_cut_or_paste(); break;
 
-        case Gesture::L_B: browser_select(); break;
-        case Gesture::L_A: browser_cut_or_paste(); break;
-        case Gesture::L_R: end_selection(fb); break;
-
-        case Gesture::SELECT_A: browser_rename(); break;
-        case Gesture::SELECT_B: browser_arm_delete(); break;
-        case Gesture::SELECT_R: browser_new_folder(); break;
+        // EDIT + OPTION: delete (arms the confirm); EDIT + PLAY: rename; PLAY + OPTION: new folder.
+        case Gesture::A_B: browser_arm_delete(); break;
+        case Gesture::X_A: browser_rename(); break;
+        case Gesture::X_B: browser_new_folder(); break;
 
         default: break;   // every other gesture means nothing here
     }
@@ -66,6 +67,9 @@ GestureResult InputDispatcher::file_browser_screen(Gesture g) {
 }
 
 void InputDispatcher::browser_back() {
+    std::fprintf(stderr, "browser_back called, mode=%d sel=%d prev=%d\n",
+                 (int)s_.fileBrowser.mode, (int)s_.fileBrowser.selectionMode,
+                 (int)s_.previousScreen);
     FileBrowserState& fb = s_.fileBrowser;
 
     // B is the NO: it disarms any mode rather than leaving, so an accidental SELECT+A/B is harmless.
@@ -199,6 +203,16 @@ void InputDispatcher::browser_move_cursor(int delta, bool page) {
     } else if (b.cursor >= b.scroll + BROWSER_VISIBLE_ROWS) {
         b.scroll = b.cursor - BROWSER_VISIBLE_ROWS + 1;
     }
+}
+
+// ─── LEFT / RIGHT: the first or the last entry ───────────────────────────────────────────────────
+
+void InputDispatcher::browser_jump_to_edge(bool bottom) {
+    FileBrowserState& b = s_.fileBrowser;
+    const int         total = static_cast<int>(b.items.size());
+    if (total == 0) return;
+    b.cursor = bottom ? total - 1 : 0;
+    b.scroll = bottom ? std::max(0, total - BROWSER_VISIBLE_ROWS) : 0;
 }
 
 // ─── A: open a folder, or LOAD the file ──────────────────────────────────────────────────────────

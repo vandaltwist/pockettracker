@@ -31,9 +31,11 @@ enum class SettingsRow {
     METRONOME  = 16,   // ON / OFF, + VOL
     HELP       = 17,   // OFF / SHORT / FULL
     AUDIO_OUT  = 18,   // the output device (Windows)
+    AUDIO_IN   = 19,   // the input device for recording
+    BTN_MAP    = 20,   // mappage des fonctions EDIT / OPTION / PLAY / SHIFT sur les boutons A B X Y
 };
 
-inline constexpr int SETTINGS_ROW_COUNT = 19;
+inline constexpr int SETTINGS_ROW_COUNT = 21;
 
 // The order rows are drawn and walked; every SettingsRow exactly once.
 inline constexpr SettingsRow SETTINGS_DISPLAY_ORDER[SETTINGS_ROW_COUNT] = {
@@ -45,7 +47,8 @@ inline constexpr SettingsRow SETTINGS_DISPLAY_ORDER[SETTINGS_ROW_COUNT] = {
     SettingsRow::FOLDER,    SettingsRow::NOTE_PREV,
     SettingsRow::VISUALIZER, SettingsRow::HELP,     SettingsRow::THEME,
     SettingsRow::TEMPLATE,
-    SettingsRow::RESUME,    SettingsRow::TRACE,
+    SettingsRow::RESUME,    SettingsRow::TRACE,     SettingsRow::AUDIO_IN,
+    SettingsRow::BTN_MAP,
 };
 
 // Where `row` sits in the display order.
@@ -79,6 +82,7 @@ inline bool settings_row_visible(SettingsRow row, const PlatformCaps& caps) {
         case SettingsRow::AUDIO_OUT: return caps.audioOutputs;
         case SettingsRow::RESUME:    return caps.autosave;
         case SettingsRow::TRACE:     return caps.debug;
+        case SettingsRow::AUDIO_IN:  return caps.audioInput;
 
         // ⚠️ Never gate NAV: under NAV = SONG a phrase not in the song is reachable only by changing it.
         default: return true;
@@ -116,6 +120,7 @@ inline bool settings_row_has_second_column(SettingsRow row, const PlatformCaps& 
         case SettingsRow::BTN_VIBRO: // POW
         case SettingsRow::METRONOME: // VOL
         case SettingsRow::TEMPLATE:  // SAVE | CLEAR
+        case SettingsRow::BTN_MAP:   // fonction | bouton
             return true;
         default:                     return false;
     }

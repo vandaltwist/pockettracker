@@ -1,68 +1,31 @@
-// The plain buttons — A, B, SELECT, START — and LIVE mode's two chords.
+// The plain buttons — X, Y, A, B — and their combos.
 
 #include "ui/dispatch/dispatch_common.h"
 
 #include "songcore/traversal.h"
+#include "ui/navigation.h"
 #include "ui/song_pointer.h"
 
 namespace pt::ui {
 
 // ─── The plain buttons ───────────────────────────────────────────────────────────────────────────
 
-// A and B are the screen's: every screen's handler answers them (ui/dispatch/screens/).
-void InputDispatcher::on_button_a() { route(Gesture::A); }
-void InputDispatcher::on_button_b() { route(Gesture::B); }
-
-void InputDispatcher::on_select() {
-    if (route(Gesture::SELECT)) return;
-    // ⚠️ Bare SELECT is HELP, and arrives on the RELEASE (ui/button_mapper.h): on the browser SELECT is a
-    // modifier, and any other press cancels this. FULL opens the overlay; SHORT toggles the compact
-    // panel, which has no room on the FILE BROWSER.
-    switch (static_cast<HelpMode>(s_.settings.helpMode)) {
-        case HelpMode::OFF:
-            return;
-        case HelpMode::FULL:
-            s_.helpOpen = false;
-            s_.helpFull = true;
-            return;
-        case HelpMode::SHORT:
-            if (on_browser()) return;
-            s_.helpOpen = !s_.helpOpen;
-            return;
-    }
-}
-
-void InputDispatcher::on_help_dismiss() {
-    // ⚠️ The compact panel closes and the press still does its job; the FULL overlay's press is consumed
-    // by the mapper. Both flags go, so the two are never up together.
-    s_.helpOpen = false;
-    s_.helpFull = false;
-}
-
-// Each screen that can start an audition stops its own — under the confirm and the FX picker too.
-void InputDispatcher::on_stop_preview() { route(Gesture::STOP_PREVIEW); }
-
-void InputDispatcher::on_start() {
-    if (route(Gesture::START)) return;
-    // The transport — also under the THEME and EQ editors, so an edit is heard while it is dialled.
+// X is the transport: play/stop, what it plays depends on the screen.
+void InputDispatcher::on_button_x() {
+    if (route(Gesture::X)) return;
     if (host_.is_playing()) {
         host_.stop();
         return;
     }
     switch (s_.currentScreen) {
-        // SONG plays from the cursor row.
         case ScreenType::SONG:  host_.play_song(s_.cursorRow); break;
 
-        // CHAIN plays on its own track (fader, mute, FX), not channel 1; the remembered song cell breaks a
-        // tie.
         case ScreenType::CHAIN:
             host_.play_chain(s_.currentChain,
                              songcore::track_of_chain(*s_.project, s_.currentChain,
                                                       remembered_song_track()));
             break;
 
-        // No song cursor: the song from the top. MIDI too — its OFFSET and the mapping list's VAL are
-        // dialled against a playing song.
         case ScreenType::MIXER:
         case ScreenType::EFFECTS:
         case ScreenType::PROJECT:
@@ -70,7 +33,6 @@ void InputDispatcher::on_start() {
         case ScreenType::MIDI:
         case ScreenType::MIDI_MAP: host_.play_song(0); break;
 
-        // The rest play the phrase, through the chain on screen (one phrase may sit in five chains).
         default:
             host_.play_phrase(s_.currentPhrase,
                               songcore::track_of_phrase(*s_.project, s_.currentPhrase, s_.currentChain,
@@ -79,36 +41,87 @@ void InputDispatcher::on_start() {
     }
 }
 
-// LIVE mode's chords: SONG's handler answers them. L+START is reserved everywhere else.
-void InputDispatcher::on_l_start() { route(Gesture::L_START); }
+// Y is SHIFT: alone it is the cell help (the old SELECT); with a direction it changes screen.
+void InputDispatcher::on_button_y() { on_help_toggle(); }
 
-// Below SONG, where START plays one chain or phrase, R+START plays every track from the song row you
-// came through. ⚠️ A list, not a default: the chord reaches the browser and the sample editor too.
-void InputDispatcher::on_r_start() {
-    if (route(Gesture::R_START)) return;
+// SHIFT + PLAY: the whole song from the cursor's row — all tracks, not just the edited one. On SONG
+// that is the live cursor; on the other screens it is the song position they were last pointing at.
+void InputDispatcher::on_y_x() {
+    if (route(Gesture::Y_X)) return;
+    if (top_layer()) return;   // a dialog or editor owns the transport
     switch (s_.currentScreen) {
-        case ScreenType::CHAIN:
-        case ScreenType::PHRASE:
-        case ScreenType::TABLE:
-        case ScreenType::GROOVE:
-        case ScreenType::SCALE:
-        case ScreenType::INSTRUMENT:
-        case ScreenType::INST_POOL:
-        case ScreenType::MODS:
-            if (host_.is_playing()) {
-                host_.stop();
-            } else if (host_.live_mode()) {
-                // LIVE has no "all eight": the row launches as a scene, an empty cell silent.
-                host_.play_song_live(pointer_song_row(s_), live_row_mask(pointer_song_row(s_)));
-            } else {
-                host_.play_song(pointer_song_row(s_));
-            }
-            break;
+        case ScreenType::FILE_BROWSER:
+        case ScreenType::SAMPLE_EDITOR:
+            return;   // no song position to play from
         default:
-            break;
+            host_.play_song(pointer_song_row(s_));
+            return;
     }
 }
 
-void InputDispatcher::on_a_start() { route(Gesture::A_START); }
+// A and B are the screen's: every screen's handler answers them (ui/dispatch/screens/).
+void InputDispatcher::on_button_a() { route(Gesture::A); }
+void InputDispatcher::on_button_b() { route(Gesture::B); }
+
+void InputDispatcher::on_help_dismiss() {
+    s_.helpOpen = false;
+    s_.helpFull = false;
+}
+
+void InputDispatcher::on_stop_preview() { route(Gesture::STOP_PREVIEW); }
+
+// ── Y + A: SHIFT + OPTION → selection mode ─────────────────────────────────────────────────────
+
+void InputDispatcher::on_y_a() { route(Gesture::Y_A); }
+
+// ── Y + B: SHIFT + EDIT → selection mode ───────────────────────────────────────────────────────
+
+void InputDispatcher::on_y_b() { route(Gesture::Y_B); }
+
+// ── Y + DPAD: move between screens / cycle sort / zoom / step section ──────────────────────────
+
+void InputDispatcher::on_y_up() {
+    if (route(Gesture::Y_UP)) return;
+    go_to_screen(s_, navigate_up(nav_state_of(s_)));
+    s_.selection.exit();
+}
+
+void InputDispatcher::on_y_down() {
+    if (route(Gesture::Y_DOWN)) return;
+    go_to_screen(s_, navigate_down(nav_state_of(s_)));
+    s_.selection.exit();
+}
+
+void InputDispatcher::on_y_left() {
+    if (route(Gesture::Y_LEFT)) return;
+    const NavResult r = navigate_left(nav_state_of(s_));
+    if (r.screen != s_.currentScreen) sync_last_edited_on_screen_switch(s_.currentScreen, r.screen);
+    go_to_screen(s_, r);
+    s_.selection.exit();
+}
+
+void InputDispatcher::on_y_right() {
+    if (route(Gesture::Y_RIGHT)) return;
+    const NavResult r = navigate_right(nav_state_of(s_));
+    if (!song_relative_entry_allowed(s_, r.screen)) return;
+    if (r.screen != s_.currentScreen) sync_last_edited_on_screen_switch(s_.currentScreen, r.screen);
+    go_to_screen(s_, r);
+    s_.selection.exit();
+}
+
+// ── X + A: audition the instrument on the instrument screens and TABLE ─────────────────────────
+
+void InputDispatcher::on_x_a() { route(Gesture::X_A); }
+
+// ── X + B: arm delete in the file browser ──────────────────────────────────────────────────────
+
+void InputDispatcher::on_x_b() { route(Gesture::X_B); }
+
+// ── A + Y + B: deep-clone the chain/phrase under the cursor into free slots ────────────────────
+
+void InputDispatcher::on_a_y_b() {
+    if (route(Gesture::A_Y_B)) return;
+    s_.selection.exit();
+}
 
 }  // namespace pt::ui

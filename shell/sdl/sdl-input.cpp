@@ -24,17 +24,14 @@ constexpr KeyDefault KEY_DEFAULTS[] = {
     {SDLK_a, Button::DPAD_LEFT},  {SDLK_LEFT,  Button::DPAD_LEFT},
     {SDLK_d, Button::DPAD_RIGHT}, {SDLK_RIGHT, Button::DPAD_RIGHT},
 
-    // Face buttons: right-hand home row, plus Enter/Escape
-    {SDLK_k, Button::A}, {SDLK_RETURN, Button::A},
-    {SDLK_j, Button::B}, {SDLK_ESCAPE, Button::B},
-
-    // Shoulders: the keys above the face buttons
-    {SDLK_u, Button::L_SHIFT},
-    {SDLK_i, Button::R_SHIFT},
-
-    // System
-    {SDLK_LSHIFT, Button::SELECT},
-    {SDLK_SPACE,  Button::START},
+    // Face buttons: J K N M on keyboard = B X Y A on console.
+    //   J -> B  (EDIT / confirm)
+    //   K -> X  (PLAY / transport)
+    //   N -> Y  (SHIFT)
+    //   M -> A  (OPTION / cancel)
+    // Also bind ; to A for layouts where M is ; (AZERTY, etc.)
+    {SDLK_j, Button::B}, {SDLK_k, Button::X}, {SDLK_n, Button::Y}, {SDLK_m, Button::A}, {SDLK_SEMICOLON, Button::A},
+    {SDLK_RETURN, Button::X}, {SDLK_ESCAPE, Button::B},
 };
 
 // The built-in pad map by printed name (the ABXY swap is applied before lookup); a table for the same
@@ -50,15 +47,9 @@ constexpr PadDefault PAD_DEFAULTS[] = {
     {SDL_CONTROLLER_BUTTON_DPAD_LEFT,  Button::DPAD_LEFT},
     {SDL_CONTROLLER_BUTTON_DPAD_RIGHT, Button::DPAD_RIGHT},
 
-    // X and Y alias A and B: face-button layouts differ across handhelds, and listening to two of four
-    // is one bad SDL mapping from unusable.
-    {SDL_CONTROLLER_BUTTON_A, Button::A}, {SDL_CONTROLLER_BUTTON_X, Button::A},
-    {SDL_CONTROLLER_BUTTON_B, Button::B}, {SDL_CONTROLLER_BUTTON_Y, Button::B},
-
-    {SDL_CONTROLLER_BUTTON_LEFTSHOULDER,  Button::L_SHIFT},
-    {SDL_CONTROLLER_BUTTON_RIGHTSHOULDER, Button::R_SHIFT},
-    {SDL_CONTROLLER_BUTTON_BACK,          Button::SELECT},
-    {SDL_CONTROLLER_BUTTON_START,         Button::START},
+    // Face buttons: A B X Y — distinct on console and PC (J K N M).
+    {SDL_CONTROLLER_BUTTON_A, Button::A}, {SDL_CONTROLLER_BUTTON_B, Button::B},
+    {SDL_CONTROLLER_BUTTON_X, Button::X}, {SDL_CONTROLLER_BUTTON_Y, Button::Y},
 
     // ⚠️ No default for L2/R2 (bindable as lefttrigger/righttrigger) or the stick: axes that differ
     // per CFW.
@@ -261,9 +252,8 @@ ButtonMods SdlInput::mods_now() const {
     ButtonMods m;
     m.a      = held_[static_cast<size_t>(Button::A)];
     m.b      = held_[static_cast<size_t>(Button::B)];
-    m.l      = held_[static_cast<size_t>(Button::L_SHIFT)];
-    m.r      = held_[static_cast<size_t>(Button::R_SHIFT)];
-    m.select = held_[static_cast<size_t>(Button::SELECT)];
+    m.x      = held_[static_cast<size_t>(Button::X)];
+    m.y      = held_[static_cast<size_t>(Button::Y)];
     return m;
 }
 

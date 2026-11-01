@@ -114,11 +114,21 @@ const songcore::Instrument& current_instrument(const AppState& s) {
     return s.project->instruments[static_cast<size_t>(s.currentInstrument)];
 }
 
+// The copy dot lights the cell A copied only while the cursor is still on it — the bar it sits in.
+// Moving away ends it early; the fade ends it on its own.
+int cursor_copy_flash_alpha(const AppState& s) {
+    if (!s.copy_flash_active()) return 0;
+    if (s.copyFlash.screen != static_cast<int>(s.currentScreen)) return 0;
+    if (s.copyFlash.row != s.cursorRow || s.copyFlash.column != s.cursorColumn) return 0;
+    return s.copy_flash_alpha();
+}
+
 PhraseEditorState phrase_state(const AppState& s) {
     const songcore::Project& p = *s.project;
     PhraseEditorState ps{p.phrases[static_cast<size_t>(s.currentPhrase)]};
     ps.cursorRow      = s.cursorRow;
     ps.cursorColumn   = s.cursorColumn;
+    ps.cursorFlashAlpha = cursor_copy_flash_alpha(s);
     std::copy(std::begin(s.playheads), std::end(s.playheads), std::begin(ps.playheads));
     ps.selectionMode  = s.selection_mode();
     ps.isCellSelected = [&s](int row, int col) { return s.is_cell_selected(row, col); };
@@ -138,6 +148,7 @@ ChainEditorState chain_state(const AppState& s) {
     ChainEditorState cs{s.project->chains[static_cast<size_t>(s.currentChain)]};
     cs.cursorRow      = s.cursorRow;
     cs.cursorColumn   = s.cursorColumn;
+    cs.cursorFlashAlpha = cursor_copy_flash_alpha(s);
     std::copy(std::begin(s.playheads), std::end(s.playheads), std::begin(cs.playheads));
     cs.selectionMode  = s.selection_mode();
     cs.isCellSelected = [&s](int row, int col) { return s.is_cell_selected(row, col); };
@@ -153,6 +164,7 @@ SongEditorState song_state(const AppState& s) {
     SongEditorState ss{*s.project};
     ss.cursorRow      = s.cursorRow;
     ss.cursorTrack    = s.cursorColumn;
+    ss.cursorFlashAlpha = cursor_copy_flash_alpha(s);
     ss.scrollPosition = s.songScrollPosition;
     std::copy(std::begin(s.playheads), std::end(s.playheads), std::begin(ss.playheads));
     ss.liveMode       = s.liveMode;

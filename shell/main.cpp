@@ -150,6 +150,7 @@ int main(int argc, char** argv) {
         SDL_Quit();
         return 1;
     }
+    engine->setAudioBackend(&audio);
 
     ui::StdFileSystem filesystem(appRoot);
 
@@ -176,6 +177,7 @@ int main(int argc, char** argv) {
     cfg.audio             = &audioOutputs;
     cfg.audioOutputs      = &audioOutputs;
     cfg.caps.audioOutputs = true;
+    engine->setAudioBackend(&audioOutputs);
 #endif
 
     // A terminal, an ssh session or a PortMaster log — always somewhere to print to.

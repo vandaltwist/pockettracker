@@ -25,15 +25,15 @@ GestureResult InputDispatcher::qwerty_layer(Gesture g) {
             break;
 
         case Gesture::B:      delete_char(k);  break;
-        case Gesture::START:  qwerty_apply();  break;
-        // B backspaces, so SELECT is the quick way to abandon a rename.
-        case Gesture::SELECT: qwerty_cancel(); break;
+        case Gesture::X:  qwerty_apply();  break;
+        // B backspaces, so Y is the quick way to abandon a rename.
+        case Gesture::Y: qwerty_cancel(); break;
 
-        // R+UP/DOWN switch the layout; R+LEFT/RIGHT move the text cursor.
-        case Gesture::R_UP:    k.layout = 0; clamp_col(k); break;
-        case Gesture::R_DOWN:  k.layout = 1; clamp_col(k); break;
-        case Gesture::R_LEFT:  move_text_cursor_left(k);  break;
-        case Gesture::R_RIGHT: move_text_cursor_right(k); break;
+        // Y+UP/DOWN switch the layout; Y+LEFT/RIGHT move the text cursor.
+        case Gesture::Y_UP:    k.layout = 0; clamp_col(k); break;
+        case Gesture::Y_DOWN:  k.layout = 1; clamp_col(k); break;
+        case Gesture::Y_LEFT:  move_text_cursor_left(k);  break;
+        case Gesture::Y_RIGHT: move_text_cursor_right(k); break;
 
         default: break;
     }

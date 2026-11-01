@@ -22,6 +22,8 @@
 #include "effects/send-chain.h"
 #include "effects/master-chain.h"
 
+class AudioBackend;
+
 // One SoundFont voice per song track (0-7) plus the preview lane (8). Defined in audio-engine.cpp.
 static const int SF_VOICE_COUNT = 9;
 extern SoundfontVoice sfVoices[SF_VOICE_COUNT];
@@ -128,6 +130,9 @@ public:
     // Restarts the output stream if the platform paused it; called before every scheduled note.
     std::function<void()> onResumeRequested;
     void requestResume() { if (onResumeRequested) onResumeRequested(); }
+
+    // Set the platform backend so startRecord/stopRecord can open its capture device.
+    void setAudioBackend(AudioBackend* backend) { backend_ = backend; }
 
     // Live input (a MIDI keyboard), drained on the audio thread at the top of each block, so a note
     // sounds in the block it arrived in. During an export it is discarded instead.
@@ -468,6 +473,7 @@ public:
         bool    octaWanted;           // the OCTA scopes are being drawn
         bool    spectrumWanted;       // the send spectra are being drawn
         int     monitoredInstrId;     // the EQ screen's instrument, or -1
+        int     recordTap;            // internal REC source: -1 off, 0..7 a track, 8 the master
         float   faderStep;            // how far a fader may move in this block
         // Per track, the preview lane included: the fader and the mute gate.
         float   trackVolStart[SF_VOICE_COUNT], trackVolEnd[SF_VOICE_COUNT];
@@ -1015,4 +1021,58 @@ private:
     // The oscilloscope's capture stride; 1 = every sample.
     static const int WAVEFORM_DOWNSAMPLE = 1;
     int waveformDownsampleCounter = 0;
+
+    // ── Record state (audio thread writes, UI thread reads) ───────────────────────────────────────
+    std::atomic<bool> recordActive{false};
+    float*            recordBufL       = nullptr;
+    float*            recordBufR       = nullptr;   // null = mono capture
+    int               recordCapacity   = 0;         // frames allocated
+    std::atomic<int>  recordLength_    {0};        // frames captured
+    std::atomic<float> recordPeak_    {0.0f};     // live input peak (0..1)
+    std::atomic<int64_t> countInEnd   {-1};       // frame where the record's count-in ends; -1 = none
+    int               recordDeviceIndex = -1;
+    // Internal capture (P1..P8 / M1): which bus the audio thread copies into the record buffer, and
+    // the per-block scratch it is summed into. -1 = no internal tap (an external device is capturing).
+    std::atomic<int>  recordTapTrack  {-1};
+    float             recordTapL[PROCESS_SUBBLOCK] = {0};
+    float             recordTapR[PROCESS_SUBBLOCK] = {0};
+    AudioBackend*     backend_          = nullptr;
+
+  public:
+    // ── Record (audio input capture) ──────────────────────────────────────────────────────────────
+    // startRecord opens the backend's capture device at the engine rate and fills recordBuf until
+    // stopRecord. ⚠️ One slot at a time; a second startRecord while one is in progress is a no-op.
+    bool startRecord(int deviceIndex);
+    void stopRecord();
+    // Count-in before the take: `beats` quarter notes, with a click when `click`. The capture keeps running
+    // (the visualiser stays live); installRecord drops the returned number of frames from the start.
+    // Call right after a successful startRecord. Returns the frames to skip (0 = start now).
+    int  startCountIn(int beats, int64_t framesPerBeat, bool click);
+    bool isRecording() const { return recordActive.load(std::memory_order_relaxed); }
+    // After stopRecord: pointers valid until the next startRecord; length in frames, one channel each.
+    float*  recordDataL()  { return recordBufL; }
+    float*  recordDataR()  { return recordBufR; }
+    int     recordLength() const { return recordLength_; }
+    float   recordPeak() const { return recordPeak_.load(std::memory_order_relaxed); }
+    const float* recordBufferL() const { return recordBufL; }
+    const float* recordBufferR() const { return recordBufR; }
+    // Called by the backend's capture thread: appends input frames to the record buffer.
+    void    captureWriteImpl(const float* left, const float* right, int frames);
+    // List input device names the platform sees. Cleared on each call.
+    void    listInputDevices(std::vector<std::string>& out);
+
+    // Max seconds of record before auto-stop (guard against RAM runnable). Modifiable via VIZ SETTINGS > DURATION.
+    static int MAX_RECORD_SECONDS;
+
+    // Internal capture sources, appended to the input list after the backend's devices: P1..P8 (each
+    // track's own output, dry, post-fader) then M1 (the master bus, what leaves the master chain).
+    // startRecord() recognises these codes instead of opening a capture device, so REC works on the
+    // app's own audio with no microphone involved. The sample editor maps list entries to them.
+    static constexpr int INTERNAL_INPUT_COUNT = 9;
+    static constexpr int INTERNAL_INPUT_BASE  = 100;
+
+    // Install the current record buffer into sample slot `id`. Copies L/R under sampleEditMutex.
+    // `skipFrames` are dropped from the start (the count-in); `gainDb` is the MIC GAIN, applied once here so the
+    // meters and the visualiser keep seeing the raw input. Returns false when nothing was recorded.
+    bool installRecord(int id, int skipFrames = 0, float gainDb = 0.0f);
 };

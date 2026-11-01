@@ -133,7 +133,10 @@ inline bool blink_on(int phase_ms, bool fast) {
 // fixed-width or the highlight is ragged.
 class RowCells {
   public:
-    RowCells(Canvas& c, int text_y, const Theme& t) : c_(c), textY_(text_y), t_(t) {}
+    // `cursor_flash_alpha` lights a few pixels at the top-right of this row's cursor cell: A's copy
+    // confirmation on SONG / CHAIN / PHRASE, faded out by the caller (0 = none).
+    RowCells(Canvas& c, int text_y, const Theme& t, int cursor_flash_alpha = 0)
+        : c_(c), textY_(text_y), t_(t), flashAlpha_(cursor_flash_alpha) {}
 
     void cell(const std::string& text, int x, bool is_cursor, bool is_selected, bool is_empty,
               Argb value_color) {
@@ -145,6 +148,13 @@ class RowCells {
             const int from = (is_selected && selectedRight_ >= 0) ? selectedRight_ : left;
             c_.fill_rect(from, textY_ - TEXT_PADDING, right - from, ROW_HEIGHT,
                          is_selected ? t_.rowSelection : t_.rowCursor);
+        }
+
+        if (is_cursor && flashAlpha_ > 0) {
+            // Inside the bar's top-right corner, above the glyphs: tiny on purpose ("quelques pixels").
+            constexpr int FLASH_PX = 3;
+            c_.fill_rect(right - FLASH_PX - 1, textY_ - TEXT_PADDING, FLASH_PX, FLASH_PX,
+                         with_alpha(cursor_cell_ink(t_), static_cast<float>(flashAlpha_) / 255.0f));
         }
 
         selectedRight_ = is_selected ? right : -1;
@@ -161,6 +171,7 @@ class RowCells {
     int          textY_;
     const Theme& t_;
     int          selectedRight_ = -1;   // −1: the cell to the left is not selected
+    int          flashAlpha_    = 0;    // 0..255, on the cursor cell only
 };
 
 // One cell with no neighbours.

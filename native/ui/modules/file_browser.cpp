@@ -292,30 +292,30 @@ void FileBrowserModule::draw(Canvas& c, int x, int y, const FileBrowserState& s,
         const std::vector<const BrowserItem*> doomed = s.delete_targets();
         const std::string what = doomed.size() == 1 ? Canvas::clip_text(doomed[0]->displayName, 16)
                                                     : std::to_string(doomed.size()) + " FILES";
-        hint = "DELETE " + what + "? A=YES B=NO";
+        hint = "DELETE " + what + "? EDIT=YES OPT=NO";
         hintColor = 0xFFFF0000;
     } else if (s.mode == BrowserMode::SET_HOME) {
         const BrowserItem* item = s.current();
         // Not red: nothing is destroyed. Still a confirm — it moves where every app folder is.
-        hint = "HOME FOLDER? " + Canvas::clip_text(item ? item->displayName : "", 14) + " A=YES B=NO";
+        hint = "HOME FOLDER? " + Canvas::clip_text(item ? item->displayName : "", 14) + " EDIT=YES OPT=NO";
         hintColor = t.textTitle;
     } else if (s.mode == BrowserMode::FORGET_ROOT) {
         const BrowserItem* item = s.current();
         // ⚠️ FORGET, never DELETE: it hands back a permission; every file stays.
-        hint = "FORGET " + Canvas::clip_text(item ? item->displayName : "", 15) + "? A=YES B=NO";
+        hint = "FORGET " + Canvas::clip_text(item ? item->displayName : "", 15) + "? EDIT=YES OPT=NO";
         hintColor = t.textTitle;
     } else if (s.selectionMode) {
-        hint      = "B=COPY L+A=CUT L+B=ALL L+R=CANCEL";
+        hint      = "OPT=COPY SHIFT+EDIT=CUT SHIFT+OPT=CANCEL";
         hintColor = t.rowSelection;
     } else if (!s.fileClipboard.empty()) {
-        hint      = "L+A=PASTE  " + s.clipboard_info();
+        hint      = "SHIFT+EDIT=PASTE  " + s.clipboard_info();
         hintColor = t.textTitle;
     } else if (const BrowserItem* item = s.current(); item && item->isRoot) {
         // On a granted tree the file chords are refused, so the bar names what works there.
-        hint      = "SEL+A=SET HOME  SEL+B=FORGET";
+        hint      = "PLAY+EDIT=SET HOME  EDIT+OPT=FORGET";
         hintColor = t.textParam;
     } else {
-        hint      = "SEL+A=RENAME SEL+B=DEL SEL+R=NEW";
+        hint      = "PLAY+EDIT=RENAME EDIT+OPT=DEL PLAY+OPT=NEW";
         hintColor = t.textParam;
     }
     c.draw_text(hint, x + 10, barY1 + TEXT_PADDING, hintColor, CHAR_SPACING, FONT_SCALE);
@@ -387,7 +387,7 @@ void FileBrowserModule::draw(Canvas& c, int x, int y, const FileBrowserState& s,
                     s.statusSuccess ? t.textTitle : 0xFFFF4444, CHAR_SPACING, FONT_SCALE);
     } else {
         // Real arrows (the font has them; '^' draws blank). 28 code points leave the counter room.
-        c.draw_text("A=OPN B=BCK R+\xE2\x86\x90=UP R+\xE2\x86\x91\xE2\x86\x93=SRT", x + 10,
+        c.draw_text("EDIT=OPN OPT=BCK SFT+OPT=SRT", x + 10,
                     bottomY + TEXT_PADDING, t.textParam, CHAR_SPACING, FONT_SCALE);
     }
 

@@ -1,12 +1,27 @@
-// The sample editor: its buttons, the selection, the slice markers, the ops, SAVE and CHOP.
+﻿// The sample editor: its buttons, the selection, the slice markers, the ops, SAVE and CHOP.
 
 #include "ui/dispatch/dispatch_common.h"
+#include "ui/modules/rec_viz.h"
+#include "audio-engine.h"
 
 #include "ui/std_filesystem.h"
+#include "ui/modules/rec_viz.h"
 
 #include <algorithm>
+#include "ui/modules/rec_viz.h"
+#include <array>
+#include "ui/modules/rec_viz.h"
+#include <cmath>
+#include "ui/modules/rec_viz.h"
+#include <cstring>
+#include "ui/modules/rec_viz.h"
 #include <string>
+#include "ui/modules/rec_viz.h"
 #include <vector>
+#include "ui/modules/rec_viz.h"
+
+#include "kissfft/kiss_fftr.h"
+#include "ui/modules/rec_viz.h"
 
 namespace pt::ui {
 
@@ -47,12 +62,63 @@ std::vector<int> divide_points(int totalFrames, int divisions) {
     return out;
 }
 
+/** Hann-windowed real FFT → log-spaced band magnitudes in dB (floor -100).
+ *  `out` receives `bands` values, band b covers [f0, f1] log-spaced between fmin/fmax. */
+void compute_log_bands(const float* buf, int len, int sampleRate, int fftSize,
+                       float fmin, float fmax, int bands, std::vector<float>& out) {
+    out.assign(static_cast<size_t>(bands), -100.0f);
+    if (len <= 0 || buf == nullptr || fftSize < 8) return;
+
+    // Window length = min(len, fftSize); pad with zeros if len < fftSize.
+    const int n = std::min(len, fftSize);
+    std::vector<float> window(fftSize, 0.0f);
+    for (int i = 0; i < n; ++i) {
+        float w = 0.5f * (1.0f - cosf(2.0f * static_cast<float>(M_PI) * i /
+                                           static_cast<float>(std::max(n - 1, 1))));
+        window[i] = buf[i] * w;
+    }
+
+    kiss_fftr_cfg cfg = kiss_fftr_alloc(fftSize, 0, nullptr, nullptr);
+    if (!cfg) return;
+    std::vector<kiss_fft_cpx> spec(fftSize / 2 + 1);
+    kiss_fftr(cfg, window.data(), spec.data());
+    kiss_fftr_free(cfg);
+
+    const float nyq = static_cast<float>(sampleRate) * 0.5f;
+    const float norm = 1.0f / static_cast<float>(fftSize);
+    const int   nBins = fftSize / 2;
+
+    // bin → frequency
+    auto bin_freq = [&](int k) { return static_cast<float>(k) * nyq / static_cast<float>(nBins); };
+
+    for (int b = 0; b < bands; ++b) {
+        float f0 = fmin * std::pow(fmax / fmin, static_cast<float>(b) / static_cast<float>(bands));
+        float f1 = fmin * std::pow(fmax / fmin, static_cast<float>(b + 1) / static_cast<float>(bands));
+        int   i0 = std::max(0, static_cast<int>(std::floor(f0 / nyq * static_cast<float>(nBins))));
+        int   i1 = std::min(nBins - 1, static_cast<int>(std::floor(f1 / nyq * static_cast<float>(nBins))));
+        if (i1 <= i0) i1 = i0 + 1;
+        float best = 0.0f;
+        for (int k = i0; k <= i1; ++k) {
+            float re = spec[static_cast<size_t>(k)].r * norm;
+            float im = spec[static_cast<size_t>(k)].i * norm;
+            float m = sqrtf(re * re + im * im);
+            if (m > best) best = m;
+        }
+        float db = (best > 0.0f) ? 20.0f * log10f(best) : -100.0f;
+        out[static_cast<size_t>(b)] = std::max(-100.0f, std::min(0.0f, db));
+    }
+}
+
 }  // namespace
 
 // ─── The buttons ─────────────────────────────────────────────────────────────────────────────────
 
 GestureResult InputDispatcher::sample_editor_screen(Gesture g) {
     SampleEditorState& se = s_.sampleEditor;
+
+    // The INPUT cell (row 5, cols 0..1) must show what is plugged in NOW: a USB mic connected after the
+    // editor opened is missing from the list read at open, and picking it would silently record the mic.
+    if (se.cursorRow == 5 && (se.cursorCol == 0 || se.cursorCol == 1)) refresh_input_devices();
 
     // A+DPAD drags the selection's active edge on rows 3..8, the slice boundary on row 11's POSITION
     // cell; elsewhere it edits the cell like any screen.
@@ -66,23 +132,72 @@ GestureResult InputDispatcher::sample_editor_screen(Gesture g) {
     switch (g) {
         // ⚠️ A cell that opens something (EQ) goes first, or its FX APPLY would run.
         case Gesture::A:
+            // Row 5 is RECORD: A on REC toggles recording, A on INPUT cycles devices,
+            // A on SET opens/closes the viz settings menu.
+            if (se.cursorRow == 5) {
+                if (se.cursorCol == 0) handle_record_toggle();
+                else if (se.cursorCol == 1) generic_input(pt::ui::increment);
+                else if (se.cursorCol == 2) { pt::ui::rec_viz().toggleMenu(); }
+                else if (se.cursorCol == 3) {
+                    se.loopPreview = !se.loopPreview;
+                    set_status(s_, se.loopPreview ? "LOOP: ON" : "LOOP: OFF", true);
+                    if (se.playbackPosition >= 0.0f) {
+                        host_.stop_preview();
+                        se.playbackPosition = -1.0f;
+                    }
+                }
+                return GestureResult::TAKEN;
+            }
+            // Close the viz menu if it is open and A is pressed elsewhere.
+            if (pt::ui::rec_viz().menuOpen()) { pt::ui::rec_viz().closeMenu(); return GestureResult::TAKEN; }
             if (!open_sub_screen_at_cursor(/*peek=*/false)) sample_editor_confirm();
             return GestureResult::TAKEN;
 
-        // ⚠️ B asks first if anything would be lost: the edits live in the engine, not the project.
         case Gesture::B:
+            if (pt::ui::rec_viz().menuOpen()) { pt::ui::rec_viz().closeMenu(); return GestureResult::TAKEN; }
             if (se.isModified) se.showConfirmClose = true;
             else               close_sample_editor();
             return GestureResult::TAKEN;
 
-        case Gesture::START:
-            sample_editor_audition();
+        // X is the transport (PLAY): on the sample editor it auditions, exactly as START did.
+        case Gesture::X:
+            if (!se.recordActive) {
+                sample_editor_audition();
+                return GestureResult::TAKEN;
+            }
+            return GestureResult::PASS;
+
+        case Gesture::Y:
+            // Boucle de pré-écoute : rejoue le sample en boucle jusqu'à ce qu'on rappuie sur X.
+            se.loopPreview = !se.loopPreview;
+            set_status(s_, se.loopPreview ? "LOOP: ON" : "LOOP: OFF", true);
+            if (se.playbackPosition >= 0.0f) {
+                host_.stop_preview();
+                se.playbackPosition = -1.0f;
+            }
             return GestureResult::TAKEN;
 
-        case Gesture::A_UP:    return nudge(+coarse_step(se));
-        case Gesture::A_DOWN:  return nudge(-coarse_step(se));
-        case Gesture::A_LEFT:  return nudge(-fine_step(se));
-        case Gesture::A_RIGHT: return nudge(+fine_step(se));
+
+        case Gesture::A_UP:
+            if (se.cursorRow == 5 && se.cursorCol == 0) return GestureResult::TAKEN;
+            return nudge(+coarse_step(se));
+        case Gesture::A_DOWN:
+            if (se.cursorRow == 5 && se.cursorCol == 0) return GestureResult::TAKEN;
+            return nudge(-coarse_step(se));
+        case Gesture::A_LEFT:
+            if (se.cursorRow == 5 && se.cursorCol != 0) {
+                generic_input(pt::ui::decrement);
+                return GestureResult::TAKEN;
+            }
+            if (se.cursorRow == 5 && se.cursorCol == 0) return GestureResult::TAKEN;
+            return nudge(-fine_step(se));
+        case Gesture::A_RIGHT:
+            if (se.cursorRow == 5 && se.cursorCol != 0) {
+                generic_input(pt::ui::increment);
+                return GestureResult::TAKEN;
+            }
+            if (se.cursorRow == 5 && se.cursorCol == 0) return GestureResult::TAKEN;
+            return nudge(+fine_step(se));
 
         case Gesture::A_B:
             // The SELECTION row: back to the sample's own bound — START to 0, END to the last frame.
@@ -104,18 +219,19 @@ GestureResult InputDispatcher::sample_editor_screen(Gesture g) {
             }
             return GestureResult::PASS;
 
-        // ZOOM: `zoomLevel` 0 = 1× … 4 = 16×; the feed re-bins the waveform.
-        case Gesture::R_UP:   se.zoomLevel = std::min(se.zoomLevel + 1, 4); return GestureResult::TAKEN;
-        case Gesture::R_DOWN: se.zoomLevel = std::max(se.zoomLevel - 1, 0); return GestureResult::TAKEN;
-
-        // ⚠️ Swallowed: navigating would bypass ARE YOU SURE? and discard an unsaved edit.
-        case Gesture::R_LEFT:
-        case Gesture::R_RIGHT:
-            return GestureResult::TAKEN;
-
-        // Not the clipboard's or the mix's to clear from here: neither is on this screen.
-        case Gesture::L_R:
-            return GestureResult::TAKEN;
+        // When the viz settings menu is open, the D-pad drives it instead of the editor cursor.
+        case Gesture::DPAD_UP:
+            if (pt::ui::rec_viz().menuOpen()) { pt::ui::rec_viz().menuMove(-1); return GestureResult::TAKEN; }
+            return GestureResult::PASS;
+        case Gesture::DPAD_DOWN:
+            if (pt::ui::rec_viz().menuOpen()) { pt::ui::rec_viz().menuMove(+1); return GestureResult::TAKEN; }
+            return GestureResult::PASS;
+        case Gesture::DPAD_LEFT:
+            if (pt::ui::rec_viz().menuOpen()) { pt::ui::rec_viz().menuAdjust(-1); return GestureResult::TAKEN; }
+            return GestureResult::PASS;
+        case Gesture::DPAD_RIGHT:
+            if (pt::ui::rec_viz().menuOpen()) { pt::ui::rec_viz().menuAdjust(+1); return GestureResult::TAKEN; }
+            return GestureResult::PASS;
 
         default:
             return GestureResult::PASS;
@@ -245,17 +361,30 @@ void InputDispatcher::init_sample_editor_state() {
     se.sliceIndex = 0;
     // ⚠️ sliceMethod survives, so a second sample keeps TRANSIENT.
 
-    se.isModified       = false;
-    se.showConfirmClose = false;
+    se.recordActive = false;
+    se.recordFailed = false;
+    se.recordSkipFrames = 0;
     se.playbackPosition = -1.0f;
+
+    // Populate the audio input devices list from the host
+    host_.listInputDevices(se.audioInputDevices);
+    set_status(s_, "INPUT DEVICES: " + std::to_string(se.audioInputDevices.size()) + " devices", true);
 }
 
 void InputDispatcher::close_sample_editor() {
+    // Stop recording if active before closing the editor
+    SampleEditorState& se = s_.sampleEditor;
+    if (se.recordActive) {
+        host_.stop_record();
+        se.recordActive = false;
+        se.recordSkipFrames = 0;
+    }
+    
     // Pay any pending audition restore now, or it lands on a slot no longer on screen.
     run_due_sample_preview_restore(/*force=*/true);
 
     host_.restore_fx_preview_backup();          // drop an un-applied FX preview
-    host_.free_sample_undo(s_.sampleEditor.instrumentId);   // unreachable once the editor is gone
+    host_.free_sample_undo(se.instrumentId);     // unreachable once the editor is gone
     host_.clear_previews();                     // the 254/255 scratch slots
 
     s_.currentScreen = s_.previousScreen;
@@ -285,6 +414,13 @@ void InputDispatcher::nudge_selection_edge(int64_t delta) {
     } else {
         const int64_t raw = std::clamp<int64_t>(se.selectionEnd + delta, se.selectionStart + 1, maxFrame);
         se.selectionEnd   = std::clamp<int64_t>(snap(raw), se.selectionStart + 1, maxFrame);
+    }
+
+    // LOOP : la pré-écoute suit les changements de début/fin.
+    if (se.loopPreview && se.playbackPosition >= 0.0f) {
+        host_.stop_preview();
+        se.playbackPosition = -1.0f;
+        sample_editor_audition();
     }
 }
 
@@ -870,12 +1006,234 @@ void InputDispatcher::run_due_sample_preview_restore(bool force) {
 // ─── The cursor and the edit ─────────────────────────────────────────────────────────────────────
 
 CursorContext InputDispatcher::sample_editor_context() const {
-    return sample_.cursor_context(s_.sampleEditor);
+    SampleEditorState s = s_.sampleEditor;
+    return sample_.cursor_context(s);
+}
+
+void InputDispatcher::refresh_sample_record() {
+    if (!on_sample_editor()) return;
+    SampleEditorState& se = s_.sampleEditor;
+    if (se.recordActive) {
+        se.recordLevel = host_.record_peak();
+        const int len = host_.record_length();
+        se.recordFrames = len;
+        const float* L = host_.record_buffer_l();
+        const float* R = host_.record_buffer_r();
+        if (L && len > 0) {
+            // pan / bass / high
+            int start = std::max(0, len - 512);
+            float sumAbsL = 0, sumAbsR = 0;
+            float highL = 0, highR = 0;
+            float prevL = 0, prevR = 0;
+            bool first = true;
+            for (int i = start; i < len; ++i) {
+                float l = L[i]; if (l < 0) l = -l;
+                float r = R ? R[i] : L[i]; if (r < 0) r = -r;
+                sumAbsL += l; sumAbsR += r;
+                if (!first) {
+                    float dl = L[i] - prevL; if (dl < 0) dl = -dl; highL += dl;
+                    if (R) { float dr = R[i] - prevR; if (dr < 0) dr = -dr; highR += dr; }
+                }
+                prevL = L[i]; prevR = R ? R[i] : L[i];
+                first = false;
+            }
+            int n = len - start;
+            float meanL = sumAbsL / n;
+            float meanR = sumAbsR / n;
+            float total = meanL + meanR;
+            se.recordPan = (total > 0.0001f) ? (meanR - meanL) / total : 0.0f;
+            float bass = (meanL + meanR) * 0.5f;
+            float high = ((highL + highR) * 0.5f) / (float)n;
+            se.recordBass = std::min(1.0f, bass * 2.0f);
+            se.recordHigh = std::min(1.0f, high * 8.0f);
+
+            pt::ui::rec_viz().feedBuffer(L, R, len, se.sampleRate);
+            // full-buffer waveform (scaled to fit) for L and R
+            if (len > se.lastRecordLength + 1024 || se.recWaveL.empty()) {
+                const int bins = 256;
+                se.recWaveL.assign(bins * 2, 0.0f);
+                se.recWaveR.assign(bins * 2, 0.0f);
+                se.recThick.assign(bins, 0.1f);
+                for (int i = 0; i < bins; ++i) {
+                    int s0 = (int)((long long)i * len / bins);
+                    int e0 = (int)((long long)(i + 1) * len / bins);
+                    if (e0 <= s0) e0 = s0 + 1;
+                    if (e0 > len) e0 = len;
+                    float minL = 0, maxL = 0, minR = 0, maxR = 0;
+                    int zc = 0; float prev = 0; bool first2 = true;
+                    for (int j = s0; j < e0; ++j) {
+                        if (L[j] < minL) minL = L[j];
+                        if (L[j] > maxL) maxL = L[j];
+                        float rv = R ? R[j] : L[j];
+                        if (rv < minR) minR = rv;
+                        if (rv > maxR) maxR = rv;
+                        if (!first2 && ((L[j] >= 0) != (prev >= 0))) ++zc;
+                        prev = L[j];
+                        first2 = false;
+                    }
+                    se.recWaveL[i*2]   = minL;
+                    se.recWaveL[i*2+1] = maxL;
+                    se.recWaveR[i*2]   = minR;
+                    se.recWaveR[i*2+1] = maxR;
+                    int nn = e0 - s0;
+                    float zcr = (nn > 1) ? (float)zc / (float)(nn - 1) : 0.0f;
+                    float thick = 1.0f - std::min(1.0f, zcr * 2.0f);
+                    if (thick < 0.1f) thick = 0.1f;
+                    se.recThick[i] = thick;
+                }
+                se.lastRecordLength = len;
+            }
+
+            // ── Topographic spectrogram: grille dB bandes×temps, fondu + nouvelle colonne ────────
+            const int   bands  = std::max(se.recVizBands, 2);
+            const int   cols   = std::max(se.recVizCols, 2);
+            const size_t gridSize = static_cast<size_t>(bands) * static_cast<size_t>(cols);
+            if (se.recSpecL.size() != gridSize) se.recSpecL.assign(gridSize, -100.0f);
+            if (se.recSpecR.size() != gridSize) se.recSpecR.assign(gridSize, -100.0f);
+
+            // Estompage progressif à chaque frame (les formes s'estompent doucement).
+            const float fade = se.recVizFade;
+            if (fade > 0.0f) {
+                for (size_t i = 0; i < gridSize; ++i) {
+                    float v = se.recSpecL[i] - fade;  if (v < -100.0f) v = -100.0f; se.recSpecL[i] = v;
+                    v = se.recSpecR[i] - fade;        if (v < -100.0f) v = -100.0f; se.recSpecR[i] = v;
+                }
+            }
+
+            // Nouvelle colonne (plus récente à droite) à l'intervalle d'analyse.
+            if (++se.recVizFrameCounter >= std::max(se.recVizAnalyzeEvery, 1)) {
+                se.recVizFrameCounter = 0;
+                const int fftSize = std::max(se.recVizFftSize, 128);
+                const int take    = std::min(len, fftSize);
+                const float* srcL = L + len - take;
+                const float* srcR = (R != nullptr) ? (R + len - take) : srcL;
+
+                std::vector<float> bandsL, bandsR;
+                compute_log_bands(srcL, take, se.sampleRate, fftSize, se.recVizFmin, se.recVizFmax,
+                                  bands, bandsL);
+                compute_log_bands(srcR, take, se.sampleRate, fftSize, se.recVizFmin, se.recVizFmax,
+                                  bands, bandsR);
+
+                // Glisser l'historique vers la gauche ; le nouveau son apparaît à droite.
+                for (int b = 0; b < bands; ++b) {
+                    const size_t row = static_cast<size_t>(b) * static_cast<size_t>(cols);
+                    std::memmove(&se.recSpecL[row], &se.recSpecL[row + 1],
+                                 (cols - 1) * sizeof(float));
+                    std::memmove(&se.recSpecR[row], &se.recSpecR[row + 1],
+                                 (cols - 1) * sizeof(float));
+                    se.recSpecL[row + static_cast<size_t>(cols) - 1] = bandsL[static_cast<size_t>(b)];
+                    se.recSpecR[row + static_cast<size_t>(cols) - 1] = bandsR[static_cast<size_t>(b)];
+                }
+                se.recVizDirty = true;
+            }
+        }
+    } else {
+        se.recordLevel = 0.0f;
+        se.recWaveL.clear();
+        se.recWaveR.clear();
+        se.recThick.clear();
+        se.recSpecL.clear();
+        se.recSpecR.clear();
+        se.lastRecordLength = 0;
+    }
+}
+void InputDispatcher::refresh_input_devices() {
+    SampleEditorState& se = s_.sampleEditor;
+    std::vector<std::string> fresh;
+    host_.listInputDevices(fresh);
+    if (fresh == se.audioInputDevices) return;
+    se.audioInputDevices = std::move(fresh);
+    // The device that was picked is gone (unplugged): fall back to DEFAULT rather than keep a name that
+    // maps to no card, which would make REC quietly use the built-in mic.
+    if (!se.recordInputDevice.empty() &&
+        std::find(se.audioInputDevices.begin(), se.audioInputDevices.end(), se.recordInputDevice) ==
+            se.audioInputDevices.end())
+        se.recordInputDevice.clear();
+}
+
+void InputDispatcher::handle_record_toggle() {
+    SampleEditorState& se = s_.sampleEditor;
+
+    if (!se.recordActive) {
+        // The list is rebuilt here (cheap, reads /proc/asound): a USB mic plugged after boot, or the
+        // saved INPUT from last session, must map to a real code — an empty list would fall back to
+        // the built-in mic without saying so.
+        refresh_input_devices();
+        // Make sure no capture is left open from a previous attempt.
+        host_.stop_record();
+        // Applique la durée max choisie dans VIZ SETTINGS > DURATION avant d'allouer le buffer d'enregistrement.
+        AudioEngine::MAX_RECORD_SECONDS = pt::ui::rec_viz().p.recordMaxSeconds;
+        // Start recording on the chosen input device. -1 = the platform default.
+        // The list ends with the engine's own buses (P1..P8, M1 MASTER): the backend's cards keep their
+        // 1-based index, a bus gets INTERNAL_INPUT_BASE + n and never opens a capture device.
+        int device = -1;
+        const int phys = std::max(0, static_cast<int>(se.audioInputDevices.size()) -
+                                         AudioEngine::INTERNAL_INPUT_COUNT);
+        for (size_t i = 0; i < se.audioInputDevices.size(); ++i) {
+            if (se.audioInputDevices[i] != se.recordInputDevice) continue;
+            device = (static_cast<int>(i) < phys)
+                         ? static_cast<int>(i) + 1   // backend uses 1-based indices (0 = default)
+                         : AudioEngine::INTERNAL_INPUT_BASE + (static_cast<int>(i) - phys);
+            break;
+        }
+        if (host_.start_record(device)) {
+            se.recordActive = true;
+            se.recordFailed = false;
+            // START (SET menu): DIRECT, 1/4, 2/4, 1 BAR, 2 BAR of count-in at the project's tempo, with the
+            // click if CLICK is on. The capture runs from now on (the visualiser is live); the count-in's
+            // frames are cut when the take is installed. There is no calibration pause any more.
+            static const int kBeats[5] = {0, 1, 2, 4, 8};
+            const auto& vp = pt::ui::rec_viz().p;
+            se.recordSkipFrames = host_.begin_count_in(kBeats[std::max(0, std::min(4, vp.startMode))], vp.clickOn);
+            se.recordFrames = 0;
+            set_status(s_, se.recordSkipFrames > 0 ? "COUNT-IN" : "RECORDING", true);
+        } else {
+            se.recordActive = false;
+            se.recordFailed = true;
+            set_status(s_, "RECORD FAILED", false);
+        }
+    } else {
+        // Stop and install into the current instrument. Only the user stops a take.
+        const int skip = se.recordSkipFrames;
+        se.recordSkipFrames = 0;
+        if (skip > 0 && host_.record_length() <= skip) {   // stopped during the count-in: nothing to keep
+            host_.stop_record();
+            se.recordActive = false;
+            se.recordFailed = false;
+            set_status(s_, "CANCELLED", false);
+            return;
+        }
+        host_.backup_sample(se.instrumentId);
+        if (host_.record_capture(se.instrumentId, skip, pt::ui::rec_viz().p.micGainDb)) {
+            se.recordActive = false;
+            se.recordFailed = false;
+            se.isModified = true;
+            set_status(s_, "RECORDED", true);
+            // Refresh the editor state to see the new sample.
+            refresh_sample_view(true);
+        } else {
+            se.recordActive = false;
+            se.recordFailed = true;
+            set_status(s_, "RECORD FAILED", false);
+        }
+    }
 }
 
 bool InputDispatcher::sample_editor_edit(const InputAction& action) {
-    const SampleEditorInputResult r = sample_.handle_input(s_.sampleEditor, action);
+    SampleEditorState& se = s_.sampleEditor;
+    const bool loopBefore = se.loopPreview;
+    const SampleEditorInputResult r = sample_.handle_input(se, action);
     if (r.rateModeChanged || r.bitDepthChanged) apply_sample_rate_and_bits();
+
+    // LOOP : la pré-écoute suit l'activation/désactivation et les changements de début/fin.
+    if (se.loopPreview != loopBefore) {
+        if (se.loopPreview) {
+            if (se.playbackPosition < 0.0f) sample_editor_audition();
+        } else if (se.playbackPosition >= 0.0f) {
+            host_.stop_preview();
+            se.playbackPosition = -1.0f;
+        }
+    }
 
     // ⚠️ false: the editor's session is not the document (a held A+UP on ZOOM would arm an autosave).
     // RATE and BIT push for themselves.

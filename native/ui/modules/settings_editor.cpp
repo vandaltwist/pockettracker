@@ -14,6 +14,15 @@ constexpr int VAL1_X     = 190;  // the primary value
 constexpr int SUBLABEL_X = 355;  // the secondary column's own label (STR / VOL / POW)
 constexpr int VAL2_X     = 408;  // the secondary value
 
+// Le bouton (0=A, 1=B, 2=X, 3=Y) assigne a la fonction selectionnee par btnMapSel.
+inline int btn_for_sel(const SettingsValues& v) {
+    switch (v.btnMapSel) {
+        case 0: return v.btnEdit;
+        case 1: return v.btnOption;
+        case 2: return v.btnPlay;
+        default: return v.btnShift;
+    }
+}
 
 }  // namespace
 
@@ -114,6 +123,31 @@ void SettingsModule::draw(Canvas& c, int x, int y, const SettingsState& s) const
     param_row(SettingsRow::ABXY, "ABXY",
               abxy_name(static_cast<AbxyLayout>(clamp(v.abxyIndex, 0, 2))));
 
+    // BTN MAP: colonne 1 = fonction, colonne 2 = bouton assigne (0=A, 1=B, 2=X, 3=Y).
+    {
+        const SettingsRow row = SettingsRow::BTN_MAP;
+        const int ry = rowY(row);
+        c.draw_text("BTN MAP", labelX, ry + TEXT_PADDING,
+                    on_row(row) ? cursor_mark_ink(t) : t.textParam, CHAR_SPACING, FONT_SCALE);
+        static constexpr const char* FUNC_NAMES[4] = {"EDIT", "OPTION", "PLAY", "SHIFT"};
+        static constexpr const char* BTN_NAMES[4] = {"A", "B", "Y", "X"};
+        const int fn = clamp(v.btnMapSel, 0, 3);
+        int btn = 0;
+        switch (fn) {
+            case 0: btn = v.btnEdit; break;
+            case 1: btn = v.btnOption; break;
+            case 2: btn = v.btnPlay; break;
+            default: btn = v.btnShift; break;
+        }
+        btn = clamp(btn, 0, 3);
+        draw_cursor_cell(c, FUNC_NAMES[fn], val1X, ry + TEXT_PADDING,
+                         on_cell(row, 1), t.textValue, t);
+        draw_cursor_cell(c, BTN_NAMES[btn], val2X, ry + TEXT_PADDING,
+                         on_cell(row, 2), t.textValue, t);
+        draw_cursor_cell(c, "RESET", val2X + 60, ry + TEXT_PADDING,
+                          on_cell(row, 3), t.textValue, t);
+    }
+
     dual_row(SettingsRow::METRONOME, "METRONOME", on_off(v.metronomeEnabled),
              "VOL", hex2(v.metronomeVolume));
 
@@ -159,6 +193,8 @@ void SettingsModule::draw(Canvas& c, int x, int y, const SettingsState& s) const
 
     param_row(SettingsRow::TRACE, "TRACE", on_off(v.traceEnabled));
 
+    param_row(SettingsRow::AUDIO_IN, "AUDIO IN", v.audioInputDevice.empty() ? "OFF" : v.audioInputDevice);
+
     // FOLDER = REMEMBER / REFRESH, placed by its own offset.
     param_row(SettingsRow::FOLDER, "FOLDER", v.rememberFolder ? "REMEMBER" : "REFRESH");
 }
@@ -202,6 +238,10 @@ CursorContext SettingsModule::cursor_context(const SettingsState& s) const {
             return cc::hex_byte(v.metronomeVolume, 0, 255);
 
         case SettingsRow::ABXY:       return cc::enum_cycle(v.abxyIndex, 3);
+        case SettingsRow::BTN_MAP:
+            if (s.cursorColumn == 1) return cc::enum_cycle(v.btnMapSel, 4);
+            if (s.cursorColumn == 3) return cc::read_only();
+            return cc::enum_cycle(btn_for_sel(v), 4);
         case SettingsRow::AUDIO_OUT:  return cc::enum_cycle(v.audioOutIndex, v.audioOutCount);
         case SettingsRow::KB_INSERT:  return cc::toggle_binary(v.insertBefore);
         case SettingsRow::CURSOR:     return cc::toggle_binary(v.cursorRemember);
@@ -223,6 +263,9 @@ CursorContext SettingsModule::cursor_context(const SettingsState& s) const {
         case SettingsRow::RESUME:     return cc::toggle_binary(v.autosaveResumeAuto);
 
         case SettingsRow::TRACE:      return cc::toggle_binary(v.traceEnabled);
+        case SettingsRow::AUDIO_IN:   return cc::toggle_ternary(v.audioInputDevice.empty() ? "OFF" : v.audioInputDevice,
+                                                                v.audioInputDevices.empty() ? std::vector<std::string>{"OFF"}
+                                                                                             : v.audioInputDevices);
     }
     return cc::none();
 }
@@ -271,6 +314,15 @@ SettingsInputResult SettingsModule::handle_input(SettingsValues& v, Theme& theme
             break;
 
         case SettingsRow::ABXY: v.abxyIndex = index_in(3); break;
+        case SettingsRow::BTN_MAP:
+            if (cursor_column == 1)      v.btnMapSel = index_in(4);
+            else {
+                int& target = (v.btnMapSel == 0) ? v.btnEdit :
+                              (v.btnMapSel == 1) ? v.btnOption :
+                              (v.btnMapSel == 2) ? v.btnPlay : v.btnShift;
+                target = clamp(value, 0, 3);
+            }
+            break;
         // The shell opens the output and writes the NAME once it plays.
         case SettingsRow::AUDIO_OUT: v.audioOutIndex = index_in(v.audioOutCount); break;
 
@@ -289,6 +341,14 @@ SettingsInputResult SettingsModule::handle_input(SettingsValues& v, Theme& theme
             break;
 
         case SettingsRow::HELP: v.helpMode = clamp(value, 0, 2); break;
+
+        case SettingsRow::AUDIO_IN: {
+            if (value >= 0 && value < static_cast<int>(v.audioInputDevices.size()))
+                v.audioInputDevice = v.audioInputDevices[static_cast<size_t>(value)];
+            else
+                v.audioInputDevice.clear();
+            break;
+        }
 
         // A-only rows: the dispatcher's.
         case SettingsRow::THEME:

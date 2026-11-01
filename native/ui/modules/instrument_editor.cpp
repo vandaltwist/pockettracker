@@ -69,6 +69,11 @@ const char* cell_label(Cell cell, int cc_slot_index) {
         case Cell::END:          return "END";
         case Cell::LOOP_END:     return "LOOP END";
         case Cell::REVERSE:      return "REVERSE";
+        case Cell::GRAIN_SIZE:   return "GRAIN SZ";
+        case Cell::GRAIN_DENSITY:return "DENSITY";
+        case Cell::GRAIN_PITCH:  return "G PITCH";
+        case Cell::SCAN_POS:     return "SCAN";
+        case Cell::GRAIN_DIR:    return "G DIR";
         case Cell::MIDI_CHANNEL: return "CHAN";
         case Cell::MIDI_BANK:    return "BANK";
         case Cell::MIDI_PROGRAM: return "PROG";
@@ -124,6 +129,11 @@ std::string cell_text(Cell cell, int cc_slot_index, const InstrumentEditorState&
         case Cell::END:        return hex2(ins.sampleEnd);
         case Cell::LOOP_END:   return hex2(ins.loopEnd);
         case Cell::REVERSE:    return on_off(ins.reverse);
+        case Cell::GRAIN_SIZE:     return hex2(ins.granular.grainSize);
+        case Cell::GRAIN_DENSITY:  return hex2(ins.granular.grainDensity);
+        case Cell::GRAIN_PITCH:    return hex2(ins.granular.grainPitch);
+        case Cell::SCAN_POS:       return hex2(ins.granular.scanPos);
+        case Cell::GRAIN_DIR:      return ins.granular.grainReverse ? "REV" : "FWD";
         // CHAN is stored 0-15 and shown 1-16.
         case Cell::MIDI_CHANNEL: return dec2(clamp(ins.midiChannel, 0, 15) + 1);
         // 14-bit, so four hex digits.
@@ -248,6 +258,7 @@ void InstrumentEditorModule::draw_type_load_row(Canvas& c, int x, int y, int nam
     // Lowercase, as the other cycling cells here.
     const char* typeText = "sampler";
     switch (type) {
+        case InstrumentType::GRANULAR:   typeText = "moongranular"; break;
         case InstrumentType::SOUNDFONT: typeText = "soundfont"; break;
         case InstrumentType::EXTERNAL:  typeText = "external";  break;
         case InstrumentType::SAMPLER:   break;
@@ -351,6 +362,11 @@ CursorContext InstrumentEditorModule::cursor_context(const InstrumentEditorState
         case Cell::END:        return cc::plain_byte(ins.sampleEnd, 0xFF);
         case Cell::LOOP_END:   return cc::plain_byte(ins.loopEnd, 0xFF);
         case Cell::REVERSE:    return cc::toggle_binary(ins.reverse);
+        case Cell::GRAIN_SIZE:     return cc::plain_byte(ins.granular.grainSize, 0x40);
+        case Cell::GRAIN_DENSITY:  return cc::plain_byte(ins.granular.grainDensity, 0x80);
+        case Cell::GRAIN_PITCH:    return cc::plain_byte(ins.granular.grainPitch, 0x80);
+        case Cell::SCAN_POS:       return cc::plain_byte(ins.granular.scanPos, 0x00);
+        case Cell::GRAIN_DIR:      return cc::toggle_binary(ins.granular.grainReverse);
 
         // Steps the stored 0-15, wrapping as the wire does.
         case Cell::MIDI_CHANNEL:
@@ -488,6 +504,11 @@ InstrumentInputResult InstrumentEditorModule::handle_input(Instrument& ins, int 
         case Cell::END:        b255(ins.sampleEnd);                break;
         case Cell::LOOP_END:   b255(ins.loopEnd);                  break;
         case Cell::REVERSE:    flag(ins.reverse);                  break;
+        case Cell::GRAIN_SIZE:     b255(ins.granular.grainSize);    break;
+        case Cell::GRAIN_DENSITY:  b255(ins.granular.grainDensity); break;
+        case Cell::GRAIN_PITCH:    b255(ins.granular.grainPitch);   break;
+        case Cell::SCAN_POS:       b255(ins.granular.scanPos);      break;
+        case Cell::GRAIN_DIR:      flag(ins.granular.grainReverse); break;
 
         case Cell::MIDI_CHANNEL: if (isSet) ins.midiChannel = clamp(v, 0, 15); break;  // stored 0-15
         case Cell::MIDI_BANK:    optional(ins.midiBank, 16383);   break;

@@ -233,6 +233,25 @@ inline Instrument parse_instrument(const json& j, int index) {
     i.eqSlot         = get_int(j, "eqSlot", i.eqSlot);
     i.slicingMode    = get_int(j, "slicingMode", i.slicingMode);
     i.transposeEnabled = get_bool(j, "transposeEnabled", i.transposeEnabled);
+    { auto it = j.find("granular");
+      if (it != j.end() && it->is_object()) {
+          const auto& g = *it;
+          i.granular.grainSize    = get_int(g, "grainSize", i.granular.grainSize);
+          i.granular.grainDensity = get_int(g, "grainDensity", i.granular.grainDensity);
+          i.granular.grainPitch   = get_int(g, "grainPitch", i.granular.grainPitch);
+          i.granular.grainCount   = get_int(g, "grainCount", i.granular.grainCount);
+          i.granular.grainReverse = get_bool(g, "grainReverse", i.granular.grainReverse);
+          i.granular.scanPos      = get_int(g, "scanPos", i.granular.scanPos);
+          i.granular.scanSpeed    = get_int(g, "scanSpeed", i.granular.scanSpeed);
+          i.granular.envAttack    = get_int(g, "envAttack", i.granular.envAttack);
+          i.granular.envDecay     = get_int(g, "envDecay", i.granular.envDecay);
+          i.granular.envSustain   = get_int(g, "envSustain", i.granular.envSustain);
+          i.granular.envRelease   = get_int(g, "envRelease", i.granular.envRelease);
+          i.granular.lfoRate      = get_int(g, "lfoRate", i.granular.lfoRate);
+          i.granular.lfoDepth     = get_int(g, "lfoDepth", i.granular.lfoDepth);
+          i.granular.lfoTarget    = get_int(g, "lfoTarget", i.granular.lfoTarget);
+          i.granular.lfoShape     = get_int(g, "lfoShape", i.granular.lfoShape);
+      } }
     { auto it = j.find("sliceMarkers");
       if (it != j.end() && it->is_array())
           for (const auto& e : *it) i.sliceMarkers.push_back(e.is_number() ? e.get<int64_t>() : 0); }
@@ -677,6 +696,26 @@ inline void emit_instrument(JsonWriter& w, const Instrument& i) {
     if (i.slicingMode != 0) w.field_int("slicingMode", i.slicingMode);
     // ⚠️ Defaults to TRUE, so the guard is inverted: the field appears only once turned OFF.
     if (!i.transposeEnabled) w.field_bool("transposeEnabled", i.transposeEnabled);
+    if (i.instrumentType == InstrumentType::GRANULAR) {
+        w.key("granular");
+        w.begin_object();
+        w.field_int("grainSize", i.granular.grainSize);
+        w.field_int("grainDensity", i.granular.grainDensity);
+        w.field_int("grainPitch", i.granular.grainPitch);
+        w.field_int("grainCount", i.granular.grainCount);
+        w.field_bool("grainReverse", i.granular.grainReverse);
+        w.field_int("scanPos", i.granular.scanPos);
+        w.field_int("scanSpeed", i.granular.scanSpeed);
+        w.field_int("envAttack", i.granular.envAttack);
+        w.field_int("envDecay", i.granular.envDecay);
+        w.field_int("envSustain", i.granular.envSustain);
+        w.field_int("envRelease", i.granular.envRelease);
+        w.field_int("lfoRate", i.granular.lfoRate);
+        w.field_int("lfoDepth", i.granular.lfoDepth);
+        w.field_int("lfoTarget", i.granular.lfoTarget);
+        w.field_int("lfoShape", i.granular.lfoShape);
+        w.end_object();
+    }
     if (!i.sliceMarkers.empty()) {
         w.key("sliceMarkers");
         w.begin_array();

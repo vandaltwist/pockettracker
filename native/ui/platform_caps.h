@@ -38,6 +38,9 @@ struct PlatformCaps {
     // AUDIO OUT: the output can be switched while running (Windows: ASIO).
     bool audioOutputs = false;
 
+    // AUDIO IN: an input device exists for recording.
+    bool audioInput = false;
+
     // The tests' row map: every device row, no exit.
     static PlatformCaps android(bool debug_build) {
         PlatformCaps c;
@@ -63,6 +66,7 @@ struct PlatformCaps {
         c.appExit        = true;
         c.midi           = true;
         c.loopWindow     = debug_build;
+        c.audioInput     = true;
         return c;
     }
 

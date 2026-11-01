@@ -6,6 +6,9 @@
 #ifndef POCKETTRACKER_AUDIO_BACKEND_H
 #define POCKETTRACKER_AUDIO_BACKEND_H
 
+#include <string>
+#include <vector>
+
 class AudioBackend {
   public:
     virtual ~AudioBackend() = default;
@@ -34,6 +37,16 @@ class AudioBackend {
     // Did the platform take the device away? ⚠️ False = nothing to report, not "fine": only Oboe on
     // AAudio says.
     virtual bool deviceLost() const { return false; }
+
+    // ── Audio input capture ─────────────────────────────────────────────────────────────────────
+    // Open a capture device. Returns false when the platform has no input or the device cannot open.
+    virtual bool openCapture(int deviceIndex) { return false; }
+    virtual void closeCapture() {}
+    // The capture device calls this with input audio (interleaved stereo float32, or mono when
+    // right == nullptr). Returns frames actually written.
+    virtual int captureWrite(const float* left, const float* right, int frames) { return 0; }
+    // List input device names. Cleared on each call.
+    virtual void listInputDevices(std::vector<std::string>& out) {}
 };
 
 #endif  // POCKETTRACKER_AUDIO_BACKEND_H
