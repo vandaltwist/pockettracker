@@ -805,6 +805,12 @@ void AudioEngine::setInstrumentParams(int instrumentId, int start, int end, bool
     instrumentParams.publish(instrumentId);
 }
 
+void AudioEngine::setGranularParams(int instrumentId, const pt::GranularSettings& p) {
+    if (instrumentId < 0 || instrumentId >= 256) return;
+    instrumentParams.edit(instrumentId).granular = p;
+    instrumentParams.publish(instrumentId);
+}
+
 void AudioEngine::setInstrumentFrameWindow(int instrumentId, int startFrame, int endFrame) {
     if (instrumentId < 0 || instrumentId >= 256) return;
     const bool armed = (startFrame >= 0 && endFrame > startFrame);

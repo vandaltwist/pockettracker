@@ -1,0 +1,11 @@
+{
+	"InstallScripts" : 
+	[
+		"C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/cmake_install.cmake",
+		"C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/native/cmake_install.cmake",
+		"C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/native/vendor/ogg/cmake_install.cmake",
+		"C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/native/vendor/opus/cmake_install.cmake",
+		"C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/_deps/sdl2-build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

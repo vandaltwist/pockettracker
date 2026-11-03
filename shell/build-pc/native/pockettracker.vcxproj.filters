@@ -1,0 +1,148 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="16.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\songcore\schema-check.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\common\byte_source.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\common\platform_memory.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\common\load_progress.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\soundfont-voice.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\soundfont-trim.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\sample-editor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\audio-engine.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\engine-samples.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\engine-soundfont.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\engine-tables.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\engine-mix.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\transient-detector.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\audio-decoders.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\stb_vorbis\stb_vorbis.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\minimp4\minimp4_impl.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\kissfft\kiss_fft.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\kissfft\kiss_fftr.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\effects\primitives\daisysp\svf.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\effects\primitives\daisysp\overdrive.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\effects\primitives\daisysp\decimator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\effects\primitives\daisysp\limiter.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\effects\primitives\daisysp\compressor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\effects\primitives\daisysp\crossfade.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\effects\primitives\daisysp\balance.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\effects\primitives\daisysp\reverbsc.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\effects\primitives\dragonfly\dragonfly-reverb.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\effects\primitives\dragonfly\freeverb\allpass.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\effects\primitives\dragonfly\freeverb\biquad.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\effects\primitives\dragonfly\freeverb\comb.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\effects\primitives\dragonfly\freeverb\delay.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\effects\primitives\dragonfly\freeverb\delayline.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\effects\primitives\dragonfly\freeverb\earlyref.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\effects\primitives\dragonfly\freeverb\efilter.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\effects\primitives\dragonfly\freeverb\nrev.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\effects\primitives\dragonfly\freeverb\nrevb.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\effects\primitives\dragonfly\freeverb\progenitor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\effects\primitives\dragonfly\freeverb\progenitor2.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\effects\primitives\dragonfly\freeverb\revbase.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\effects\primitives\dragonfly\freeverb\slot.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\effects\primitives\dragonfly\freeverb\utils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\effects\primitives\dragonfly\freeverb\zrev.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\effects\primitives\dragonfly\freeverb\zrev2.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\effects\modules\dust-chain.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\effects\soundpipe\pareq.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{078A3C53-D12E-3AAC-AF2A-95CF61EA20B6}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

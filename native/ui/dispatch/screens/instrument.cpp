@@ -138,7 +138,9 @@ bool InputDispatcher::instrument_open_at_cursor(bool peek) {
                               isSF ? soundfont_extensions() : sample_extensions());
             return true;
         case InstrumentCell::SOURCE_EDIT:
-            open_sample_editor();
+            // MOONGRANULAR has its own editor; every other type edits its sample.
+            if (ins.instrumentType == songcore::InstrumentType::GRANULAR) open_moonset();
+            else                                                          open_sample_editor();
             return true;
 
         // The INSTRUMENT PRESET (.pti: params, mods, table, source path).

@@ -40,6 +40,8 @@ public:
     // The rate every platform opens its stream at; where the hardware runs another, the system
     // converts. One rate everywhere, so a project and its export sound the same on every device.
     static constexpr int SAMPLE_RATE = 48000;
+    // The grain overlay's snapshot: enough heads for every voice the editor can show at once.
+    static constexpr int GRAIN_VIZ_MAX = 64;
 
     // The device's rate, set by the shell when the stream opens. Call before the stream is unpaused.
     // ⚠️ A new rate rebuilds the send and master buses at factory defaults; the caller re-pushes the
@@ -110,6 +112,9 @@ public:
 
     void setInstrumentParams(int instrumentId, int start, int end, bool rev, int loop, int loopSt, int loopEn,
                              int drv, int crsh, int dwn, int fType, int fCut, int fRes);
+    // MOONGRANULAR's GRAIN / ROAM / MOTION blocks. A value copy: the audio thread reads it every
+    // piece, so the UI never shares memory with the engine.
+    void setGranularParams(int instrumentId, const pt::GranularSettings& p);
 
     // The playback window in frames, for the sample editor's audition. Overrides start/end until the
     // next setInstrumentParams; −1 or an inverted pair disarms.
@@ -177,6 +182,9 @@ public:
     void  getSampleData(int id, float* out);       // left channel copy
     void  getSampleDataRight(int id, float* out);  // right channel copy
     float getSamplePlaybackPosition(int id);  // 0.0-1.0 fraction of active voice, or -1 if silent
+    // The grain cloud's live read heads, 0..1 of their sample; returns how many were copied. Written
+    // once a block by the audio thread, read by the editor at frame rate.
+    int   getGrainPositions(float* out, int max) const;
     void normalizeSample(int id, int startFrame, int endFrame);
     void fadeInSample(int id, int startFrame, int endFrame);
     void fadeOutSample(int id, int startFrame, int endFrame);
@@ -720,6 +728,11 @@ private:
     };
     SeqPublisher<VoiceView> voiceViewPublisher;
     void publishVoiceView();              // audio thread
+    // The grain cloud snapshot. Positions first, count with release; the editor reads count with
+    // acquire and never sees a half-written new set. Visual only, so a rare torn frame is harmless.
+    void publishGrainViz();               // audio thread, after the voices are mixed
+    std::atomic<int>   grainVizCount_{0};
+    std::atomic<float> grainVizPos_[GRAIN_VIZ_MAX]{};
     VoiceView voiceView_;                 // the UI's copy
     uint32_t  voiceViewSeen_ = 0;
     const VoiceView& voiceView() { voiceViewPublisher.read(voiceView_, voiceViewSeen_); return voiceView_; }

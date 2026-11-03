@@ -16,6 +16,7 @@
 #include "ui/instrument_row_layout.h"
 #include "ui/modules/groove_editor.h"
 #include "ui/modules/midi_map_editor.h"
+#include "ui/modules/moonset.h"
 #include "ui/modules/scale_editor.h"
 #include "ui/settings_row_layout.h"
 #include "ui/song_pointer.h"
@@ -156,6 +157,21 @@ inline void sample_editor_step_col(AppState& s, int delta) {
     }
 }
 
+// MOONSET: rows walk within the block; LEFT/RIGHT change the block.
+inline void moonset_step_row(AppState& s, int delta) {
+    MoonsetState& m = s.moonset;
+    const int count = moonset_row_count(m.cursorColumn);
+    if (count <= 0) { m.cursorRow = 0; return; }
+    m.cursorRow = std::clamp(m.cursorRow + delta, 0, count - 1);
+}
+
+inline void moonset_step_col(AppState& s, int delta) {
+    MoonsetState& m = s.moonset;
+    m.cursorColumn = std::clamp(m.cursorColumn + delta, 0, 2);
+    const int count = moonset_row_count(m.cursorColumn);
+    if (count > 0 && m.cursorRow >= count) m.cursorRow = count - 1;
+}
+
 inline void instrument_step_row(AppState& s, int delta) {
     const songcore::InstrumentType ty = instrument_type_of(s);
     const int oldRow = s.instrumentCursorRow;
@@ -192,6 +208,10 @@ inline void move_cursor_up(AppState& s) {
     switch (s.currentScreen) {
         case ScreenType::SAMPLE_EDITOR:
             detail::sample_editor_step_row(s, -1);
+            break;
+
+        case ScreenType::MOONSET:
+            detail::moonset_step_row(s, -1);
             break;
 
         case ScreenType::SONG:
@@ -291,6 +311,10 @@ inline void move_cursor_down(AppState& s) {
     switch (s.currentScreen) {
         case ScreenType::SAMPLE_EDITOR:
             detail::sample_editor_step_row(s, +1);
+            break;
+
+        case ScreenType::MOONSET:
+            detail::moonset_step_row(s, +1);
             break;
 
         case ScreenType::SONG:
@@ -407,6 +431,10 @@ inline void move_cursor_left(AppState& s) {
         detail::sample_editor_step_col(s, -1);
         return;
     }
+    if (s.currentScreen == ScreenType::MOONSET) {
+        detail::moonset_step_col(s, -1);
+        return;
+    }
     switch (s.currentScreen) {
         case ScreenType::TABLE:
             if (s.tableCursorColumn > 1) s.tableCursorColumn--;
@@ -485,6 +513,10 @@ inline void move_cursor_left(AppState& s) {
 inline void move_cursor_right(AppState& s) {
     if (s.currentScreen == ScreenType::SAMPLE_EDITOR) {
         detail::sample_editor_step_col(s, +1);
+        return;
+    }
+    if (s.currentScreen == ScreenType::MOONSET) {
+        detail::moonset_step_col(s, +1);
         return;
     }
     switch (s.currentScreen) {

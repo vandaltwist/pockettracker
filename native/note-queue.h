@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <cstring>
 #include "audio-defs.h"
+#include "granular/granular-voice.h"   // GranularSettings, the engine's copy of GRAIN/ROAM/MOTION
 #include "songcore/program.h"   // NoteOnPayload — a queued note carries it until the trigger
 #include "table-lanes.h"
 
@@ -64,6 +65,9 @@ struct ScheduledNote {
     float vibratoDepth;      // PVB/PVX, semitones
 
     int tableStartRow;       // THO: -1 = default (0 or TIC00 continuity), else 0-15
+
+    // Sampler notes only: this one plays through a grain cloud instead of one playhead.
+    bool isGranular = false;
 
     // SoundFont notes only.
     bool isSoundfont = false;
@@ -297,6 +301,9 @@ struct InstrumentParams {
     // Cleared by every setInstrumentParams push; read at the trigger, so it changes the next note only.
     int startFrame = -1;
     int endFrame   = -1;
+
+    // MOONGRANULAR's live blocks. Read every piece by the grain cloud, so an edit is heard at once.
+    pt::GranularSettings granular{};
 };
 
 // One modulation slot; copied to VoiceModSlot at the trigger.

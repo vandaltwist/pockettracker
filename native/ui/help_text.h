@@ -348,6 +348,7 @@ enum class HelpTopic {
     INST_MIDI_BEND,
     MIDI_SYNC_IN,
     PROJECT_COLLECT,
+    SCREEN_MOONSET,
 
     COUNT
 };
@@ -2436,6 +2437,21 @@ inline constexpr HelpEntry HELP_ENTRIES[] = {
       "song. Your own files stay put."},
      {"A collects. If the folder is",
       "there, it asks what to do."}},
+    /* SCREEN_MOONSET */
+    {"MOONSET: the grain cloud", "The three blocks of a", "MOONGRANULAR instrument.",
+     {"Edit the granular instrument:",
+      "GRAIN sets the cloud itself,",
+      "ROAM moves the read head",
+      "around the sample, and MOTION",
+      "jumps and stutters the grains.",
+      "The waveform shows the head,",
+      "the live grains and the",
+      "playhead."},
+     {"X auditions the instrument",
+      "A+D-PAD changes a value",
+      "LEFT/RIGHT picks a block",
+      "UP/DOWN a row",
+      "B goes back to INSTRUMENT"}},
 };
 
 // ─── Rules 2 and 3, as compile errors — at runtime they fail silently ────────────────────────────
@@ -2543,6 +2559,7 @@ inline HelpTopic help_screen_topic(ScreenType screen) {
         case ScreenType::SAMPLE_EDITOR: return HelpTopic::SCREEN_SAMPLE_EDITOR;
         case ScreenType::MIDI:          return HelpTopic::SCREEN_MIDI;
         case ScreenType::MIDI_MAP:      return HelpTopic::SCREEN_MIDI_MAP;
+        case ScreenType::MOONSET:       return HelpTopic::SCREEN_MOONSET;
     }
     return HelpTopic::NONE;
 }

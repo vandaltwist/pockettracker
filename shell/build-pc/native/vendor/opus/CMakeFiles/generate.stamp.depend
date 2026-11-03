@@ -1,0 +1,26 @@
+# CMake generation dependency list for this directory.
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/native/vendor/opus/CMakeLists.txt
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/native/vendor/opus/cmake/CFeatureCheck.cmake
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/native/vendor/opus/cmake/OpusBuildtype.cmake
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/native/vendor/opus/cmake/OpusConfig.cmake
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/native/vendor/opus/cmake/OpusFunctions.cmake
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/native/vendor/opus/cmake/OpusPackageVersion.cmake
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/native/vendor/opus/cmake/OpusSources.cmake
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/native/vendor/opus/cmake/config.h.cmake.in
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/CMakeFiles/cmake.verify_globs
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/CMakeCheckCompilerFlagCommonPatterns.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/CMakeDependentOption.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/CMakePushCheckState.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/CheckCCompilerFlag.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/CheckCSourceCompiles.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/CheckIncludeFile.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/CheckLibraryExists.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/CheckSymbolExists.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/FeatureSummary.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/FindGit.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/FindPackageHandleStandardArgs.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/FindPackageMessage.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/GNUInstallDirs.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/Internal/CheckCompilerFlag.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/Internal/CheckFlagCommonConfig.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/Internal/CheckSourceCompiles.cmake

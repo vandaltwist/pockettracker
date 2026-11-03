@@ -1,0 +1,2 @@
+C:\Users\JORDAN~1\scoop\apps\mingw\current\bin\ar.exe qc libopusfile.a CMakeFiles/opusfile.dir/vendor/opusfile/src/opusfile.c.obj CMakeFiles/opusfile.dir/vendor/opusfile/src/info.c.obj CMakeFiles/opusfile.dir/vendor/opusfile/src/internal.c.obj CMakeFiles/opusfile.dir/vendor/opusfile/src/stream.c.obj
+C:\Users\JORDAN~1\scoop\apps\mingw\current\bin\ranlib.exe libopusfile.a

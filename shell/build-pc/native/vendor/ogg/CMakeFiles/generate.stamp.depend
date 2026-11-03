@@ -1,0 +1,20 @@
+# CMake generation dependency list for this directory.
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/native/vendor/ogg/CMakeLists.txt
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/native/vendor/ogg/cmake/CheckSizes.cmake
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/native/vendor/ogg/cmake/OggConfig.cmake.in
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/native/vendor/ogg/include/ogg/config_types.h.in
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/native/vendor/ogg/ogg.pc.in
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/CMakeFiles/cmake.verify_globs
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/BasicConfigVersion-SameMajorVersion.cmake.in
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/CMakePackageConfigHelpers.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/CPack.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/CPackComponent.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/CTest.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/CTestUseLaunchers.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/CheckIncludeFile.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/CheckIncludeFileCXX.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/CheckIncludeFiles.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/CheckTypeSize.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/GNUInstallDirs.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/WriteBasicConfigVersionFile.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Templates/CPackConfig.cmake.in

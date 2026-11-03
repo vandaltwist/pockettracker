@@ -1,0 +1,358 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="16.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+  </PropertyGroup>
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="MinSizeRel|x64">
+      <Configuration>MinSizeRel</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="RelWithDebInfo|x64">
+      <Configuration>RelWithDebInfo</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{822ACD19-319B-3DF3-B5B6-B3C5461C3A4D}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <WindowsTargetPlatformVersion>10.0.22621.0</WindowsTargetPlatformVersion>
+    <Platform>x64</Platform>
+    <ProjectName>faad2</ProjectName>
+    <VCProjectUpgraderObjectName>NoUpgrade</VCProjectUpgraderObjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.20506.1</_ProjectFileVersion>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\native\Debug\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">faad2.dir\Debug\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">faad2</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.lib</TargetExt>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\native\Release\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">faad2.dir\Release\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">faad2</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Release|x64'">.lib</TargetExt>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\native\MinSizeRel\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">faad2.dir\MinSizeRel\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">faad2</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">.lib</TargetExt>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\native\RelWithDebInfo\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">faad2.dir\RelWithDebInfo\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">faad2</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">.lib</TargetExt>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\include;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /w</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <BufferSecurityCheck></BufferSecurityCheck>
+      <CallingConvention></CallingConvention>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <FloatingPointModel></FloatingPointModel>
+      <ForceConformanceInForLoopScope></ForceConformanceInForLoopScope>
+      <InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
+      <MinimalRebuild></MinimalRebuild>
+      <Optimization>Disabled</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RemoveUnreferencedCodeData></RemoveUnreferencedCodeData>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <SupportJustMyCode></SupportJustMyCode>
+      <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
+      <UseFullPaths>false</UseFullPaths>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;PACKAGE_VERSION="2.11.2";HAVE_STDINT_H=1;CMAKE_INTDIR="Debug"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_DEBUG;_WINDOWS;PACKAGE_VERSION=\"2.11.2\";HAVE_STDINT_H=1;CMAKE_INTDIR=\"Debug\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\include;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\include;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\include;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /w</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <BufferSecurityCheck></BufferSecurityCheck>
+      <CallingConvention></CallingConvention>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <FloatingPointModel></FloatingPointModel>
+      <ForceConformanceInForLoopScope></ForceConformanceInForLoopScope>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <MinimalRebuild></MinimalRebuild>
+      <Optimization>MaxSpeed</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RemoveUnreferencedCodeData></RemoveUnreferencedCodeData>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <SupportJustMyCode></SupportJustMyCode>
+      <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
+      <UseFullPaths>false</UseFullPaths>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;PACKAGE_VERSION="2.11.2";HAVE_STDINT_H=1;CMAKE_INTDIR="Release"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <DebugInformationFormat>
+      </DebugInformationFormat>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;PACKAGE_VERSION=\"2.11.2\";HAVE_STDINT_H=1;CMAKE_INTDIR=\"Release\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\include;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\include;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\include;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /w</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <BufferSecurityCheck></BufferSecurityCheck>
+      <CallingConvention></CallingConvention>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <FloatingPointModel></FloatingPointModel>
+      <ForceConformanceInForLoopScope></ForceConformanceInForLoopScope>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <MinimalRebuild></MinimalRebuild>
+      <Optimization>MinSpace</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RemoveUnreferencedCodeData></RemoveUnreferencedCodeData>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <SupportJustMyCode></SupportJustMyCode>
+      <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
+      <UseFullPaths>false</UseFullPaths>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;PACKAGE_VERSION="2.11.2";HAVE_STDINT_H=1;CMAKE_INTDIR="MinSizeRel"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <DebugInformationFormat>
+      </DebugInformationFormat>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;PACKAGE_VERSION=\"2.11.2\";HAVE_STDINT_H=1;CMAKE_INTDIR=\"MinSizeRel\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\include;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\include;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\include;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /w</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <BufferSecurityCheck></BufferSecurityCheck>
+      <CallingConvention></CallingConvention>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <FloatingPointModel></FloatingPointModel>
+      <ForceConformanceInForLoopScope></ForceConformanceInForLoopScope>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <MinimalRebuild></MinimalRebuild>
+      <Optimization>MaxSpeed</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RemoveUnreferencedCodeData></RemoveUnreferencedCodeData>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <SupportJustMyCode></SupportJustMyCode>
+      <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
+      <UseFullPaths>false</UseFullPaths>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;PACKAGE_VERSION="2.11.2";HAVE_STDINT_H=1;CMAKE_INTDIR="RelWithDebInfo"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;PACKAGE_VERSION=\"2.11.2\";HAVE_STDINT_H=1;CMAKE_INTDIR=\"RelWithDebInfo\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\include;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\include;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\CMakeLists.txt">
+      <UseUtf8Encoding>Always</UseUtf8Encoding>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Building Custom Rule C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/native/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+"C:\Users\Jordan Solans\scoop\apps\cmake\current\bin\cmake.exe" "-SC:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell" "-BC:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc" --check-stamp-file "C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/native/CMakeFiles/generate.stamp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\CMakeFiles\cmake.verify_globs;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\native\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Building Custom Rule C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/native/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+"C:\Users\Jordan Solans\scoop\apps\cmake\current\bin\cmake.exe" "-SC:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell" "-BC:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc" --check-stamp-file "C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/native/CMakeFiles/generate.stamp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\CMakeFiles\cmake.verify_globs;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\native\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">Building Custom Rule C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/native/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">setlocal
+"C:\Users\Jordan Solans\scoop\apps\cmake\current\bin\cmake.exe" "-SC:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell" "-BC:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc" --check-stamp-file "C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/native/CMakeFiles/generate.stamp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\CMakeFiles\cmake.verify_globs;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\native\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">Building Custom Rule C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/native/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">setlocal
+"C:\Users\Jordan Solans\scoop\apps\cmake\current\bin\cmake.exe" "-SC:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell" "-BC:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc" --check-stamp-file "C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/native/CMakeFiles/generate.stamp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\CMakeFiles\cmake.verify_globs;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\native\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\bits.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\cfft.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\common.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\decoder.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\drc.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\drm_dec.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\error.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\filtbank.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\hcr.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\huffman.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\ic_predict.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\is.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\lt_predict.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\mdct.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\mp4.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\ms.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\output.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\pns.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\ps_dec.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\ps_syntax.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\pulse.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\rvlc.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\sbr_dct.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\sbr_dec.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\sbr_e_nf.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\sbr_fbt.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\sbr_hfadj.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\sbr_hfgen.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\sbr_huff.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\sbr_qmf.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\sbr_syntax.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\sbr_tf_grid.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\specrec.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\ssr.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\ssr_fb.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\ssr_ipqf.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\syntax.c" />
+    <ClCompile Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\vendor\faad2\libfaad\tns.c" />
+  </ItemGroup>
+  <ItemGroup />
+  <ItemGroup>
+    <ProjectReference Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\ZERO_CHECK.vcxproj">
+      <Project>{E5458726-8B27-3347-B9E2-8CE656D818E3}</Project>
+      <Name>ZERO_CHECK</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

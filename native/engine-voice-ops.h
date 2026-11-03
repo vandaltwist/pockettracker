@@ -1,6 +1,8 @@
 #pragma once
 // Per-voice writes shared by the table walk (engine-tables.cpp) and the block's queue drain
 // (engine-mix.cpp). Private to the engine: one overload per voice type, resolved at compile time.
+#include <type_traits>
+
 #include "audio-engine.h"
 #include "songcore/chords.h"
 
@@ -97,6 +99,34 @@ static inline void voiceReloadInstrument(V& v, const InstrumentParams& ip, float
     voiceSetDrive(v, ip.drive);
     voiceSetCrush(v, ((ip.crush & 0x0F) << 4) | (ip.downsample & 0x0F));
     voiceSetSends(v, ip.reverbSend, ip.delaySend);
+
+    // The sample window and loop too: the editor's START drags a selection under a sounding
+    // audition, and that audition must follow without a retrigger. A note with its own override
+    // (a CUT slice, an Offset) keeps the window it was played with.
+    if constexpr (std::is_same_v<V, Voice>) {
+        if (v.noteStartOverride < 0 && v.noteEndOverride < 0 && v.sampleLength >= 2) {
+            derive_sample_window((float)ip.startPoint, (float)ip.endPoint, v.sampleLength,
+                                 v.actualStart, v.actualEnd);
+            const bool frameWindow = (ip.startFrame >= 0 && ip.endFrame > ip.startFrame);
+            if (frameWindow) {
+                v.actualStart = std::max(0, std::min(ip.startFrame, v.sampleLength - 2));
+                v.actualEnd   = std::max(v.actualStart + 1, std::min(ip.endFrame, v.sampleLength - 1));
+            }
+            v.windowStartFrame = frameWindow ? v.actualStart : -1;
+            v.windowEndFrame   = frameWindow ? v.actualEnd   : -1;
+
+            v.actualLoopStart = (int)(((int64_t)ip.loopStart * v.sampleLength) / 255);
+            v.actualLoopEnd   = (int)(((int64_t)ip.loopEnd   * v.sampleLength) / 255);
+            v.actualLoopStart = std::max(v.actualStart, std::min(v.actualLoopStart, v.actualEnd - 1));
+            v.actualLoopEnd   = std::max(v.actualLoopStart + 1, std::min(v.actualLoopEnd, v.actualEnd));
+            v.loopEndNorm     = ip.loopEnd;
+            v.reverse         = ip.reverse;
+            v.loopMode        = ip.loopMode;
+            v.loopSlideFrames = 0;
+            if (v.position < (double)v.actualStart || v.position >= (double)v.actualEnd)
+                v.position = v.firstFrame();
+        }
+    }
 }
 
 // A table PAN glides over PAN_GLIDE_SAMPLES (glide.h).

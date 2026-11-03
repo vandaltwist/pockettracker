@@ -1,0 +1,38 @@
+# CMake generation dependency list for this directory.
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/CMakeFiles/cmake.verify_globs
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/_deps/sdl2-build/SDL_config.h.intermediate
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/_deps/sdl2-src/CMakeLists.txt
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/_deps/sdl2-src/SDL2.spec.in
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/_deps/sdl2-src/cmake/CheckCPUArchitecture.cmake
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/_deps/sdl2-src/cmake/macros.cmake
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/_deps/sdl2-src/cmake/sdlchecks.cmake
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/_deps/sdl2-src/cmake/sdlfind.cmake
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/_deps/sdl2-src/cmake/sdlplatform.cmake
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/_deps/sdl2-src/cmake_uninstall.cmake.in
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/_deps/sdl2-src/include/SDL_config.h.cmake
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/_deps/sdl2-src/include/SDL_revision.h.cmake
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/_deps/sdl2-src/sdl2-config.in
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/_deps/sdl2-src/sdl2.pc.in
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/CMakeDependentOption.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/CMakeParseArguments.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/CMakePushCheckState.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/CheckCCompilerFlag.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/CheckCSourceCompiles.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/CheckCSourceRuns.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/CheckCXXCompilerFlag.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/CheckCXXSourceCompiles.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/CheckIncludeFile.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/CheckIncludeFiles.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/CheckLanguage.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/CheckLibraryExists.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/CheckSourceCompiles.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/CheckStructHasMember.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/CheckSymbolExists.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/FindGit.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/FindPackageHandleStandardArgs.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/FindPackageMessage.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/FindPkgConfig.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/GNUInstallDirs.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/Internal/CheckCompilerFlag.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/Internal/CheckSourceCompiles.cmake
+C:/Users/Jordan Solans/scoop/apps/cmake/current/share/cmake-4.2/Modules/Internal/CheckSourceRuns.cmake

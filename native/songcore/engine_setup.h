@@ -18,6 +18,7 @@
 #include "model.h"
 #include "scheduler.h"    // hex_to_float
 #include "traversal.h"    // collect_used_instruments
+#include "../granular/granular-voice.h"   // pt::GranularSettings
 #include "voice_derive.h" // Routing, push_instrument_mod_eq_sends, push_instrument_playback_params
 #include "wav_writer.h"   // read_cue_points
 
@@ -31,6 +32,27 @@ template <typename Engine>
 void push_instrument_params(Engine& engine, const Instrument& ins, const Routing& routing,
                             int tempo, int sampleRate) {
     push_instrument_playback_params(engine, ins);
+    // The granular blocks ride with the playback params, keyed by the slot the note will play from.
+    pt::GranularSettings gs;
+    gs.grain.state   = ins.granular.grain.state;
+    gs.grain.position = ins.granular.grain.position;
+    gs.grain.size    = ins.granular.grain.size;
+    gs.grain.density = ins.granular.grain.density;
+    gs.grain.spray   = ins.granular.grain.spray;
+    gs.grain.pitch   = ins.granular.grain.pitch;
+    gs.roam.state    = ins.granular.roam.state;
+    gs.roam.mode     = ins.granular.roam.mode;
+    gs.roam.range    = ins.granular.roam.range;
+    gs.roam.wander   = ins.granular.roam.wander;
+    gs.roam.speed    = ins.granular.roam.speed;
+    gs.roam.smooth   = ins.granular.roam.smooth;
+    gs.motion.state  = ins.granular.motion.state;
+    gs.motion.jump   = ins.granular.motion.jump;
+    gs.motion.hold   = ins.granular.motion.hold;
+    gs.motion.rev    = ins.granular.motion.rev;
+    gs.motion.elastic = ins.granular.motion.elastic;
+    gs.motion.chaos   = ins.granular.motion.chaos;
+    engine.setGranularParams(ins.sampleId, gs);
     push_instrument_mod_eq_sends(engine, ins, tempo, sampleRate);
     // The SF ADSR override — a live key is scheduled with no push, so the engine's copy must be current.
     const SFOverrides& ov = ins.sfOverrides;

@@ -25,6 +25,7 @@ public:
         poll_peaks(engine, state, now_ms);
         poll_eq_spectrum(host, state, now_ms);
         poll_sample_editor(host, state);
+        poll_moonset(engine, host, state);
         poll_sample_ram(engine, state);
     }
 
@@ -305,6 +306,20 @@ private:
         }
     }
 
+    // MOONSET's live reads: the whole sample's waveform (rebuilt when the instrument or its length
+    // changes), the engine's live grain heads every frame, and the voice's playhead.
+    void poll_moonset(AudioEngine& engine, songcore::SongcoreHost& host, AppState& state) {
+        if (state.currentScreen != ScreenType::MOONSET) return;
+        MoonsetState& m = state.moonset;
+        if (m.waveformData.empty()) {
+            m.waveformData = host.sample_waveform(m.instrumentId, 620, 0, 0, /*channel=*/2);
+        }
+        m.sampleRate = host.sample_rate_of(m.instrumentId);
+        m.totalFrames = host.sample_length(m.instrumentId);
+        m.playbackPosition = host.sample_playback_position(m.instrumentId);
+        (void)engine;
+    }
+
     float waveform_[WAVEFORM_SIZE]                            = {};
     float trackWaveforms_[TRACK_WAVEFORM_COUNT * WAVEFORM_SIZE] = {};
     bool  activeFlags_[TRACK_WAVEFORM_COUNT]                  = {};
@@ -314,6 +329,11 @@ private:
     bool    wfKeyValid_ = false;
     int64_t wfStart_ = 0, wfEnd_ = 0;
     int     wfSource_ = -1, wfTotal_ = -1, wfInst_ = -1;
+
+    // What MOONSET's bins were computed from.
+    bool moonsetWfValid_ = false;
+    int  moonsetWfInst_ = -1;
+    int  moonsetWfLen_  = -1;
 
     int         sfCachedId_ = -1, sfCachedBank_ = -1, sfCachedPreset_ = -1;
     bool        sfCachedIsSf_ = false;

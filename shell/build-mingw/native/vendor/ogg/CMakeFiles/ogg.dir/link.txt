@@ -1,0 +1,2 @@
+C:\Users\JORDAN~1\scoop\apps\mingw\current\bin\ar.exe qc libogg.a CMakeFiles/ogg.dir/src/bitwise.c.obj CMakeFiles/ogg.dir/src/framing.c.obj
+C:\Users\JORDAN~1\scoop\apps\mingw\current\bin\ranlib.exe libogg.a

@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <algorithm>
 #include "rng.h"
+#include "granular/granular-voice.h"
 #include "mods/mod-system.h"
 #include "effects/instrument-chain.h"
 #include "table-lanes.h"
@@ -128,6 +129,12 @@ struct Voice : public IAudioVoice {
     float* sampleData = nullptr;
     float* sampleDataRight = nullptr;  // null = mono
     int sampleLength = 0;
+    // MOONGRANULAR: when running, its cloud replaces this voice's single playhead read.
+    pt::GranularVoice granular;
+    // The note's own window overrides (a CUT slice or an Offset). A live instrument reload must not
+    // widen a note that was deliberately narrowed.
+    int noteStartOverride = -1;
+    int noteEndOverride   = -1;
     // double: float spacing reaches 1.0 at 2^24 frames (~6 min), where interpolation collapses.
     double position = 0;
     int trackId = -1;
@@ -256,6 +263,7 @@ struct Voice : public IAudioVoice {
                  const int (&tblTicRates)[TABLE_LANES] = TABLE_TICS_DEFAULT,
                  int octave = 4, int pitch = 0,
                  const int (&startRows)[TABLE_LANES] = TABLE_ROWS_TOP) {
+        granular.reset();
         sampleData = sample;
         sampleDataRight = sampleRight;
         sampleLength = length;
@@ -271,6 +279,8 @@ struct Voice : public IAudioVoice {
         dsFade = Ramp{};
 
         // An override is an Offset effect or a slice start.
+        noteStartOverride = startPointOverride;
+        noteEndOverride   = endPointOverride;
         int effectiveStartPoint = (startPointOverride >= 0) ? startPointOverride : instrParams.startPoint;
         int effectiveEndPoint   = (endPointOverride   >= 0) ? endPointOverride   : instrParams.endPoint;
         derive_sample_window((float)effectiveStartPoint, (float)effectiveEndPoint, length,

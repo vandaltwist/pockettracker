@@ -1,0 +1,2 @@
+C:\Users\JORDAN~1\scoop\apps\mingw\current\bin\ar.exe qc libsongcore.a CMakeFiles/songcore.dir/songcore/scheduler.cpp.obj CMakeFiles/songcore.dir/songcore/host.cpp.obj
+C:\Users\JORDAN~1\scoop\apps\mingw\current\bin\ranlib.exe libsongcore.a

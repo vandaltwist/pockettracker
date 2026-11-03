@@ -405,6 +405,7 @@ bool AudioEngine::resolveScheduledNote(ScheduledNote& note) {
         note.tableStartRow    = a.tableStartRow;
     };
     note.isSoundfont = d.isSoundfont;
+    note.isGranular  = (p.type == songcore::PROGRAM_GRANULAR);
     if (d.isSoundfont) {
         const songcore::SoundfontNoteArgs& a = d.soundfont;
         common(a);
@@ -779,6 +780,14 @@ void AudioEngine::refreshSoundingInstrument(int instrumentId) {
     update.action      = PARAM_UPDATE_INSTRUMENT;
     update.instrId     = instrumentId;
     paramUpdateQueue.schedule(update);
+}
+
+int AudioEngine::getGrainPositions(float* out, int max) const {
+    if (!out || max <= 0) return 0;
+    const int n = std::min(grainVizCount_.load(std::memory_order_acquire), max);
+    for (int i = 0; i < n; ++i)
+        out[i] = grainVizPos_[i].load(std::memory_order_relaxed);
+    return n;
 }
 
 void AudioEngine::setOttDepth(int depth) {

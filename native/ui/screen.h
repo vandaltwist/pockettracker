@@ -30,7 +30,8 @@ enum class ScreenType {
 
     // Appended; screens are named, never numbered.
     MIDI,       // reached from PROJECT > MIDI; not on the R+DPAD grid
-    MIDI_MAP    // …and from MIDI > MAPPING. Not on the grid either
+    MIDI_MAP,   // …and from MIDI > MAPPING. Not on the grid either
+    MOONSET     // a GRANULAR instrument's EDIT; full-screen, like the sample editor
 };
 
 inline const char* screen_label(ScreenType s) {
@@ -52,6 +53,7 @@ inline const char* screen_label(ScreenType s) {
         case ScreenType::SAMPLE_EDITOR: return "SAMPLE EDITOR";
         case ScreenType::MIDI:          return "MIDI";
         case ScreenType::MIDI_MAP:      return "MIDI MAPPING";
+        case ScreenType::MOONSET:       return "MOONSET";
     }
     return "";
 }
@@ -76,6 +78,7 @@ inline const char* screen_short_label(ScreenType s) {
         case ScreenType::SAMPLE_EDITOR: return "SE";
         case ScreenType::MIDI:          return "MI";
         case ScreenType::MIDI_MAP:      return "MM";
+        case ScreenType::MOONSET:       return "MS";
     }
     return "";
 }

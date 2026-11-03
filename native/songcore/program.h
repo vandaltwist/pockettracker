@@ -24,7 +24,8 @@ inline float clampf(float v, float lo, float hi)  { return v < lo ? lo : (v > hi
 constexpr float C4_HZ = 261.63f;
 
 // Instrument kinds as numbers, in InstrumentType's order. ⚠️ A number is an identity: append only.
-enum ProgramType : int8_t { PROGRAM_SAMPLER = 0, PROGRAM_SOUNDFONT = 1, PROGRAM_EXTERNAL = 2 };
+enum ProgramType : int8_t { PROGRAM_SAMPLER = 0, PROGRAM_SOUNDFONT = 1, PROGRAM_EXTERNAL = 2,
+                            PROGRAM_GRANULAR = 3 };
 
 // One instrument, flattened by make_program() (voice_derive.h) with the loaders' rate ratio and slot.
 // ⚠️ `sliceMarkers` is a VIEW into caller-owned memory that must outlive the Program.
@@ -189,9 +190,9 @@ inline SamplerNoteArgs derive_sampler_note(const NoteOnPayload& n, int64_t frame
     if (program_selects_slice(p, n.slice)) {
         const int markerCount = p.sliceCount;
 
-        // SLI wins; otherwise derive from the raw phrase note before transpose (C-4 = slice 0).
+        // SLI wins; otherwise derive from the raw phrase note before transpose (C-4 = slice 1).
         const int sliceIndex = (n.slice >= 0) ? std::min(n.slice, markerCount)
-                                              : clampi(n.note - n.transpose - 60, 0, markerCount);
+                                              : clampi(n.note - n.transpose - 59, 0, markerCount);
 
         if (sampleLength > 0) {
             const int64_t sliceStart = (sliceIndex == 0) ? 0 : p.sliceMarkers[sliceIndex - 1];

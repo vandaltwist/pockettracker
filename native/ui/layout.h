@@ -24,6 +24,7 @@
 #include "ui/modules/midi_settings.h"
 #include "ui/modules/mixer.h"
 #include "ui/modules/modulation.h"
+#include "ui/modules/moonset.h"
 #include "ui/modules/navigation_map.h"
 #include "ui/modules/oscilloscope.h"
 #include "ui/modules/phrase_editor.h"
@@ -108,6 +109,7 @@ private:
     NavigationMapModule   navigationMap_;
     FileBrowserModule     fileBrowser_;
     SampleEditorModule    sampleEditor_;
+    MoonsetModule         moonset_;
     QwertyKeyboardOverlay qwerty_;
     EqModule              eq_;
     ThemeEditorModule     themeEditor_;

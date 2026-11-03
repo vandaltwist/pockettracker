@@ -38,6 +38,7 @@ inline Program make_program(const Instrument& ins, float sampleRateRatio, int sf
     Program p;
     p.type            = (ins.instrumentType == InstrumentType::SOUNDFONT) ? PROGRAM_SOUNDFONT
                       : (ins.instrumentType == InstrumentType::EXTERNAL) ? PROGRAM_EXTERNAL
+                      : (ins.instrumentType == InstrumentType::GRANULAR) ? PROGRAM_GRANULAR
                                                                          : PROGRAM_SAMPLER;
     p.hasSample       = ins.sampleFilePath.has_value();
     p.hasSoundfont    = ins.soundfontPath.has_value();

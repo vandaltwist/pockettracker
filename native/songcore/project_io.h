@@ -2,8 +2,8 @@
 #define POCKETTRACKER_SONGCORE_PROJECT_IO_H
 
 // .ptp / .pti: read with nlohmann/json (unknown keys ignored), written by a hand-rolled MINIFIED
-// emitter — autosave rewrites the whole file every 3 s.
-// ⚠️ The golden .ptp files are pretty-printed by the ORIGINAL implementation; never regenerate them
+// emitter Ã¢â‚¬â€ autosave rewrites the whole file every 3 s.
+// Ã¢Å¡Â Ã¯Â¸Â The golden .ptp files are pretty-printed by the ORIGINAL implementation; never regenerate them
 // from this emitter.
 // Output: keys in declaration order (model.h); a field equal to its default is omitted, except
 // fixed-size arrays and fields with no default; nulls omitted; enums by NAME; integers only.
@@ -22,7 +22,7 @@ namespace songcore {
 
 using nlohmann::json;
 
-// ─── parse helpers (missing / wrong-typed key → the supplied default) ──────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ parse helpers (missing / wrong-typed key Ã¢â€ â€™ the supplied default) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 namespace detail {
 
@@ -39,7 +39,7 @@ inline std::string get_str(const json& j, const char* k, const std::string& def)
     auto it = j.find(k);
     return (it != j.end() && it->is_string()) ? it->get<std::string>() : def;
 }
-// Nullable string: absent or json null → nullopt.
+// Nullable string: absent or json null Ã¢â€ â€™ nullopt.
 inline std::optional<std::string> get_opt_str(const json& j, const char* k) {
     auto it = j.find(k);
     if (it != j.end() && it->is_string()) return it->get<std::string>();
@@ -88,7 +88,7 @@ inline Chain parse_chain(const json& j, int index) {
     Chain c(get_int(j, "id", index));
     c.phraseRefs      = parse_int_array(j, "phraseRefs",      c.phraseRefs);
     c.transposeValues = parse_int_array(j, "transposeValues", c.transposeValues);
-    // ⚠️ The CHAIN editor indexes these by cursor row, and a hand-edited file can hold short ones.
+    // Ã¢Å¡Â Ã¯Â¸Â The CHAIN editor indexes these by cursor row, and a hand-edited file can hold short ones.
     c.phraseRefs.resize(CHAIN_ROWS, -1);
     c.transposeValues.resize(CHAIN_ROWS, 0);
     return c;
@@ -198,8 +198,14 @@ inline SFOverrides parse_sf_overrides(const json& j) {
 inline Instrument parse_instrument(const json& j, int index) {
     Instrument i(get_int(j, "id", index));
     i.name           = get_str(j, "name", i.name);
-    i.sampleId       = get_int(j, "sampleId", i.sampleId);   // absent → -1 (field default), not the index
+    i.sampleId       = get_int(j, "sampleId", i.sampleId);   // absent Ã¢â€ â€™ -1 (field default), not the index
     i.volume         = get_int(j, "volume", i.volume);
+    i.sampleGain     = get_int(j, "sampleGain", i.sampleGain);
+    i.xfade          = get_int(j, "xfade", i.xfade);
+    i.attack         = get_int(j, "attack", i.attack);
+    i.release        = get_int(j, "release", i.release);
+    i.keyTrack       = get_int(j, "keyTrack", i.keyTrack);
+    i.glide          = get_int(j, "glide", i.glide);
     i.pan            = get_int(j, "pan", i.pan);
     { auto it = j.find("root"); if (it != j.end() && it->is_object()) i.root = parse_note(*it); }
     i.detune         = get_int(j, "detune", i.detune);
@@ -236,21 +242,71 @@ inline Instrument parse_instrument(const json& j, int index) {
     { auto it = j.find("granular");
       if (it != j.end() && it->is_object()) {
           const auto& g = *it;
-          i.granular.grainSize    = get_int(g, "grainSize", i.granular.grainSize);
-          i.granular.grainDensity = get_int(g, "grainDensity", i.granular.grainDensity);
-          i.granular.grainPitch   = get_int(g, "grainPitch", i.granular.grainPitch);
-          i.granular.grainCount   = get_int(g, "grainCount", i.granular.grainCount);
-          i.granular.grainReverse = get_bool(g, "grainReverse", i.granular.grainReverse);
-          i.granular.scanPos      = get_int(g, "scanPos", i.granular.scanPos);
-          i.granular.scanSpeed    = get_int(g, "scanSpeed", i.granular.scanSpeed);
-          i.granular.envAttack    = get_int(g, "envAttack", i.granular.envAttack);
-          i.granular.envDecay     = get_int(g, "envDecay", i.granular.envDecay);
-          i.granular.envSustain   = get_int(g, "envSustain", i.granular.envSustain);
-          i.granular.envRelease   = get_int(g, "envRelease", i.granular.envRelease);
-          i.granular.lfoRate      = get_int(g, "lfoRate", i.granular.lfoRate);
-          i.granular.lfoDepth     = get_int(g, "lfoDepth", i.granular.lfoDepth);
-          i.granular.lfoTarget    = get_int(g, "lfoTarget", i.granular.lfoTarget);
-          i.granular.lfoShape     = get_int(g, "lfoShape", i.granular.lfoShape);
+          // The flat keys of a project written before GRAIN/ROAM/MOTION. They seed the matching
+          // block, so an old sound opens with its head, length, density and pitch where they were.
+          i.granular.grain.size    = get_int(g, "grainSize", i.granular.grain.size);
+          i.granular.grain.density = get_int(g, "grainDensity", i.granular.grain.density);
+          i.granular.grain.pitch   = get_int(g, "grainPitch", i.granular.grain.pitch);
+          i.granular.grain.position = get_int(g, "scanPos", i.granular.grain.position);
+          i.granular.roam.speed    = get_int(g, "scanSpeed", i.granular.roam.speed);
+          if (auto b = g.find("grainReverse"); b != g.end() && b->is_boolean() && b->get<bool>())
+              i.granular.motion.rev = 0xFF;   // old REV was a scan flag; MOTION is off, so it only records it
+
+          { auto b = g.find("grain"); if (b != g.end() && b->is_object()) {
+              const auto& o = *b;
+              i.granular.grain.state    = get_bool(o, "state", i.granular.grain.state);
+              i.granular.grain.position = get_int(o, "position", i.granular.grain.position);
+              i.granular.grain.size     = get_int(o, "size", i.granular.grain.size);
+              i.granular.grain.density  = get_int(o, "density", i.granular.grain.density);
+              i.granular.grain.spray    = get_int(o, "spray", i.granular.grain.spray);
+              i.granular.grain.pitch    = get_int(o, "pitch", i.granular.grain.pitch);
+              i.granular.grain.time        = get_int(o, "time", i.granular.grain.time);
+              i.granular.grain.density_div = get_int(o, "density_div", i.granular.grain.density_div);
+              i.granular.grain.window      = get_int(o, "window", i.granular.grain.window);
+              i.granular.grain.spread      = get_int(o, "spread", i.granular.grain.spread);
+              i.granular.grain.attack      = get_int(o, "attack", i.granular.grain.attack);
+              i.granular.grain.decay    = get_int(o, "decay", i.granular.grain.decay);
+              i.granular.grain.pan      = get_int(o, "pan", i.granular.grain.pan);
+              i.granular.grain.jitter   = get_int(o, "jitter", i.granular.grain.jitter);
+          } }
+          { auto b = g.find("roam"); if (b != g.end() && b->is_object()) {
+              const auto& o = *b;
+              i.granular.roam.state  = get_bool(o, "state", i.granular.roam.state);
+              i.granular.roam.mode   = get_int(o, "mode", i.granular.roam.mode);
+              i.granular.roam.range  = get_int(o, "range", i.granular.roam.range);
+              i.granular.roam.wander = get_int(o, "wander", i.granular.roam.wander);
+              i.granular.roam.speed     = get_int(o, "speed", i.granular.roam.speed);
+              i.granular.roam.speed_div = get_int(o, "speed_div", i.granular.roam.speed_div);
+              i.granular.roam.smooth    = get_int(o, "smooth", i.granular.roam.smooth);
+              i.granular.roam.freeze    = get_int(o, "freeze", i.granular.roam.freeze);
+              i.granular.roam.dcurve    = get_int(o, "dcurve", i.granular.roam.dcurve);
+              i.granular.roam.dir       = get_int(o, "dir", i.granular.roam.dir);
+              i.granular.roam.curve     = get_int(o, "curve", i.granular.roam.curve);
+              i.granular.roam.bpm       = get_int(o, "bpm", i.granular.roam.bpm);
+              i.granular.roam.drift     = get_int(o, "drift", i.granular.roam.drift);
+              i.granular.roam.step_rate = get_int(o, "step_rate", i.granular.roam.step_rate);
+              i.granular.roam.inertia   = get_int(o, "inertia", i.granular.roam.inertia);
+              i.granular.roam.target    = get_int(o, "target", i.granular.roam.target);
+              i.granular.roam.tlock     = get_int(o, "tlock", i.granular.roam.tlock);
+          } }
+          { auto b = g.find("motion"); if (b != g.end() && b->is_object()) {
+              const auto& o = *b;
+              i.granular.motion.state   = get_bool(o, "state", i.granular.motion.state);
+              i.granular.motion.jump    = get_int(o, "jump", i.granular.motion.jump);
+              i.granular.motion.hold    = get_int(o, "hold", i.granular.motion.hold);
+              i.granular.motion.rev     = get_int(o, "rev", i.granular.motion.rev);
+              i.granular.motion.elastic = get_int(o, "elastic", i.granular.motion.elastic);
+              i.granular.motion.chaos   = get_int(o, "chaos", i.granular.motion.chaos);
+              i.granular.motion.stutter  = get_int(o, "stutter", i.granular.motion.stutter);
+              i.granular.motion.tapestop = get_int(o, "tapestop", i.granular.motion.tapestop);
+              i.granular.motion.tunnel   = get_int(o, "tunnel", i.granular.motion.tunnel);
+              i.granular.motion.probability = get_int(o, "probability", i.granular.motion.probability);
+              i.granular.motion.lfo_depth   = get_int(o, "lfo_depth", i.granular.motion.lfo_depth);
+              i.granular.motion.step_glide  = get_int(o, "step_glide", i.granular.motion.step_glide);
+              i.granular.motion.trigger     = get_int(o, "trigger", i.granular.motion.trigger);
+              i.granular.motion.spin        = get_int(o, "spin", i.granular.motion.spin);
+              i.granular.motion.factor      = get_int(o, "factor", i.granular.motion.factor);
+          } }
       } }
     { auto it = j.find("sliceMarkers");
       if (it != j.end() && it->is_array())
@@ -275,7 +331,7 @@ inline Instrument parse_instrument(const json& j, int index) {
     return i;
 }
 
-// ⚠️ A destination this build does not know is KEPT (greyed), so a downgrade deletes no mapping.
+// Ã¢Å¡Â Ã¯Â¸Â A destination this build does not know is KEPT (greyed), so a downgrade deletes no mapping.
 // Each range end is clamped separately, so an inverted range survives.
 inline MidiMapping parse_midi_mapping(const json& j) {
     MidiMapping m;
@@ -288,7 +344,7 @@ inline MidiMapping parse_midi_mapping(const json& j) {
         m.rangeMin = std::clamp(m.rangeMin, d->min, d->max);
         m.rangeMax = std::clamp(m.rangeMax, d->min, d->max);
     }
-    // ⚠️ The scope index is not clamped: the pools are unpadded yet, and an index past the end is the
+    // Ã¢Å¡Â Ã¯Â¸Â The scope index is not clamped: the pools are unpadded yet, and an index past the end is the
     // "destination gone" case `map_dest_present` already greys.
     return m;
 }
@@ -301,7 +357,7 @@ inline std::vector<T> parse_pool(const json& j, const char* k, F&& parse_elem) {
         int idx = 0;
         for (const auto& e : *it) v.push_back(parse_elem(e, idx++));
     }
-    return v;  // absent/empty → normalize pads to canonical size
+    return v;  // absent/empty Ã¢â€ â€™ normalize pads to canonical size
 }
 
 }  // namespace detail
@@ -356,7 +412,7 @@ inline Project parse_project(const json& j) {
     p.scaleKey    = get_int(j, "scaleKey", p.scaleKey);
     p.midiSyncOut           = get_int(j, "midiSyncOut", p.midiSyncOut);
     p.midiSendProgramChange = get_bool(j, "midiSendProgramChange", p.midiSendProgramChange);
-    // ⚠️ Truncated at the cap: every incoming CC sweeps this list, so its length is paid on the audio
+    // Ã¢Å¡Â Ã¯Â¸Â Truncated at the cap: every incoming CC sweeps this list, so its length is paid on the audio
     // path. The ADD row refuses past the same number.
     { auto it = j.find("midiMappings");
       if (it != j.end() && it->is_array())
@@ -407,7 +463,7 @@ inline bool normalize_project(Project& p) {
     return true;
 }
 
-// Version 0 → 1: a table row volume of 0xFF meant "full"; it now means "no change", spelled -1.
+// Version 0 Ã¢â€ â€™ 1: a table row volume of 0xFF meant "full"; it now means "no change", spelled -1.
 inline void migrate_project(Project& p) {
     if (p.version < 1) {
         for (auto& t : p.tables)
@@ -423,7 +479,7 @@ inline void normalize_and_migrate(Project& p) {
     migrate_project(p);
 }
 
-// ─── writer ─────────────────────────────────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ writer Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 // Same schema either way. No default: MINIFIED for .ptp/.pti, PRETTY for hand-editable .ptt themes.
 enum class JsonLayout { Minified, Pretty };
@@ -461,7 +517,7 @@ private:
     int depth_ = 0;
     bool pretty_;
 
-    // The comma before every member except a container's first, and — pretty only — the newline and
+    // The comma before every member except a container's first, and Ã¢â‚¬â€ pretty only Ã¢â‚¬â€ the newline and
     // indent. With key()'s colon, the only places layout is emitted.
     void separator() {
         if (!stack_.back()) out += ',';
@@ -594,7 +650,7 @@ inline void emit_groove(JsonWriter& w, const Groove& g) {
     w.begin_object();
     w.field_int("id", g.id);
     if (!g.name.empty()) w.field_string("name", g.name);
-    // ⚠️ `steps` is never default-guarded: every project on disk writes all sixteen, so old blank
+    // Ã¢Å¡Â Ã¯Â¸Â `steps` is never default-guarded: every project on disk writes all sixteen, so old blank
     // grooves load back blank whatever a fresh Groove is born with.
     emit_int_array(w, "steps", g.steps);
     if (g.ticksPerStep != 12) w.field_int("ticksPerStep", g.ticksPerStep);
@@ -605,7 +661,7 @@ inline void emit_scale(JsonWriter& w, const Scale& s) {
     w.begin_object();
     w.field_int("id", s.id);
     if (!s.name.empty()) w.field_string("name", s.name);
-    // ⏸️ `offset` is written once non-default although nothing reads it yet, so microtuning will need
+    // Ã¢ÂÂ¸Ã¯Â¸Â `offset` is written once non-default although nothing reads it yet, so microtuning will need
     // no migration.
     if (s.enabled != std::vector<int>(12, 1)) emit_int_array(w, "enabled", s.enabled);
     if (s.offset  != std::vector<int>(12, 0)) emit_int_array(w, "offset",  s.offset);
@@ -663,6 +719,12 @@ inline void emit_instrument(JsonWriter& w, const Instrument& i) {
     if (i.name != default_instrument_name(i.id)) w.field_string("name", i.name);
     if (i.sampleId != -1)   w.field_int("sampleId", i.sampleId);
     if (i.volume != 0xFF)   w.field_int("volume", i.volume);
+    if (i.sampleGain != 0x80) w.field_int("sampleGain", i.sampleGain);
+    if (i.xfade != 0x00)     w.field_int("xfade", i.xfade);
+    if (i.attack != 0x00)    w.field_int("attack", i.attack);
+    if (i.release != 0x00)   w.field_int("release", i.release);
+    if (i.keyTrack != 0x00)  w.field_int("keyTrack", i.keyTrack);
+    if (i.glide != 0x00)     w.field_int("glide", i.glide);
     if (i.pan != 0x80)      w.field_int("pan", i.pan);
     if (i.root != Note::C4()) { w.key("root"); emit_note(w, i.root); }
     if (i.detune != 0x80)   w.field_int("detune", i.detune);
@@ -694,26 +756,63 @@ inline void emit_instrument(JsonWriter& w, const Instrument& i) {
     if (i.delaySend != 0x00) w.field_int("delaySend", i.delaySend);
     if (i.eqSlot != -1)     w.field_int("eqSlot", i.eqSlot);
     if (i.slicingMode != 0) w.field_int("slicingMode", i.slicingMode);
-    // ⚠️ Defaults to TRUE, so the guard is inverted: the field appears only once turned OFF.
+    // Ã¢Å¡Â Ã¯Â¸Â Defaults to TRUE, so the guard is inverted: the field appears only once turned OFF.
     if (!i.transposeEnabled) w.field_bool("transposeEnabled", i.transposeEnabled);
     if (i.instrumentType == InstrumentType::GRANULAR) {
         w.key("granular");
         w.begin_object();
-        w.field_int("grainSize", i.granular.grainSize);
-        w.field_int("grainDensity", i.granular.grainDensity);
-        w.field_int("grainPitch", i.granular.grainPitch);
-        w.field_int("grainCount", i.granular.grainCount);
-        w.field_bool("grainReverse", i.granular.grainReverse);
-        w.field_int("scanPos", i.granular.scanPos);
-        w.field_int("scanSpeed", i.granular.scanSpeed);
-        w.field_int("envAttack", i.granular.envAttack);
-        w.field_int("envDecay", i.granular.envDecay);
-        w.field_int("envSustain", i.granular.envSustain);
-        w.field_int("envRelease", i.granular.envRelease);
-        w.field_int("lfoRate", i.granular.lfoRate);
-        w.field_int("lfoDepth", i.granular.lfoDepth);
-        w.field_int("lfoTarget", i.granular.lfoTarget);
-        w.field_int("lfoShape", i.granular.lfoShape);
+        w.key("grain"); w.begin_object();
+        w.field_bool("state", i.granular.grain.state);
+        w.field_int("position", i.granular.grain.position);
+        w.field_int("size", i.granular.grain.size);
+        w.field_int("density", i.granular.grain.density);
+        w.field_int("spray", i.granular.grain.spray);
+        w.field_int("pitch", i.granular.grain.pitch);
+        w.field_int("density_div", i.granular.grain.density_div);
+        w.field_int("window", i.granular.grain.window);
+        w.field_int("spread", i.granular.grain.spread);
+        w.field_int("time", i.granular.grain.time);
+        w.field_int("attack", i.granular.grain.attack);
+        w.field_int("decay", i.granular.grain.decay);
+        w.field_int("pan", i.granular.grain.pan);
+        w.field_int("jitter", i.granular.grain.jitter);
+        w.end_object();
+        w.key("roam"); w.begin_object();
+        w.field_bool("state", i.granular.roam.state);
+        w.field_int("mode", i.granular.roam.mode);
+        w.field_int("range", i.granular.roam.range);
+        w.field_int("wander", i.granular.roam.wander);
+        w.field_int("speed", i.granular.roam.speed);
+        w.field_int("speed_div", i.granular.roam.speed_div);
+        w.field_int("smooth", i.granular.roam.smooth);
+        w.field_int("freeze", i.granular.roam.freeze);
+        w.field_int("dcurve", i.granular.roam.dcurve);
+        w.field_int("dir", i.granular.roam.dir);
+        w.field_int("curve", i.granular.roam.curve);
+        w.field_int("bpm", i.granular.roam.bpm);
+        w.field_int("drift", i.granular.roam.drift);
+        w.field_int("step_rate", i.granular.roam.step_rate);
+        w.field_int("inertia", i.granular.roam.inertia);
+        w.field_int("target", i.granular.roam.target);
+        w.field_int("tlock", i.granular.roam.tlock);
+        w.end_object();
+        w.key("motion"); w.begin_object();
+        w.field_bool("state", i.granular.motion.state);
+        w.field_int("jump", i.granular.motion.jump);
+        w.field_int("hold", i.granular.motion.hold);
+        w.field_int("rev", i.granular.motion.rev);
+        w.field_int("elastic", i.granular.motion.elastic);
+        w.field_int("chaos", i.granular.motion.chaos);
+        w.field_int("stutter", i.granular.motion.stutter);
+        w.field_int("tapestop", i.granular.motion.tapestop);
+        w.field_int("tunnel", i.granular.motion.tunnel);
+        w.field_int("probability", i.granular.motion.probability);
+        w.field_int("lfo_depth", i.granular.motion.lfo_depth);
+        w.field_int("step_glide", i.granular.motion.step_glide);
+        w.field_int("trigger", i.granular.motion.trigger);
+        w.field_int("spin", i.granular.motion.spin);
+        w.field_int("factor", i.granular.motion.factor);
+        w.end_object();
         w.end_object();
     }
     if (!i.sliceMarkers.empty()) {
@@ -799,7 +898,7 @@ inline std::string serialize_project(const Project& p) {
     emit_pool(w, "instruments", p.instruments, emit_instrument);
     emit_pool(w, "tables",      p.tables,      emit_table);
     emit_pool(w, "grooves",     p.grooves,     emit_groove);
-    // ⚠️ The scale pool is omitted WHOLE when nothing was authored (every other pool is always
+    // Ã¢Å¡Â Ã¯Â¸Â The scale pool is omitted WHOLE when nothing was authored (every other pool is always
     // written): absent and default both mean chromatic, and older files stay byte-identical.
     {
         bool anyAuthored = (int)p.scales.size() != POOL_SCALES;
@@ -809,10 +908,10 @@ inline std::string serialize_project(const Project& p) {
         if (anyAuthored) emit_pool(w, "scales", p.scales, emit_scale);
     }
     if (p.scaleKey != 0) w.field_int("scaleKey", p.scaleKey);
-    // MIDI. ⚠️ `midiSendProgramChange` defaults to TRUE: inverted guard.
+    // MIDI. Ã¢Å¡Â Ã¯Â¸Â `midiSendProgramChange` defaults to TRUE: inverted guard.
     if (p.midiSyncOut != 0)          w.field_int("midiSyncOut", p.midiSyncOut);
     if (!p.midiSendProgramChange)    w.field_bool("midiSendProgramChange", p.midiSendProgramChange);
-    // ⚠️ Omitted whole when empty, so a song that never mapped a knob gains no byte. Fields inside are
+    // Ã¢Å¡Â Ã¯Â¸Â Omitted whole when empty, so a song that never mapped a knob gains no byte. Fields inside are
     // guarded against their struct defaults: the usual row is `{"controller":74,"dest":5}`.
     if (!p.midiMappings.empty()) {
         w.key("midiMappings");

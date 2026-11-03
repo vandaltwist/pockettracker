@@ -2,7 +2,7 @@
 #define POCKETTRACKER_SONGCORE_MODEL_H
 
 // The song data model behind the .ptp / .pti JSON (project_io.h).
-// ⚠️ Field defaults, order and pool sizes are part of the file format: a key equal to its member
+// Ã¢Å¡Â Ã¯Â¸Â Field defaults, order and pool sizes are part of the file format: a key equal to its member
 // initializer is omitted on save and a missing one loads as it. A FACTORY value differs only for
 // Instrument.sampleId (the slot index). No floating point, so a .ptp round-trips exactly.
 
@@ -15,11 +15,11 @@
 
 // For the CC-slot ids `resolve_cc_param` translates; event.h is a leaf, so no cycle.
 #include "event.h"
-#include "program.h"   // PROGRAM_SLOTS — the engine's program table is one row per instrument
+#include "program.h"   // PROGRAM_SLOTS Ã¢â‚¬â€ the engine's program table is one row per instrument
 
 namespace songcore {
 
-// ─── pool sizes ─────────────────────────────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ pool sizes Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 // Canonical pool sizes, above the structs so members and accessors can both use them.
 constexpr int POOL_PHRASES     = 256;
@@ -27,7 +27,7 @@ constexpr int POOL_CHAINS      = 256;
 constexpr int POOL_TRACKS      = 8;
 constexpr int POOL_INSTRUMENTS = 128;
 static_assert(POOL_INSTRUMENTS == PROGRAM_SLOTS,
-              "the engine's program table is one row per instrument — the two sizes are one number");
+              "the engine's program table is one row per instrument Ã¢â‚¬â€ the two sizes are one number");
 constexpr int POOL_TABLES      = 128;
 constexpr int POOL_GROOVES     = 128;
 constexpr int POOL_EQPRESETS   = 128;
@@ -37,7 +37,7 @@ constexpr int POOL_SCALES      = 16;
 constexpr int CHAIN_ROWS  = 16;
 constexpr int PHRASE_ROWS = 16;
 
-// ─── small helpers ────────────────────────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ small helpers Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 // Lower 8 bits as 2-digit UPPERCASE hex.
 inline std::string hex2(int v) {
@@ -51,19 +51,19 @@ inline std::string hex2(int v) {
 inline std::string default_instrument_name(int id) { return "INST" + hex2(id); }
 inline std::string default_table_name(int id)      { return "TBL"  + hex2(id); }
 
-// ─── enums (serialised by NAME) ─────────────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ enums (serialised by NAME) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 enum class ModType { NONE, AHD, ADSR, LFO, DRUM, TRIG, TRACKING, SCALAR };
 enum class ModDest {
     NONE, VOLUME, PAN, PITCH, FINE_PITCH, FILTER_CUTOFF, FILTER_RES,
     SAMPLE_START, MOD_AMT, MOD_RATE, MOD_BOTH,
-    // Granular (MOONGRANULAR) �?" grain params and scan position.
+    // Granular (MOONGRANULAR) Ã¯Â¿Â½?" grain params and scan position.
     GRAIN_SIZE, GRAIN_PITCH, GRAIN_DENSITY, GRAIN_COUNT, SCAN_POS,
     ENV_ATTACK, ENV_DECAY, ENV_SUS, ENV_REL,
     LFO_RATE, LFO_DEPTH
 };
 // SAMPLER and SOUNDFONT play in the engine; EXTERNAL leaves as MIDI (midi_out.h).
-// ⚠️ EXTERNAL STAYS LAST: a build without MIDI hides it by cycling over one type fewer.
+// Ã¢Å¡Â Ã¯Â¸Â EXTERNAL STAYS LAST: a build without MIDI hides it by cycling over one type fewer.
 enum class InstrumentType { SAMPLER, GRANULAR, SOUNDFONT, EXTERNAL };
 
 // Each enum's names, in enum order: index 0 also answers for an out-of-range value.
@@ -77,7 +77,7 @@ inline constexpr const char* MOD_DEST_NAMES[] = {"NONE", "VOLUME", "PAN", "PITCH
                                                  "LFO_RATE", "LFO_DEPTH"};
 inline constexpr const char* INSTRUMENT_TYPE_NAMES[] = {"SAMPLER", "MOONGRANULAR", "SOUNDFONT", "EXTERNAL"};
 
-// ⚠️ Display names, not the serialised ones above — swapping them widens the UI or breaks the file.
+// Ã¢Å¡Â Ã¯Â¸Â Display names, not the serialised ones above Ã¢â‚¬â€ swapping them widens the UI or breaks the file.
 // DRUM plays as AHD and TRIG as ADSR; TRK has no engine implementation yet; SCL's `amount` IS the
 // output.
 inline constexpr const char* MOD_TYPE_DISPLAY_NAMES[] = {"---", "AHD", "ADSR", "LFO", "DRUM", "TRIG",
@@ -107,7 +107,7 @@ inline const char* mod_dest_display_name(ModDest d) { return enum_name(d, MOD_DE
 inline bool mod_type_from_name(const std::string& s, ModType& out) { return enum_from_name(s, MOD_TYPE_NAMES, out); }
 inline bool mod_dest_from_name(const std::string& s, ModDest& out) { return enum_from_name(s, MOD_DEST_NAMES, out); }
 inline bool instrument_type_from_name(const std::string& s, InstrumentType& out) {
-    // ⚠️ "MOONSET" was the v0.9.9.1-era GRANULAR display name, so files saved then still load.
+    // Ã¢Å¡Â Ã¯Â¸Â "MOONSET" was the v0.9.9.1-era GRANULAR display name, so files saved then still load.
     if (s == "MOONSET") { out = InstrumentType::GRANULAR; return true; }
     return enum_from_name(s, INSTRUMENT_TYPE_NAMES, out);
 }
@@ -118,7 +118,7 @@ inline constexpr int MOD_DEST_COUNT        = static_cast<int>(std::size(MOD_DEST
 static_assert(std::size(MOD_TYPE_DISPLAY_NAMES) == std::size(MOD_TYPE_NAMES) &&
               std::size(MOD_DEST_DISPLAY_NAMES) == std::size(MOD_DEST_NAMES), "a name per entry");
 
-// ─── leaf structs ───────────────────────────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ leaf structs Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 // A Note always serialises BOTH pitch and octave (no field defaults). The default ctor is EMPTY.
 struct Note {
@@ -131,11 +131,11 @@ struct Note {
     static Note C4()    { return Note{ 0, 4}; }
 };
 
-// ⚠️ A note cell has THREE states. "Not empty" is not "plays a note": ask the one you mean.
+// Ã¢Å¡Â Ã¯Â¸Â A note cell has THREE states. "Not empty" is not "plays a note": ask the one you mean.
 inline bool note_is_off(const Note& n)   { return n.pitch == -2; }
 inline bool note_is_pitch(const Note& n) { return n.pitch >= 0; }
 
-// ─── Note ↔ MIDI ↔ display ──────────────────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Note Ã¢â€ â€ MIDI Ã¢â€ â€ display Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 inline int note_to_midi(const Note& n) {
     if (n.pitch < 0) return -1;
     return (n.octave + 1) * 12 + n.pitch;  // C-4 = 60 (standard MIDI)
@@ -146,14 +146,14 @@ inline Note note_from_midi(int midi) {
 }
 
 // An authored 0x00-0xFF byte as a 0-1 gain. The model's own arithmetic, shared by the sequencer, UI
-// and MIDI — one copy.
+// and MIDI Ã¢â‚¬â€ one copy.
 inline float hex_to_float(int hex) { return (hex & 0xFF) / 255.0f; }
 
 // Two chars each, so every note renders in a fixed 3-char cell.
 inline const char* const NOTE_NAMES[12] = {"C-", "C#", "D-", "D#", "E-", "F-",
                                            "F#", "G-", "G#", "A-", "A#", "B-"};
 
-/** "C-4", "OFF", or "---" when empty — the 3-char cell every grid draws. */
+/** "C-4", "OFF", or "---" when empty Ã¢â‚¬â€ the 3-char cell every grid draws. */
 inline std::string note_name(const Note& n) {
     if (note_is_off(n)) return "OFF";
     if (n.pitch < 0 || n.pitch > 11) return "---";
@@ -187,11 +187,11 @@ inline void step_set_fx_value(PhraseStep& s, int slot, int value) {
     else if (slot == 2) s.fx2Value = value;
     else if (slot == 3) s.fx3Value = value;
 }
-/** True when any of the three slots carries `type` — the AUTHORED step, before CHA/RND touch it. */
+/** True when any of the three slots carries `type` Ã¢â‚¬â€ the AUTHORED step, before CHA/RND touch it. */
 inline bool step_has_fx(const PhraseStep& s, int type) {
     return s.fx1Type == type || s.fx2Type == type || s.fx3Type == type;
 }
-/** A step that triggers a note — an OFF does not, and neither does its instrument column. */
+/** A step that triggers a note Ã¢â‚¬â€ an OFF does not, and neither does its instrument column. */
 inline bool step_has_note(const PhraseStep& s) { return note_is_pitch(s.note); }
 
 struct Phrase {
@@ -210,7 +210,7 @@ struct Chain {
 };
 
 // The phrase a chain row names, or -1.
-// ⚠️ Every bound on a chain row lives here: the arrays may be short and a hand-edited .ptp can hold
+// Ã¢Å¡Â Ã¯Â¸Â Every bound on a chain row lives here: the arrays may be short and a hand-edited .ptp can hold
 // 9999, which would go straight into `project.phrases[ref]`.
 inline int chain_phrase_ref(const Chain& c, int row) {
     if (row < 0 || row >= CHAIN_ROWS || row >= static_cast<int>(c.phraseRefs.size())) return -1;
@@ -218,7 +218,7 @@ inline int chain_phrase_ref(const Chain& c, int row) {
     return (ref >= 0 && ref < POOL_PHRASES) ? ref : -1;
 }
 
-// A chain row with no phrase. ⚠️ Shared by the scheduler and `nominal_spp_beats`, so a song row's
+// A chain row with no phrase. Ã¢Å¡Â Ã¯Â¸Â Shared by the scheduler and `nominal_spp_beats`, so a song row's
 // length means the same to both.
 inline bool chain_is_empty(const Chain& c, int index) { return chain_phrase_ref(c, index) < 0; }
 
@@ -249,7 +249,7 @@ struct ModSlot {
     int lfoFreq = 0x40;
 };
 
-// The rows this slot takes on the MODS screen, TYPE row included — read by cursor and renderer alike.
+// The rows this slot takes on the MODS screen, TYPE row included Ã¢â‚¬â€ read by cursor and renderer alike.
 inline int mod_slot_row_count(const ModSlot& s) {
     switch (s.type) {
         case ModType::NONE:     return 1;  // TYPE
@@ -264,7 +264,7 @@ inline int mod_slot_row_count(const ModSlot& s) {
     return 1;
 }
 
-// A new groove: two plain 12-tic steps — no groove, but the pair its swing bends is on screen.
+// A new groove: two plain 12-tic steps Ã¢â‚¬â€ no groove, but the pair its swing bends is on screen.
 // 12 is `TICS_PER_STEP`, spelled out because timing.h includes this file (groove_bank.h asserts it).
 inline std::vector<int> default_groove_steps() {
     std::vector<int> s(16, -1);
@@ -277,20 +277,20 @@ struct Groove {
     int id = 0;
     std::string name;  // "" = unnamed; the screen then names it by its steps (groove_bank.h)
     std::vector<int> steps = default_groove_steps();
-    // Tics per plain step in `steps`: 6, 12 or 24. ⚠️ The groove's alone — an effect's tic stays 1/12.
+    // Tics per plain step in `steps`: 6, 12 or 24. Ã¢Å¡Â Ã¯Â¸Â The groove's alone Ã¢â‚¬â€ an effect's tic stays 1/12.
     int ticksPerStep = 12;
     Groove() = default;
     explicit Groove(int id_) : id(id_) {}
 };
 
 // One of the 16 scales: which of the twelve intervals from the key are in it.
-// ⚠️ All twelve (the default) means chromatic — no quantizing, which every consumer must keep.
+// Ã¢Å¡Â Ã¯Â¸Â All twelve (the default) means chromatic Ã¢â‚¬â€ no quantizing, which every consumer must keep.
 // `offset` (centi-semitones per degree, microtuning) is saved but not yet read.
 struct Scale {
     int id = 0;
     std::string name;                                        // "" = never named
     std::vector<int> enabled = std::vector<int>(12, 1);      // 1 = the degree is in the scale
-    std::vector<int> offset  = std::vector<int>(12, 0);      // ⏸️ centi-semitones, −2400..+2400
+    std::vector<int> offset  = std::vector<int>(12, 0);      // Ã¢ÂÂ¸Ã¯Â¸Â centi-semitones, Ã¢Ë†â€™2400..+2400
     Scale() = default;
     explicit Scale(int id_) : id(id_) {}
 };
@@ -306,7 +306,7 @@ inline bool scale_is_chromatic(const Scale& s) {
 struct EqBand {
     int type = 0;
     int freq = 0x80;
-    int gain = 120;
+    int gain = 120;   // EqBand gain (not instrument)
     int q    = 0x80;
 };
 
@@ -350,7 +350,7 @@ constexpr int MIDI_CC_SLOTS = 4;
 // An EXTERNAL instrument's BEND: the semitones its device bends at full wheel.
 constexpr int MIDI_BEND_RANGE_MIN = 1, MIDI_BEND_RANGE_MAX = 48, MIDI_BEND_RANGE_DEFAULT = 12;
 
-// One knob pointed at one parameter (midi_map.h). ⚠️ `dest` is a saved `MapDestId` (append-only).
+// One knob pointed at one parameter (midi_map.h). Ã¢Å¡Â Ã¯Â¸Â `dest` is a saved `MapDestId` (append-only).
 // The range is in the destination's units and may be inverted.
 struct MidiMapping {
     uint8_t controller = 0;   // the CC number the knob sends, 0-127
@@ -371,6 +371,12 @@ struct Instrument {
     std::string name = default_instrument_name(0);
     int sampleId = -1;                       // FIELD default -1; the factory sets the slot index
     int volume = 0xFF;
+    int sampleGain = 0x80;   // SMP GAIN cell, 0-255, 0x80 = unity
+    int xfade      = 0x00;   // XFADE cell, 0-255
+    int attack     = 0x00;   // ATTACK cell, 0-255
+    int release    = 0x00;   // RELEASE cell, 0-255
+    int keyTrack   = 0x00;   // KEYTRK cell, 0-255
+    int glide      = 0x00;   // GLIDE cell, 0-255
     int pan = 0x80;
     Note root = Note::C4();
     int detune = 0x80;
@@ -396,7 +402,7 @@ struct Instrument {
     // OFF exempts the instrument from the scale quantizer, chain TSP and project transpose (a kit).
     bool transposeEnabled = true;
 
-    // ── EXTERNAL only; `volume` scales velocity and `pan` becomes CC 10 ──
+    // Ã¢â€â‚¬Ã¢â€â‚¬ EXTERNAL only; `volume` scales velocity and `pan` becomes CC 10 Ã¢â€â‚¬Ã¢â€â‚¬
     int midiChannel = 0;    // 0-15, shown 1-16
     int midiBank    = -1;   // -1 = send nothing; else the bank sent (CC0/CC32) before the program
     int midiProgram = -1;   // -1 = send nothing; else the program sent with the first note-on
@@ -406,24 +412,75 @@ struct Instrument {
     int midiBendRange = MIDI_BEND_RANGE_DEFAULT;
     std::vector<MidiCcSlot> midiCC = std::vector<MidiCcSlot>(MIDI_CC_SLOTS);
 
-    // Granular (MOONGRANULAR): grains scheduled from the sample buffer. 0..255 byte params, like the
-    // sampler cells; the DSP path (Phase B) consumes them. Stored here so they persist and modulate.
+    // Granular (MOONGRANULAR): the three blocks the editor shows below the waveform. 0..255 bytes
+    // (state is a real bool), so a project keeps working across platforms. Neutral defaults: the
+    // grain cloud sounds on the sample's head at unity, and ROAM/MOTION are parked until switched on.
     struct GranularParams {
-        int grainSize     = 0x40;   // grain length
-        int grainDensity  = 0x80;   // grains per second
-        int grainPitch    = 0x80;   // per-grain pitch (0x80 = unity)
-        int grainCount    = 0x20;   // polyphony of grains
-        bool grainReverse = false;  // scan direction
-        int scanPos       = 0x00;   // read head position (0..255)
-        int scanSpeed     = 0x40;   // scan advance per grain
-        int envAttack     = 0x08;
-        int envDecay      = 0x20;
-        int envSustain    = 0xC0;
-        int envRelease     = 0x20;
-        int lfoRate       = 0x40;
-        int lfoDepth      = 0x00;
-        int lfoTarget     = 0;      // index into the granular param list above
-        int lfoShape      = 0;      // 0 sine, 1 tri, 2 saw, 3 square
+        struct Grain {
+            bool state    = true;   // the cloud itself
+            int position  = 0x00;   // read head, 0..255 of the sample
+            int size      = 0x40;   // grain length, mapped to 1..1000 ms
+            int density   = 0x80;   // grains per second, mapped to 1..200
+            int spray     = 0x00;   // random spread around the head
+            int pitch     = 0x80;   // 0x80 = unison, Ã‚Â±24 semitones
+            int time      = 0x00;   // TIME mode (0=HZ,1=BPM)
+            int density_div = 6;    // index dans DIVS (quand TIME=BPM)
+            int window    = 0;      // HANN/TRI/RECT/GAUSS/EXPO
+            int spread    = 0x00;
+            int attack    = 0x00;
+            int decay     = 0x00;
+            int pan       = 0x00;
+            int jitter    = 0x00;
+        } grain{};
+        struct Roam {
+            bool state    = false;
+            int mode      = 0;      // BOUNCE / LOOP / PINGPONG / RANDOM
+            int range     = 0x00;
+            int wander    = 0x00;
+            int speed     = 0x80;
+            int speed_div = 2;      // index dans DIVS (quand TIME=BPM)
+            int smooth    = 0x40;
+            int freeze    = 0;      // OFF|ON
+            int dcurve    = 0;      // LIN|EASE|EXP|SINE
+            int dir       = 0x00;
+            int curve     = 0x00;
+            int bpm       = 0x80;
+            int drift     = 0x00;
+            int step_rate = 0x00;
+            int inertia   = 0x00;
+            int target    = 0x00;
+            int tlock     = 0x00;
+        } roam{};
+        struct Motion {
+            bool state       = false;
+            int jump         = 0x00;
+            int hold         = 0x00;
+            int rev          = 0x00;
+            int elastic      = 0x00;
+            int chaos        = 0x00;
+            int stutter      = 1;
+            int tapestop     = 0;
+            int tunnel       = 0;
+            int probability  = 0x00;
+            int lfo_depth    = 0x00;
+            int step_glide   = 0x00;
+            int trigger      = 0x00;
+            int spin         = 0x00;
+            int factor       = 0x00;
+        } motion{};
+
+        bool operator==(const GranularParams& o) const {
+            return grain.state == o.grain.state && grain.position == o.grain.position &&
+                   grain.size == o.grain.size && grain.density == o.grain.density &&
+                   grain.spray == o.grain.spray && grain.pitch == o.grain.pitch &&
+                   roam.state == o.roam.state && roam.mode == o.roam.mode &&
+                   roam.range == o.roam.range && roam.wander == o.roam.wander &&
+                   roam.speed == o.roam.speed && roam.smooth == o.roam.smooth &&
+                   motion.state == o.motion.state && motion.jump == o.motion.jump &&
+                   motion.hold == o.motion.hold && motion.rev == o.motion.rev &&
+                   motion.elastic == o.motion.elastic && motion.chaos == o.motion.chaos;
+        }
+        bool operator!=(const GranularParams& o) const { return !(*this == o); }
     } granular{};
 
     Instrument() = default;
@@ -431,18 +488,18 @@ struct Instrument {
 };
 
 // A note that picks a slice (C-4 = slice 0) rather than a pitch. `sliceOverride` = the step's SLI or -1.
-// ⚠️ Whatever moves notes musically must leave such a note alone, or a kit plays a different drum.
+// Ã¢Å¡Â Ã¯Â¸Â Whatever moves notes musically must leave such a note alone, or a kit plays a different drum.
 inline bool note_selects_slice(const Instrument& ins, int sliceOverride) {
     return (ins.slicingMode != 0 || sliceOverride >= 0) && !ins.sliceMarkers.empty();
 }
 
-/** The name is still the auto-generated "INSTxx" — nobody named this slot. */
+/** The name is still the auto-generated "INSTxx" Ã¢â‚¬â€ nobody named this slot. */
 inline bool instrument_has_default_name(const Instrument& ins) {
     return ins.name == default_instrument_name(ins.id);
 }
 
 // The slot holds nothing and may be claimed.
-// ⚠️ A null `sampleFilePath` alone is not "free": a SoundFont instrument has one too.
+// Ã¢Å¡Â Ã¯Â¸Â A null `sampleFilePath` alone is not "free": a SoundFont instrument has one too.
 inline bool instrument_is_free(const Instrument& ins) {
     return !ins.sampleFilePath.has_value() && !ins.soundfontPath.has_value() &&
            (ins.instrumentType == InstrumentType::SAMPLER || ins.instrumentType == InstrumentType::GRANULAR);
@@ -454,8 +511,8 @@ inline bool instrument_routes_external(const Instrument& ins) {
     return ins.instrumentType == InstrumentType::EXTERNAL;
 }
 
-// The controller a bus CC names for this instrument: 0-127 passes, a slot id becomes its `cc`; −1 = none.
-// ⚠️ −1 must never fall back to the raw id: 128 masks to CC 0, BANK SELECT.
+// The controller a bus CC names for this instrument: 0-127 passes, a slot id becomes its `cc`; Ã¢Ë†â€™1 = none.
+// Ã¢Å¡Â Ã¯Â¸Â Ã¢Ë†â€™1 must never fall back to the raw id: 128 masks to CC 0, BANK SELECT.
 inline int resolve_cc_param(const Instrument& ins, uint8_t param) {
     const int slot = cc_slot_index(param);
     if (slot < 0) return param <= 127 ? static_cast<int>(param) : -1;
@@ -467,36 +524,36 @@ struct Project {
     int version = 0;
     std::string name = "UNTITLED";
     int tempo = 128;
-    // ⚠️ RUNTIME ONLY, never saved: an incoming MIDI clock's tempo while it leads (SYNC IN); 0 = none.
+    // Ã¢Å¡Â Ã¯Â¸Â RUNTIME ONLY, never saved: an incoming MIDI clock's tempo while it leads (SYNC IN); 0 = none.
     // A playback path reads `tempo_in_force()`, not `tempo`; an export plays `tempo`.
     int clockTempo = 0;
     int transpose = 0;
     int masterVolume = 0xFF;
     int ottDepth = 0, masterBusFx = 0, dustDepth = 0, limiterPreGain = 0;
     std::vector<EqPreset> eqPresets;              // 128, filled by the factory
-    // ⚠️ `reverbFeedback` is the DCAY cell (the tail's length); the JSON key keeps the old name. The
+    // Ã¢Å¡Â Ã¯Â¸Â `reverbFeedback` is the DCAY cell (the tail's length); the JSON key keeps the old name. The
     // room is `reverbSize`.
     int reverbFeedback = 0x60, reverbDamp = 0x80, reverbWet = 0x80, reverbInputEq = -1;
-    // The reverb's character. ⚠️ The defaults are what older projects play with: PRE 00 (no line),
+    // The reverb's character. Ã¢Å¡Â Ã¯Â¸Â The defaults are what older projects play with: PRE 00 (no line),
     // WIDE 80 (mid/side skipped).
     int reverbPreDelay = 0x00, reverbWidth = 0x80, reverbMod = 0x10;
-    // The SIZE cell. ⚠️ 0x60 is exactly the original room (`reverb_room_scale` is 1), so older projects
+    // The SIZE cell. Ã¢Å¡Â Ã¯Â¸Â 0x60 is exactly the original room (`reverb_room_scale` is 1), so older projects
     // sound as they did.
     int reverbSize = 0x60;
-    // Which reverb reads the cells above (`kReverbAlgo*`). ⚠️ 0 is the original, and a number is an
-    // identity — append, never insert. Switching rewrites no cell.
+    // Which reverb reads the cells above (`kReverbAlgo*`). Ã¢Å¡Â Ã¯Â¸Â 0 is the original, and a number is an
+    // identity Ã¢â‚¬â€ append, never insert. Switching rewrites no cell.
     int reverbAlgo = 0;
-    // The names the preset rows show — labels only. Empty = matched against the built-ins.
+    // The names the preset rows show Ã¢â‚¬â€ labels only. Empty = matched against the built-ins.
     std::string reverbPreset, delayPreset;
     int delayTime = 0x40;
     bool delaySync = false;
     int delayFeedback = 0x60, delayWet = 0x80, delayReverbSend = 0x00, delayInputEq = -1;
     // The delay's character, written by the preset row (effects/modules/delay-presets.h).
-    // ⚠️ Defaults are what older projects play with: TONE FF (filter switched out), WOBL 00.
+    // Ã¢Å¡Â Ã¯Â¸Â Defaults are what older projects play with: TONE FF (filter switched out), WOBL 00.
     bool delayPong = false;
     int  delayTone = 0xFF, delayWobble = 0x00;
-    // The two send RETURNS are mixer channels with their own mute/solo. ⚠️ A return SOLO never stops a
-    // track — its feed must keep sounding — so it is not part of `track_audible` (see `dry_audible`).
+    // The two send RETURNS are mixer channels with their own mute/solo. Ã¢Å¡Â Ã¯Â¸Â A return SOLO never stops a
+    // track Ã¢â‚¬â€ its feed must keep sounding Ã¢â‚¬â€ so it is not part of `track_audible` (see `dry_audible`).
     bool reverbMute = false, reverbSolo = false;
     bool delayMute  = false, delaySolo  = false;
     int masterEqSlot = -1;
@@ -506,23 +563,23 @@ struct Project {
     std::vector<Instrument> instruments;          // 128, sampleId = slot index
     std::vector<Table>      tables;               // 128
     std::vector<Groove>     grooves;              // 128
-    std::vector<Scale>      scales;               // 16 — slot 00 is every track's default
+    std::vector<Scale>      scales;               // 16 Ã¢â‚¬â€ slot 00 is every track's default
 
     // The default scale's root, 0-11 (0 = C). SCA moves a track off it during playback, unsaved.
     int scaleKey = 0;
 
-    // ── MIDI intent travels with the song; the device picks are in settings.json ──
+    // Ã¢â€â‚¬Ã¢â€â‚¬ MIDI intent travels with the song; the device picks are in settings.json Ã¢â€â‚¬Ã¢â€â‚¬
     int  midiSyncOut = 0;               // 0 OFF | 1 CLOCK | 2 TRANSPORT | 3 CLOCK+TRANSPORT
     bool midiSendProgramChange = true;
 
-    // Which knob moves which parameter — song content; the knobs' channel is in settings.json.
+    // Which knob moves which parameter Ã¢â‚¬â€ song content; the knobs' channel is in settings.json.
     std::vector<MidiMapping> midiMappings;
 };
 
 // The tempo the app plays at: a leading clock's, else the song's TEMPO.
 inline int tempo_in_force(const Project& p) { return p.clockTempo > 0 ? p.clockTempo : p.tempo; }
 
-// Which tracks sound. ⚠️ DERIVED, never stored: solo is a property of the set. Mute wins over solo.
+// Which tracks sound. Ã¢Å¡Â Ã¯Â¸Â DERIVED, never stored: solo is a property of the set. Mute wins over solo.
 inline bool any_solo(const Project& p) {
     for (const Track& t : p.tracks)
         if (t.solo) return true;
@@ -538,7 +595,7 @@ inline bool track_audible(const Project& p, int trackId) {
     return track_audible(p, p.tracks[static_cast<size_t>(trackId)]);
 }
 
-// …and which send return: a separate solo set. The two meet at the DRY sum, which a soloed return mutes.
+// Ã¢â‚¬Â¦and which send return: a separate solo set. The two meet at the DRY sum, which a soloed return mutes.
 inline bool any_send_solo(const Project& p) { return p.reverbSolo || p.delaySolo; }
 
 inline bool reverb_return_audible(const Project& p) {
@@ -549,7 +606,7 @@ inline bool delay_return_audible(const Project& p) {
     return !p.delayMute && (p.delaySolo || !any_send_solo(p));
 }
 
-/** Is the dry mix heard? A soloed return silences it — unless a TRACK is soloed too, which asks for
+/** Is the dry mix heard? A soloed return silences it Ã¢â‚¬â€ unless a TRACK is soloed too, which asks for
  *  that track's dry signal alongside the return. */
 inline bool dry_audible(const Project& p) { return !any_send_solo(p) || any_solo(p); }
 

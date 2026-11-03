@@ -32,6 +32,7 @@
 #include "ui/modules/midi_settings.h"
 #include "ui/modules/mixer.h"
 #include "ui/modules/modulation.h"
+#include "ui/modules/moonset.h"
 #include "ui/modules/phrase_editor.h"
 #include "ui/modules/project_editor.h"
 #include "ui/modules/qwerty_keyboard.h"
@@ -1055,6 +1056,19 @@ class InputDispatcher {
     // or the first restore would undo the second.
     void run_due_sample_preview_restore(bool force = false);
 
+    // ── MOONSET (ui/dispatch/screens/moonset.cpp) ───────────────────────────────────────────────
+
+    bool on_moonset() const { return s_.currentScreen == ScreenType::MOONSET; }
+
+    GestureResult moonset_screen(Gesture g);
+    CursorContext moonset_context() const;
+    bool          moonset_edit(const InputAction& action);
+
+    // INSTRUMENT's EDIT button on a GRANULAR slot. Samplers keep the sample editor.
+    void open_moonset();
+    void close_moonset();
+    void init_moonset_state();
+
     // What the editor's buttons leave for later (not drawn, so not in `s_.sampleEditor`).
     struct SamplePending {
         bool      previewRestore     = false;   // run_due_sample_preview_restore
@@ -1068,6 +1082,7 @@ class InputDispatcher {
     SamplePending samplePending_{};
 
     SampleEditorModule sample_{};
+    MoonsetModule      moonset_{};
 };
 
 }  // namespace pt::ui

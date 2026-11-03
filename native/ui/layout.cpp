@@ -63,6 +63,71 @@ void TrackerLayout::draw_full_screen(Canvas& c, const AppState& s) {
     const Theme& t = s.theme;
     if (s.currentScreen == ScreenType::FILE_BROWSER) {
         fileBrowser_.draw(c, 0, 0, s.fileBrowser, t);
+    } else if (s.currentScreen == ScreenType::MOONSET) {
+        const songcore::Instrument& ins = s.project->instruments[static_cast<size_t>(s.moonset.instrumentId)];
+        c.fill_rect(0, 0, 640, 480, t.background);
+        // Title bar (same banner as the sample editor)
+        {
+            const int ty = TEXT_PADDING;
+            c.draw_text("MOONSET", SIDE_SPACER, ty, t.textTitle, CHAR_SPACING, FONT_SCALE);
+            const std::string name = ins.name.empty() ? songcore::default_instrument_name(ins.id) : ins.name;
+            c.draw_text(Canvas::clip_text(name, 20), SIDE_SPACER + 8 * CHAR_W, ty, t.textParam,
+                        CHAR_SPACING, FONT_SCALE);
+            c.draw_text(std::to_string(s.moonset.sampleRate) + "Hz", 360, ty, t.textParam,
+                        CHAR_SPACING, FONT_SCALE);
+            if (s.project) {
+                c.draw_text(std::to_string(s.project->tempo) + " BPM", 245, ty, t.textParam,
+                            CHAR_SPACING, FONT_SCALE);
+            }
+            const int durSec = (s.moonset.totalFrames > 0) ? (s.moonset.totalFrames / s.moonset.sampleRate) : 0;
+            c.draw_text(std::to_string(durSec) + "s", 492, ty, t.textParam, CHAR_SPACING, FONT_SCALE);
+            c.draw_text("B BACK  X PREVIEW", 640 - SIDE_SPACER - 18 * CHAR_W, ty, t.textParam,
+                        CHAR_SPACING, 2);
+        }
+        // Record section (above the visualizer)
+        {
+            const int ry = 60;
+            const int ty = ry + TEXT_PADDING;
+            c.draw_text("RECORD", SIDE_SPACER, ty, t.textParam, CHAR_SPACING, FONT_SCALE);
+            c.draw_text("REC", 175, ty, t.textValue, CHAR_SPACING, FONT_SCALE);
+            c.draw_text("INPUT", 335, ty, t.textParam, CHAR_SPACING, FONT_SCALE);
+            c.draw_text("DEF", 410, ty, t.textValue, CHAR_SPACING, FONT_SCALE);
+            c.draw_text("SET", 535, ty, t.textParam, CHAR_SPACING, FONT_SCALE);
+            c.draw_text("OFF", 590, ty, t.textValue, CHAR_SPACING, FONT_SCALE);
+            c.draw_text("LOOP", 650, ty, t.textParam, CHAR_SPACING, FONT_SCALE);
+            c.draw_text("OFF", 710, ty, t.textValue, CHAR_SPACING, FONT_SCALE);
+        }
+        // Visualizer
+        {
+            const int wx = 10, wy = 85, ww = 620, wh = 155, mid = wy + wh / 2;
+            c.fill_rect(wx, wy, ww, wh, t.vizBackground);
+            c.fill_rect(wx, mid, ww, 1, t.vizCenterLine);
+            if (s.moonset.waveformData.size() >= 2) {
+                const int bins = static_cast<int>(s.moonset.waveformData.size()) / 2;
+                const float halfH = wh / 2.0f;
+                for (int i = 0; i < bins; ++i) {
+                    const float mn = s.moonset.waveformData[static_cast<size_t>(i) * 2];
+                    const float mx = s.moonset.waveformData[static_cast<size_t>(i) * 2 + 1];
+                    const int cx = wx + static_cast<int>(static_cast<float>(i) * ww / bins);
+                    const int top = mid - static_cast<int>(mx * halfH);
+                    const int bot = mid - static_cast<int>(mn * halfH);
+                    c.fill_rect(cx, top, 1, (bot > top) ? (bot - top) : 1, t.textEmpty);
+                }
+            } else {
+                c.draw_text("NO SAMPLE", wx + ww / 2 - 4 * CHAR_W, mid - 6, t.textEmpty,
+                            CHAR_SPACING, FONT_SCALE);
+            }
+            if (s.moonset.playbackPosition >= 0.0f && s.moonset.playbackPosition <= 1.0f) {
+                c.fill_rect(wx + static_cast<int>(s.moonset.playbackPosition * (ww - 1)), wy, 2, wh,
+                            t.textTitle);
+            }
+            c.stroke_rect(wx, wy, ww, wh, t.textParam);
+        }
+        // Granular parameter block
+        draw_moonset_granular(c, 0, 245, ins.granular, s.moonset.cursorRow, s.moonset.cursorColumn, t,
+                              /*sliceMethod=*/0, /*sliceIndex=*/0);
+        if (s.helpOpen)
+            helpPanel_.draw(c, SIDE_SPACER, 245, help_topic(s), t, 230);
     } else {
         sampleEditor_.draw(c, 0, 0, s.sampleEditor, t);
         // The TSTRETCH box dims the frame, so help is drawn after it.

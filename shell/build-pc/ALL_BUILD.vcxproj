@@ -1,0 +1,225 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="16.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ResolveNugetPackages>false</ResolveNugetPackages>
+  </PropertyGroup>
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="MinSizeRel|x64">
+      <Configuration>MinSizeRel</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="RelWithDebInfo|x64">
+      <Configuration>RelWithDebInfo</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{766BE5A3-9051-3E25-BE2A-9D731BF4917D}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <WindowsTargetPlatformVersion>10.0.22621.0</WindowsTargetPlatformVersion>
+    <Platform>x64</Platform>
+    <ProjectName>ALL_BUILD</ProjectName>
+    <VCProjectUpgraderObjectName>NoUpgrade</VCProjectUpgraderObjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'" Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'" Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.20506.1</_ProjectFileVersion>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Midl>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Midl>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">
+    <Midl>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">
+    <Midl>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\CMakeLists.txt">
+      <UseUtf8Encoding>Always</UseUtf8Encoding>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Building Custom Rule C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+"C:\Users\Jordan Solans\scoop\apps\cmake\current\bin\cmake.exe" "-SC:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell" "-BC:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc" --check-stamp-file "C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/CMakeFiles/generate.stamp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\app\build.gradle.kts;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\cmake\pt_version.cmake;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\CMakeFiles\4.2.3\CMakeCCompiler.cmake;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\CMakeFiles\4.2.3\CMakeCXXCompiler.cmake;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\CMakeFiles\4.2.3\CMakeRCCompiler.cmake;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\CMakeFiles\4.2.3\CMakeSystem.cmake;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\CMakeFiles\cmake.verify_globs;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\windows\pockettracker.rc.in;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeCInformation.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeCXXInformation.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeCommonLanguageInclude.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeGenericSystem.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeInitializeConfigs.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeLanguageInformation.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeRCInformation.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeSystemSpecificInformation.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeSystemSpecificInitialize.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Compiler\CMakeCommonCompilerMacros.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Compiler\MSVC-C.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Compiler\MSVC-CXX.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Compiler\MSVC.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\ExternalProject\shared_internal_commands.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\FetchContent.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\FetchContent\CMakeLists.cmake.in;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\FindGit.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\FindPackageHandleStandardArgs.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\FindPackageMessage.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Internal\CMakeCLinkerInformation.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Internal\CMakeCXXLinkerInformation.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Internal\CMakeCommonLinkerInformation.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Linker\MSVC-C.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Linker\MSVC-CXX.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Linker\MSVC.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\Linker\Windows-MSVC-C.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\Linker\Windows-MSVC-CXX.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\Linker\Windows-MSVC.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\Windows-Initialize.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\Windows-MSVC-C.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\Windows-MSVC-CXX.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\Windows-MSVC.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\Windows.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\WindowsPaths.cmake;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Building Custom Rule C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+"C:\Users\Jordan Solans\scoop\apps\cmake\current\bin\cmake.exe" "-SC:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell" "-BC:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc" --check-stamp-file "C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/CMakeFiles/generate.stamp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\app\build.gradle.kts;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\cmake\pt_version.cmake;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\CMakeFiles\4.2.3\CMakeCCompiler.cmake;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\CMakeFiles\4.2.3\CMakeCXXCompiler.cmake;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\CMakeFiles\4.2.3\CMakeRCCompiler.cmake;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\CMakeFiles\4.2.3\CMakeSystem.cmake;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\CMakeFiles\cmake.verify_globs;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\windows\pockettracker.rc.in;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeCInformation.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeCXXInformation.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeCommonLanguageInclude.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeGenericSystem.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeInitializeConfigs.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeLanguageInformation.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeRCInformation.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeSystemSpecificInformation.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeSystemSpecificInitialize.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Compiler\CMakeCommonCompilerMacros.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Compiler\MSVC-C.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Compiler\MSVC-CXX.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Compiler\MSVC.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\ExternalProject\shared_internal_commands.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\FetchContent.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\FetchContent\CMakeLists.cmake.in;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\FindGit.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\FindPackageHandleStandardArgs.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\FindPackageMessage.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Internal\CMakeCLinkerInformation.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Internal\CMakeCXXLinkerInformation.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Internal\CMakeCommonLinkerInformation.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Linker\MSVC-C.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Linker\MSVC-CXX.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Linker\MSVC.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\Linker\Windows-MSVC-C.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\Linker\Windows-MSVC-CXX.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\Linker\Windows-MSVC.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\Windows-Initialize.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\Windows-MSVC-C.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\Windows-MSVC-CXX.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\Windows-MSVC.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\Windows.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\WindowsPaths.cmake;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">Building Custom Rule C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">setlocal
+"C:\Users\Jordan Solans\scoop\apps\cmake\current\bin\cmake.exe" "-SC:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell" "-BC:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc" --check-stamp-file "C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/CMakeFiles/generate.stamp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\app\build.gradle.kts;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\cmake\pt_version.cmake;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\CMakeFiles\4.2.3\CMakeCCompiler.cmake;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\CMakeFiles\4.2.3\CMakeCXXCompiler.cmake;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\CMakeFiles\4.2.3\CMakeRCCompiler.cmake;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\CMakeFiles\4.2.3\CMakeSystem.cmake;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\CMakeFiles\cmake.verify_globs;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\windows\pockettracker.rc.in;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeCInformation.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeCXXInformation.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeCommonLanguageInclude.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeGenericSystem.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeInitializeConfigs.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeLanguageInformation.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeRCInformation.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeSystemSpecificInformation.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeSystemSpecificInitialize.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Compiler\CMakeCommonCompilerMacros.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Compiler\MSVC-C.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Compiler\MSVC-CXX.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Compiler\MSVC.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\ExternalProject\shared_internal_commands.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\FetchContent.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\FetchContent\CMakeLists.cmake.in;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\FindGit.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\FindPackageHandleStandardArgs.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\FindPackageMessage.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Internal\CMakeCLinkerInformation.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Internal\CMakeCXXLinkerInformation.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Internal\CMakeCommonLinkerInformation.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Linker\MSVC-C.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Linker\MSVC-CXX.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Linker\MSVC.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\Linker\Windows-MSVC-C.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\Linker\Windows-MSVC-CXX.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\Linker\Windows-MSVC.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\Windows-Initialize.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\Windows-MSVC-C.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\Windows-MSVC-CXX.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\Windows-MSVC.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\Windows.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\WindowsPaths.cmake;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">Building Custom Rule C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">setlocal
+"C:\Users\Jordan Solans\scoop\apps\cmake\current\bin\cmake.exe" "-SC:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell" "-BC:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc" --check-stamp-file "C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/CMakeFiles/generate.stamp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\app\build.gradle.kts;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\native\cmake\pt_version.cmake;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\CMakeFiles\4.2.3\CMakeCCompiler.cmake;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\CMakeFiles\4.2.3\CMakeCXXCompiler.cmake;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\CMakeFiles\4.2.3\CMakeRCCompiler.cmake;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\CMakeFiles\4.2.3\CMakeSystem.cmake;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\CMakeFiles\cmake.verify_globs;C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\windows\pockettracker.rc.in;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeCInformation.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeCXXInformation.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeCommonLanguageInclude.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeGenericSystem.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeInitializeConfigs.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeLanguageInformation.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeRCInformation.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeSystemSpecificInformation.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\CMakeSystemSpecificInitialize.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Compiler\CMakeCommonCompilerMacros.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Compiler\MSVC-C.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Compiler\MSVC-CXX.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Compiler\MSVC.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\ExternalProject\shared_internal_commands.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\FetchContent.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\FetchContent\CMakeLists.cmake.in;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\FindGit.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\FindPackageHandleStandardArgs.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\FindPackageMessage.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Internal\CMakeCLinkerInformation.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Internal\CMakeCXXLinkerInformation.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Internal\CMakeCommonLinkerInformation.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Linker\MSVC-C.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Linker\MSVC-CXX.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Linker\MSVC.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\Linker\Windows-MSVC-C.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\Linker\Windows-MSVC-CXX.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\Linker\Windows-MSVC.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\Windows-Initialize.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\Windows-MSVC-C.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\Windows-MSVC-CXX.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\Windows-MSVC.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\Windows.cmake;C:\Users\Jordan Solans\scoop\apps\cmake\current\share\cmake-4.2\Modules\Platform\WindowsPaths.cmake;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+  </ItemGroup>
+  <ItemGroup />
+  <ItemGroup>
+    <ProjectReference Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\ZERO_CHECK.vcxproj">
+      <Project>{E5458726-8B27-3347-B9E2-8CE656D818E3}</Project>
+      <Name>ZERO_CHECK</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\_deps\sdl2-build\SDL2-static.vcxproj">
+      <Project>{F95C5714-C486-3877-8BA0-3F8EB149BACD}</Project>
+      <Name>SDL2-static</Name>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\_deps\sdl2-build\SDL2main.vcxproj">
+      <Project>{7078920D-85CF-3821-8E95-C129C44D9934}</Project>
+      <Name>SDL2main</Name>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\native\faad2.vcxproj">
+      <Project>{822ACD19-319B-3DF3-B5B6-B3C5461C3A4D}</Project>
+      <Name>faad2</Name>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\native\vendor\ogg\ogg.vcxproj">
+      <Project>{D2C9A13E-E9F2-387D-8074-D77545C12F94}</Project>
+      <Name>ogg</Name>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\native\vendor\opus\opus.vcxproj">
+      <Project>{3681F3B2-0237-3807-B479-D36C240D5835}</Project>
+      <Name>opus</Name>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\native\opusfile.vcxproj">
+      <Project>{07746C14-5CD9-3F3D-9957-5A141915E8BA}</Project>
+      <Name>opusfile</Name>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\native\pockettracker.vcxproj">
+      <Project>{B8F9D9E0-60E4-3F5A-8415-49276A5E3373}</Project>
+      <Name>pockettracker</Name>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\pockettracker-sdl.vcxproj">
+      <Project>{E3AB4836-F195-3E7A-A9F1-839F29480713}</Project>
+      <Name>pockettracker-sdl</Name>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\pt-asio.vcxproj">
+      <Project>{83897B9A-711D-3882-9B6C-C970DB441C63}</Project>
+      <Name>pt-asio</Name>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\native\pt-ui.vcxproj">
+      <Project>{A595668C-39BA-39D2-B1EE-AB192AA4927B}</Project>
+      <Name>pt-ui</Name>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\Jordan Solans\Documents\GitHub\pockettracker - Copie (2)\pockettracker - Copie\shell\build-pc\native\songcore.vcxproj">
+      <Project>{812C57FD-64E8-3844-9C8B-DB401F6567FB}</Project>
+      <Name>songcore</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

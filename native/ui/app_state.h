@@ -18,6 +18,7 @@
 #include "ui/modules/qwerty_keyboard.h"
 #include "ui/modules/render_dialog.h"
 #include "ui/modules/sample_editor.h"
+#include "ui/modules/moonset.h"
 #include "ui/modules/midi_settings.h"   // AudioLoad
 #include "ui/modules/theme_editor.h"
 #include "ui/modules/settings_editor.h"
@@ -274,6 +275,10 @@ struct AppState {
     // waveform's min/max pairs. The audio itself is in the engine.
     SampleEditorState sampleEditor{};
 
+    // The MOONSET session: the cursor, the waveform and the engine's grain read-outs. The parameters
+    // themselves are the instrument's (`Instrument::GranularParams`).
+    MoonsetState moonset{};
+
     // One state for every confirm (ui/modules/confirm_dialog.h).
     ConfirmDialogState confirm{};
 
@@ -418,6 +423,7 @@ inline bool modal_backdrop_active(const AppState& s) {
 // brings the furniture back.
 inline bool full_screen_module(const AppState& s) {
     return s.currentScreen == ScreenType::FILE_BROWSER ||
+           s.currentScreen == ScreenType::MOONSET ||
            (s.currentScreen == ScreenType::SAMPLE_EDITOR && !s.eq.isOpen);
 }
 

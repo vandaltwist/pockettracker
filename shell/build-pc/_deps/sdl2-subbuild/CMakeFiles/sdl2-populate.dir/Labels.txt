@@ -1,0 +1,14 @@
+# Target labels
+ sdl2-populate
+# Source files and their labels
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/_deps/sdl2-subbuild/CMakeFiles/sdl2-populate
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/_deps/sdl2-subbuild/CMakeFiles/107e7bab892dd86e792e32470db2ae4d/sdl2-populate.rule
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/_deps/sdl2-subbuild/CMakeFiles/a1f6b662b6cedeaabb10530616d8b92c/sdl2-populate-complete.rule
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/_deps/sdl2-subbuild/CMakeFiles/f128b0225abb38e78fe8d98699768a9d/sdl2-populate-build.rule
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/_deps/sdl2-subbuild/CMakeFiles/f128b0225abb38e78fe8d98699768a9d/sdl2-populate-configure.rule
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/_deps/sdl2-subbuild/CMakeFiles/f128b0225abb38e78fe8d98699768a9d/sdl2-populate-download.rule
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/_deps/sdl2-subbuild/CMakeFiles/f128b0225abb38e78fe8d98699768a9d/sdl2-populate-install.rule
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/_deps/sdl2-subbuild/CMakeFiles/f128b0225abb38e78fe8d98699768a9d/sdl2-populate-mkdir.rule
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/_deps/sdl2-subbuild/CMakeFiles/f128b0225abb38e78fe8d98699768a9d/sdl2-populate-patch.rule
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/_deps/sdl2-subbuild/CMakeFiles/f128b0225abb38e78fe8d98699768a9d/sdl2-populate-test.rule
+C:/Users/Jordan Solans/Documents/GitHub/pockettracker - Copie (2)/pockettracker - Copie/shell/build-pc/_deps/sdl2-subbuild/CMakeFiles/f128b0225abb38e78fe8d98699768a9d/sdl2-populate-update.rule

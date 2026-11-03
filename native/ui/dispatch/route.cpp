@@ -40,6 +40,7 @@ constexpr GridCursor TABLE_GRID{&AppState::tableCursorRow, &AppState::tableCurso
 using D = InputDispatcher;
 const D::ScreenHandler D::SCREENS[] = {
     {ScreenType::SAMPLE_EDITOR, &D::sample_editor_screen, &D::sample_editor_context, &D::sample_editor_edit, nullptr, nullptr},
+    {ScreenType::MOONSET,       &D::moonset_screen,       &D::moonset_context,       &D::moonset_edit,       nullptr, nullptr},
     {ScreenType::FILE_BROWSER,  &D::file_browser_screen,  nullptr,                   nullptr,                nullptr, nullptr},
     {ScreenType::INSTRUMENT,    &D::instrument_screen,    &D::instrument_context,    &D::instrument_edit,    &D::instrument_knob, nullptr},
     {ScreenType::INST_POOL,     &D::pool_screen,          &D::pool_context,          &D::pool_edit,          nullptr, nullptr},

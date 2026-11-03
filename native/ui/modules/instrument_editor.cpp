@@ -129,11 +129,11 @@ std::string cell_text(Cell cell, int cc_slot_index, const InstrumentEditorState&
         case Cell::END:        return hex2(ins.sampleEnd);
         case Cell::LOOP_END:   return hex2(ins.loopEnd);
         case Cell::REVERSE:    return on_off(ins.reverse);
-        case Cell::GRAIN_SIZE:     return hex2(ins.granular.grainSize);
-        case Cell::GRAIN_DENSITY:  return hex2(ins.granular.grainDensity);
-        case Cell::GRAIN_PITCH:    return hex2(ins.granular.grainPitch);
-        case Cell::SCAN_POS:       return hex2(ins.granular.scanPos);
-        case Cell::GRAIN_DIR:      return ins.granular.grainReverse ? "REV" : "FWD";
+        case Cell::GRAIN_SIZE:     return hex2(ins.granular.grain.size);
+        case Cell::GRAIN_DENSITY:  return hex2(ins.granular.grain.density);
+        case Cell::GRAIN_PITCH:    return hex2(ins.granular.grain.pitch);
+        case Cell::SCAN_POS:       return hex2(ins.granular.grain.position);
+        case Cell::GRAIN_DIR:      return ins.granular.motion.rev != 0 ? "REV" : "FWD";
         // CHAN is stored 0-15 and shown 1-16.
         case Cell::MIDI_CHANNEL: return dec2(clamp(ins.midiChannel, 0, 15) + 1);
         // 14-bit, so four hex digits.
@@ -362,11 +362,11 @@ CursorContext InstrumentEditorModule::cursor_context(const InstrumentEditorState
         case Cell::END:        return cc::plain_byte(ins.sampleEnd, 0xFF);
         case Cell::LOOP_END:   return cc::plain_byte(ins.loopEnd, 0xFF);
         case Cell::REVERSE:    return cc::toggle_binary(ins.reverse);
-        case Cell::GRAIN_SIZE:     return cc::plain_byte(ins.granular.grainSize, 0x40);
-        case Cell::GRAIN_DENSITY:  return cc::plain_byte(ins.granular.grainDensity, 0x80);
-        case Cell::GRAIN_PITCH:    return cc::plain_byte(ins.granular.grainPitch, 0x80);
-        case Cell::SCAN_POS:       return cc::plain_byte(ins.granular.scanPos, 0x00);
-        case Cell::GRAIN_DIR:      return cc::toggle_binary(ins.granular.grainReverse);
+        case Cell::GRAIN_SIZE:     return cc::plain_byte(ins.granular.grain.size, 0x40);
+        case Cell::GRAIN_DENSITY:  return cc::plain_byte(ins.granular.grain.density, 0x80);
+        case Cell::GRAIN_PITCH:    return cc::plain_byte(ins.granular.grain.pitch, 0x80);
+        case Cell::SCAN_POS:       return cc::plain_byte(ins.granular.grain.position, 0x00);
+        case Cell::GRAIN_DIR:      return cc::toggle_binary(ins.granular.motion.rev != 0);
 
         // Steps the stored 0-15, wrapping as the wire does.
         case Cell::MIDI_CHANNEL:
@@ -504,11 +504,11 @@ InstrumentInputResult InstrumentEditorModule::handle_input(Instrument& ins, int 
         case Cell::END:        b255(ins.sampleEnd);                break;
         case Cell::LOOP_END:   b255(ins.loopEnd);                  break;
         case Cell::REVERSE:    flag(ins.reverse);                  break;
-        case Cell::GRAIN_SIZE:     b255(ins.granular.grainSize);    break;
-        case Cell::GRAIN_DENSITY:  b255(ins.granular.grainDensity); break;
-        case Cell::GRAIN_PITCH:    b255(ins.granular.grainPitch);   break;
-        case Cell::SCAN_POS:       b255(ins.granular.scanPos);      break;
-        case Cell::GRAIN_DIR:      flag(ins.granular.grainReverse); break;
+        case Cell::GRAIN_SIZE:     b255(ins.granular.grain.size);    break;
+        case Cell::GRAIN_DENSITY:  b255(ins.granular.grain.density); break;
+        case Cell::GRAIN_PITCH:    b255(ins.granular.grain.pitch);   break;
+        case Cell::SCAN_POS:       b255(ins.granular.grain.position); break;
+        case Cell::GRAIN_DIR:      if (isSet) ins.granular.motion.rev = (v == 1) ? 0xFF : 0x00; break;
 
         case Cell::MIDI_CHANNEL: if (isSet) ins.midiChannel = clamp(v, 0, 15); break;  // stored 0-15
         case Cell::MIDI_BANK:    optional(ins.midiBank, 16383);   break;

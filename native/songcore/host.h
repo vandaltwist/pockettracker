@@ -393,7 +393,12 @@ class SongcoreHost {
     // ⚠️ The window goes in as FRAMES, not the 0-255 start/end grid — the audition must be exactly
     // what CROP keeps. It is read when the note fires, so `finish_sample_preview()` ends it later.
     void preview_sample_editor(int id, int sourceMode, int64_t selStart, int64_t selEnd,
-                               int totalFrames, int pitchSemitones, const SampleSync& sync = {});
+                               int totalFrames, int pitchSemitones, const SampleSync& sync = {},
+                               bool loop = false);
+
+    // An audit still sounding after a cell changed: re-push the window and loop, then ask the engine
+    // to reload every voice on `id`. No retrigger — the same grain/playhead keeps going.
+    void refresh_sample_preview(int id, bool loop, int64_t selStart, int64_t selEnd);
 
     // Put the instrument back (window, EQ, sends, modulation) — on the dispatcher's 100 ms deadline,
     // or at once on a second START.
@@ -546,6 +551,15 @@ class SongcoreHost {
 
     // Flushed after each verb: a long session stays bounded in RAM and a crash keeps the trace so far.
     void flush_trace();
+
+    // The audition in progress, so a cell change can re-push its window without the caller having to
+    // remember which scratch slot or synced length it was started from.
+    int     previewEditorId_       = -1;
+    int     previewEditorSlot_     = -1;
+    int     previewEditorSource_   = 0;
+    int64_t previewEditorTotal_    = 0;
+    int64_t previewEditorSelStart_ = 0;
+    int64_t previewEditorSelEnd_   = 0;
 
     AudioEngine* engine_ = nullptr;
     int sampleRate_ = 44100;

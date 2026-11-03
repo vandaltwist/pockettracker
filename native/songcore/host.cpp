@@ -534,7 +534,8 @@ void SongcoreHost::sync_sample(int id, const SampleSync& sync) {
 }
 
 void SongcoreHost::preview_sample_editor(int id, int sourceMode, int64_t selStart, int64_t selEnd,
-                                         int totalFrames, int pitchSemitones, const SampleSync& sync) {
+                                         int totalFrames, int pitchSemitones, const SampleSync& sync,
+                                         bool loop) {
     if (!engine_ || id < 0 || id >= POOL_INSTRUMENTS) return;
     Instrument& ins = project_.instruments[static_cast<size_t>(id)];
 
@@ -548,8 +549,10 @@ void SongcoreHost::preview_sample_editor(int id, int sourceMode, int64_t selStar
 
     // A voice's window is keyed on the SLOT it plays from, so the params go to the scratch slot
     // when there is one.
-    const int savedSampleId = ins.sampleId;
+    const int          savedSampleId = ins.sampleId;
+    const std::string  savedLoop     = ins.loopMode;
     if (slot != id) ins.sampleId = slot;
+    ins.loopMode = loop ? "fwd" : "off";   // the editor's LOOP cell, not the instrument's saved state
     push_instrument_playback_params(*engine_, ins);
     // After the push, which clears any previous window. A channel copy is frame-for-frame, so the
     // selection indexes it as it is; a synced one is scaled onto its new length.
@@ -561,8 +564,45 @@ void SongcoreHost::preview_sample_editor(int id, int sourceMode, int64_t selStar
     }
     preview_instrument_dry(*engine_, ins, slot, routing_.sampleRateRatio[id]);
     if (slot != id) ins.sampleId = savedSampleId;
+    ins.loopMode = savedLoop;
+    ins.root     = savedRoot;   // read at SCHEDULE time, so it can go back at once
 
-    ins.root = savedRoot;   // read at SCHEDULE time, so it can go back at once
+    previewEditorId_       = id;
+    previewEditorSlot_     = slot;
+    previewEditorSource_   = sourceMode;
+    previewEditorTotal_    = totalFrames;
+    previewEditorSelStart_ = selStart;
+    previewEditorSelEnd_   = selEnd;
+}
+
+void SongcoreHost::refresh_sample_preview(int id, bool loop, int64_t selStart, int64_t selEnd) {
+    if (!engine_ || id < 0 || id >= POOL_INSTRUMENTS) return;
+    Instrument& ins = project_.instruments[static_cast<size_t>(id)];
+
+    // A refresh follows a preview; before one, fall back to the instrument's own slot and length.
+    const int     slot  = (previewEditorId_ == id && previewEditorSlot_ >= 0)
+                              ? previewEditorSlot_ : id;
+    const int64_t total = (previewEditorId_ == id && previewEditorTotal_ > 0)
+                              ? previewEditorTotal_ : (int64_t)engine_->getSampleLength(slot);
+
+    const int          savedSampleId = ins.sampleId;
+    const std::string  savedLoop     = ins.loopMode;
+    if (slot != id) ins.sampleId = slot;
+    ins.loopMode = loop ? "fwd" : "off";
+    push_instrument_playback_params(*engine_, ins);
+    if (total > 0 && selEnd > selStart) {
+        const int64_t len = engine_->getSampleLength(slot);
+        const int64_t a   = std::clamp<int64_t>(selStart * len / total, 0, len);
+        const int64_t b   = std::clamp<int64_t>(selEnd * len / total, 0, len);
+        if (b > a) engine_->setInstrumentFrameWindow(slot, static_cast<int>(a), static_cast<int>(b));
+    }
+    // ⚠️ Keyed by the SLOT the voice plays from — for LEFT/RIGHT/MONO that is scratch 254, not `id`.
+    engine_->refreshSoundingInstrument(slot);
+    if (slot != id) ins.sampleId = savedSampleId;
+    ins.loopMode = savedLoop;
+
+    previewEditorSelStart_ = selStart;
+    previewEditorSelEnd_   = selEnd;
 }
 
 void SongcoreHost::finish_sample_preview(int id) {
@@ -573,6 +613,9 @@ void SongcoreHost::finish_sample_preview(int id) {
     engine_->setInstrumentFrameWindow(SOURCE_PREVIEW_SLOT, -1, -1);
     // The three the DRY preview switched off.
     push_instrument_mod_eq_sends(*engine_, ins, tempo_in_force(project_), engine_->getSampleRate());
+    previewEditorId_   = -1;
+    previewEditorSlot_ = -1;
+    previewEditorTotal_ = 0;
 }
 
 bool SongcoreHost::save_sample_wav(int id, const std::string& path, const std::vector<int>& cuePoints,

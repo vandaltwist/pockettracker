@@ -341,7 +341,7 @@ void SampleEditorModule::draw(Canvas& c, int x, int y, const SampleEditorState& 
     // ── Header, then rows 1 and 2, then the waveform ─────────────────────────────────────────────
     {
         const int ty = y + 5 + TEXT_PADDING;
-        c.draw_text("MOONSET", x + 10, ty, t.textTitle, CHAR_SPACING, FONT_SCALE);
+        c.draw_text("SAMPLE EDITOR", x + 10, ty, t.textTitle, CHAR_SPACING, FONT_SCALE);
         // BPM sits left of the rate and length it is derived from; six columns cap it at 999.
         c.draw_text(s.bpm_display(), x + 245, ty, t.textParam, CHAR_SPACING, FONT_SCALE);
         c.draw_text(std::to_string(s.sampleRate) + "Hz", x + 360, ty, t.textParam, CHAR_SPACING, FONT_SCALE);

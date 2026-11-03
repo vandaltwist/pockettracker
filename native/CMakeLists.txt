@@ -484,6 +484,7 @@ add_library(pt-ui STATIC
         ui/dispatch/screens/instrument.cpp
         ui/dispatch/screens/midi.cpp
         ui/dispatch/screens/mixer.cpp
+        ui/dispatch/screens/moonset.cpp
         ui/dispatch/screens/project.cpp
         ui/dispatch/screens/sample_editor.cpp
         ui/dispatch/screens/scale_groove.cpp
@@ -513,6 +514,7 @@ add_library(pt-ui STATIC
         ui/modules/midi_settings.cpp
         ui/modules/mixer.cpp
         ui/modules/modulation.cpp
+        ui/modules/moonset.cpp
         ui/modules/navigation_map.cpp
         ui/modules/oscilloscope.cpp
         ui/modules/phrase_editor.cpp

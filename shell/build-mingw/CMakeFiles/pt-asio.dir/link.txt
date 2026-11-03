@@ -1,0 +1,2 @@
+C:\Users\JORDAN~1\scoop\apps\mingw\current\bin\ar.exe qc libpt-asio.a "CMakeFiles/pt-asio.dir/C_/Users/Jordan_Solans/Documents/GitHub/pockettracker_-_Copie/native/vendor/asio/common/asio.cpp.obj" "CMakeFiles/pt-asio.dir/C_/Users/Jordan_Solans/Documents/GitHub/pockettracker_-_Copie/native/vendor/asio/host/asiodrivers.cpp.obj" "CMakeFiles/pt-asio.dir/C_/Users/Jordan_Solans/Documents/GitHub/pockettracker_-_Copie/native/vendor/asio/host/pc/asiolist.cpp.obj"
+C:\Users\JORDAN~1\scoop\apps\mingw\current\bin\ranlib.exe libpt-asio.a
