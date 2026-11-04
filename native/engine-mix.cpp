@@ -258,8 +258,11 @@ void AudioEngine::triggerSamplerNote(const ScheduledNote& note, int frame, int64
                 const uint32_t seed = (uint32_t)currentFrame ^ ((uint32_t)note.trackId * 747796405u) ^
                                       ((uint32_t)note.sampleId << 16);
                 voices[v].granular.start(seed, voices[v].sampleLength, sampleRate);
+                // The cloud lives in the note's window (slice / CUT / START-END): POSITION is relative to it,
+                // so no start override is passed any more.
+                voices[v].granular.setWindow(voices[v].actualStart, voices[v].actualEnd);
                 voices[v].granular.setParams(instrumentParams[note.sampleId].granular, voices[v].sampleLength, rate, false, 0, sampleRate,
-                                            note.startPointOverride);
+                                            -1, (float)tempo(), granBus);
             }
             voices[v].instrId = note.sampleId;
             voices[v].sampleGen = gen;
@@ -494,6 +497,8 @@ void AudioEngine::walkMixerRamps(BlockMix& b) {
 // The meters, the send buses and the visualizer accumulators, zeroed for this block. The
 // visualizers are skipped when nobody is watching (CAPTURE_IDLE_MS) or during an export.
 void AudioEngine::clearBlockScratch(BlockMix& b) {
+    // Sidechain for the granular clouds: last block's track peaks, before they are cleared.
+    for (int t = 0; t < 8; t++) granBus[t] = fminf(1.0f, fmaxf(framePeaksPerTrackL[t], framePeaksPerTrackR[t]));
     for (int t = 0; t < 8; t++) { framePeaksPerTrackL[t] = 0.0f; framePeaksPerTrackR[t] = 0.0f; }
     frameSendPeakRevL = frameSendPeakRevR = frameSendPeakDelL = frameSendPeakDelR = 0.0f;
 
@@ -851,8 +856,10 @@ void AudioEngine::prepareSamplerPiece(Voice& voice, int frames, float sampleRate
     if (voice.granular.running() && voice.instrId >= 0 && voice.instrId < 256) {
         // âš ï¸ After the loop bounds and modulation: the grain cloud reads the values this piece will
         // use, and glides to them over `frames`.
+        voice.granular.setWindow(voice.actualStart, voice.actualEnd);
         voice.granular.setParams(instrumentParams[voice.instrId].granular, voice.sampleLength,
-                                 voice.playbackRate, voice.chain.started, frames, sampleRate);
+                                 voice.playbackRate, voice.chain.started, frames, sampleRate,
+                                 -1, (float)tempo(), granBus);
     }
 
     voice.chain.filter.snapshotCoeffs();
@@ -968,7 +975,9 @@ void AudioEngine::mixSamplerPieceAs(Voice& voice, const BlockMix& b, int from, i
     // back below it â€” leave it by `break`, never `return`.
     Playhead   ph           = playheadOf(voice, modulatedRate);
     const bool stereo       = ph.right != nullptr;
-    const bool granular     = voice.granular.running();
+    const bool granular     = voice.granular.active();   // master OFF / GRAIN STATE OFF: the classic playhead
+    // MIX < FF: the normal sample plays under the cloud, through the same filter / drive / sends.
+    const bool classic      = !granular || voice.granular.blending();
     const int  lastReadable = voice.sampleLength - 1;   // the read needs idx + 1
 
     // A chord's other playheads: the voice's own, at their own place and rate.
@@ -1058,7 +1067,7 @@ void AudioEngine::mixSamplerPieceAs(Voice& voice, const BlockMix& b, int from, i
         // In double, then narrowed: (float)idx is inexact past 2^24 frames.
         const float frac = (float)(ph.position - (double)idx);
 
-        if (!granular) {
+        if (classic) {
             if (idx < 0) {   // safety hard-stop
                 isActive = false;
                 break;
@@ -1093,8 +1102,9 @@ void AudioEngine::mixSamplerPieceAs(Voice& voice, const BlockMix& b, int from, i
         float procL = 0.0f, procR = 0.0f;
         const bool dsBlend = dsFade.moving();
         float      dsOld   = 0.0f;
-        if (granular) {
-            voice.granular.render(ph.left, ph.right, procL, procR);
+        float cloudL = 0.0f, cloudR = 0.0f;
+        if (granular) voice.granular.render(ph.left, ph.right, cloudL, cloudR);
+        if (!classic) {
             if (dsBlend) dsFade.next();   // a grain cloud is already band-limited by its Hann window
         } else {
             procL = Playhead::read(ph.left, idx, frac, effDownsample);
@@ -1104,6 +1114,11 @@ void AudioEngine::mixSamplerPieceAs(Voice& voice, const BlockMix& b, int from, i
                 procL = Playhead::read(ph.left, idx, frac, dsPrev) * dsOld + procL * (1.0f - dsOld);
                 if (stereo) procR = Playhead::read(ph.right, idx, frac, dsPrev) * dsOld + procR * (1.0f - dsOld);
             }
+        }
+        if (granular) {   // the cloud, over the sample's share (1 - MIX); cloud alone: dryGain is unused
+            const float d = classic ? voice.granular.dryGain() : 0.0f;
+            procL = procL * d + cloudL;
+            procR = procR * d + cloudR;
         }
         // A strum holds the voice's own playhead where it starts until its turn.
         bool ownWaits = false;
@@ -1219,7 +1234,7 @@ void AudioEngine::mixSamplerPieceAs(Voice& voice, const BlockMix& b, int from, i
 
         if (!isActive) break;
         if (ownWaits) continue;
-        if (!granular && !ph.advance()) {
+        if (classic && !ph.advance()) {
             ranOut = true;
             break;
         }

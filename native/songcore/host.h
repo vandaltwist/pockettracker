@@ -346,6 +346,9 @@ class SongcoreHost {
     // 0..1 while the sample sounds, else −1 — the waveform's playhead.
     float sample_playback_position(int id) const;
 
+    // Live grain read positions of every sounding cloud, each 0..1 of its sample. Returns the count (<= max).
+    int grain_positions(float* out, int max) const;
+
     // `bins` (min, max) pairs. `channel`: 0 left, 1 right, 2 averaged. (0, 0) = the whole sample.
     std::vector<float> sample_waveform(int id, int bins, int startFrame = 0, int endFrame = 0,
                                        int channel = 2) const;

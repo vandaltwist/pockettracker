@@ -156,6 +156,24 @@ bool InputDispatcher::open_sub_screen_at_cursor(bool peek) {
             break;
         }
 
+        case ScreenType::MOONSET: {
+            // The FX row's VALUE cell: an EQ slot opens the EQ editor, TSTRETCH its box.
+            const MoonsetState& se = s_.moonset;
+            if (se.cursorRow != 16 || se.cursorCol != 1) break;
+            if (se.fxType == MoonsetModule::FX_EQ) {
+                if (!peek) {
+                    s_.moonset.fxEqSlot = std::max(0, se.fxEqSlot);
+                    open_eq_editor(s_.moonset.fxEqSlot, EqCallerContext::moonset_fx());
+                }
+                return true;
+            }
+            if (se.fxType == MoonsetModule::FX_SYNC && se.syncType == MoonsetModule::SYNC_TSTRETCH) {
+                if (!peek) open_moonset_stretch();
+                return true;
+            }
+            break;
+        }
+
         default:
             break;
     }

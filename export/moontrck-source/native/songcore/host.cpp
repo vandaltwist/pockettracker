@@ -1,6 +1,7 @@
 // SongcoreHost's bodies; what each one is for is said at its declaration in host.h.
 
 #include "host.h"
+#include "transient_detect.h"
 
 #include <algorithm>
 #include <cmath>
@@ -499,9 +500,22 @@ std::vector<float> SongcoreHost::sample_waveform(int id, int bins, int startFram
 
 std::vector<int> SongcoreHost::detect_transients(int id, int sensitivity) const {
     if (!engine_) return {};
+#ifdef PT_OLD_TRANSIENTS
     int       markers[128];
     const int n = engine_->detectTransients(id, sensitivity, markers, 128);
     return std::vector<int>(markers, markers + std::max(n, 0));
+#else
+    // v4 detector: log-spectral flux + adaptive threshold + attack-start refinement (transient_detect.h).
+    const int len = engine_->getSampleLength(id);
+    if (len < 4096) return {};
+    std::vector<float> l(static_cast<size_t>(len), 0.0f), r(static_cast<size_t>(len), 0.0f);
+    engine_->getSampleData(id, l.data());
+    engine_->getSampleDataRight(id, r.data());
+    bool stereo = false;
+    for (int i = 0; i < len && !stereo; i += 97) stereo = (r[static_cast<size_t>(i)] != 0.0f);
+    if (stereo) for (size_t i = 0; i < l.size(); ++i) l[i] = 0.5f * (l[i] + r[i]);
+    return detect_transient_markers(l.data(), len, sample_rate_of(id), sensitivity, 128);
+#endif
 }
 
 int SongcoreHost::find_zero_crossing(int id, int frame, int dir, int sourceMode) const {

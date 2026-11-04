@@ -218,7 +218,8 @@ struct AppState {
     enum class BrowserPurpose {
         LOAD_SOURCE,        // a sample (or an .sf2 — the instrument's TYPE decides, at open time)
         LOAD_PRESET,        // a .pti into the current instrument slot
-        LOAD_SAMPLE_EDITOR, // a .wav into the slot the SAMPLE EDITOR is open on — and back to it
+        LOAD_SAMPLE_EDITOR, // a .wav into the slot the SAMPLE EDITOR is open on - and back to it
+LOAD_MOONSET,       // a .wav into the slot the MOONSET editor is open on - and back to it
         LOAD_PROJECT,       // a .ptp — the whole document (PROJECT's LOAD)
         LOAD_THEME,         // a .ptt — and back into the THEME EDITOR that raised the browser
         LOAD_SCALE,         // a .pts into the slot the SCALE screen is showing
@@ -410,12 +411,17 @@ inline bool stretch_editor_up(const AppState& s) {
     return s.currentScreen == ScreenType::SAMPLE_EDITOR && s.sampleEditor.stretchOpen;
 }
 
+inline bool moonset_stretch_up(const AppState& s) {
+    return s.currentScreen == ScreenType::MOONSET && s.moonset.stretchOpen;
+}
+
 // Is a modal up that dims the whole canvas? The shell then dims the letterbox bars too.
 // The EQ and theme editors replace the module and leave the frame bright, so they are not here.
 inline bool modal_backdrop_active(const AppState& s) {
     // A load is not here: its strip dims nothing.
     return s.qwerty.isOpen || s.confirm.is_open() || s.fxHelper.isOpen || s.mapPicker.isOpen ||
-           s.helpFull || s.renderDialog.isOpen || send_editor_drawn(s) || stretch_editor_up(s);
+           s.helpFull || s.renderDialog.isOpen || send_editor_drawn(s) || stretch_editor_up(s) || moonset_stretch_up(s) ||
+           (s.currentScreen == ScreenType::MOONSET && s.moonset.granularFocus && s.moonset.modOpen);
 }
 
 // Does a full-screen module own the frame (no furniture)? ⚠️ `draw` and `has_falling_meters` both ask
@@ -425,6 +431,12 @@ inline bool full_screen_module(const AppState& s) {
     return s.currentScreen == ScreenType::FILE_BROWSER ||
            s.currentScreen == ScreenType::MOONSET ||
            (s.currentScreen == ScreenType::SAMPLE_EDITOR && !s.eq.isOpen);
+}
+
+// MOONSET draws a moving cloud (grain_preview.h): the frame loop must keep repainting while it is up,
+// as it does for the falling meters. Add `|| moonset_cloud_animating(s)` where `has_falling_meters` answers.
+inline bool moonset_cloud_animating(const AppState& s) {
+    return s.currentScreen == ScreenType::MOONSET && s.moonset.totalFrames > 0 && !s.moonset.recordActive;
 }
 
 // Keep `row` inside SONG's 16-row window.

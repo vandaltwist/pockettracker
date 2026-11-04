@@ -268,6 +268,7 @@ inline Instrument parse_instrument(const json& j, int index) {
               i.granular.grain.decay    = get_int(o, "decay", i.granular.grain.decay);
               i.granular.grain.pan      = get_int(o, "pan", i.granular.grain.pan);
               i.granular.grain.jitter   = get_int(o, "jitter", i.granular.grain.jitter);
+              i.granular.grain.mix      = get_int(o, "mix", i.granular.grain.mix);
           } }
           { auto b = g.find("roam"); if (b != g.end() && b->is_object()) {
               const auto& o = *b;
@@ -307,6 +308,24 @@ inline Instrument parse_instrument(const json& j, int index) {
               i.granular.motion.spin        = get_int(o, "spin", i.granular.motion.spin);
               i.granular.motion.factor      = get_int(o, "factor", i.granular.motion.factor);
           } }
+      } }
+    { auto it = j.find("granular");   // v2 modulation rows
+      if (it != j.end() && it->is_object()) {
+          i.granular.master = get_bool(*it, "master", i.granular.master);
+          auto mt = it->find("mods");
+          if (mt != it->end() && mt->is_array()) {
+              size_t k = 0;
+              for (const auto& o : *mt) {
+                  if (k >= 8 || !o.is_object()) break;
+                  auto& m = i.granular.mods[k++];
+                  m.target = get_int(o, "target", m.target);
+                  m.src    = get_int(o, "src",    m.src);
+                  m.amount = get_int(o, "amount", m.amount);
+                  m.rate   = get_int(o, "rate",   m.rate);
+                  m.shape  = get_int(o, "shape",  m.shape);
+                  m.bus    = get_int(o, "bus",    m.bus);
+              }
+          }
       } }
     { auto it = j.find("sliceMarkers");
       if (it != j.end() && it->is_array())
@@ -776,6 +795,7 @@ inline void emit_instrument(JsonWriter& w, const Instrument& i) {
         w.field_int("decay", i.granular.grain.decay);
         w.field_int("pan", i.granular.grain.pan);
         w.field_int("jitter", i.granular.grain.jitter);
+        w.field_int("mix", i.granular.grain.mix);
         w.end_object();
         w.key("roam"); w.begin_object();
         w.field_bool("state", i.granular.roam.state);
@@ -813,6 +833,22 @@ inline void emit_instrument(JsonWriter& w, const Instrument& i) {
         w.field_int("spin", i.granular.motion.spin);
         w.field_int("factor", i.granular.motion.factor);
         w.end_object();
+        if (!i.granular.master) w.field_bool("master", false);
+        {   // v2 modulation rows: only the used ones are written
+            bool any = false;
+            for (const auto& m : i.granular.mods) if (m.src != 0 && m.target != 0) any = true;
+            if (any) {
+                w.key("mods"); w.begin_array();
+                for (const auto& m : i.granular.mods) {
+                    w.element(); w.begin_object();
+                    w.field_int("target", m.target); w.field_int("src", m.src);
+                    w.field_int("amount", m.amount); w.field_int("rate", m.rate);
+                    w.field_int("shape", m.shape);   w.field_int("bus", m.bus);
+                    w.end_object();
+                }
+                w.end_array();
+            }
+        }
         w.end_object();
     }
     if (!i.sliceMarkers.empty()) {

@@ -292,9 +292,12 @@ void InputDispatcher::browser_confirm() {
     const std::string stem = item->displayName;
 
     // The SAMPLE EDITOR's LOAD targets the editor's slot, which need not be INSTRUMENT's last one.
-    const int sourceId = (s_.browserPurpose == AppState::BrowserPurpose::LOAD_SAMPLE_EDITOR)
-                             ? s_.sampleEditor.instrumentId
-                             : id;
+    const int sourceId = (s_.browserPurpose == AppState::BrowserPurpose::LOAD_SAMPLE_EDITOR ||
+                      s_.browserPurpose == AppState::BrowserPurpose::LOAD_MOONSET)
+                         ? (s_.browserPurpose == AppState::BrowserPurpose::LOAD_SAMPLE_EDITOR
+                                ? s_.sampleEditor.instrumentId
+                                : s_.moonset.instrumentId)
+                         : id;
     // The name the slot is about to stop deserving, read before the load.
     const std::string previousAutoName = instrument_auto_name(host_.project(), sourceId);
 
@@ -320,6 +323,11 @@ void InputDispatcher::browser_confirm() {
         case AppState::BrowserPurpose::LOAD_SAMPLE_EDITOR:
             // The editor's own LOAD: the same load, returning to the EDITOR.
             ok = host_.load_sample(s_.sampleEditor.instrumentId, path);
+            break;
+
+        case AppState::BrowserPurpose::LOAD_MOONSET:
+            // The MOONSET editor's own LOAD: the same load, returning to MOONSET.
+            ok = host_.load_sample(s_.moonset.instrumentId, path);
             break;
 
         case AppState::BrowserPurpose::LOAD_PROJECT:
@@ -427,7 +435,8 @@ void InputDispatcher::browser_confirm() {
     // The slot adopts the file's name unless the user TYPED its current one (not the default, not the
     // name it took from the replaced source). Both source loads apply it.
     if ((s_.browserPurpose == AppState::BrowserPurpose::LOAD_SOURCE ||
-         s_.browserPurpose == AppState::BrowserPurpose::LOAD_SAMPLE_EDITOR) &&
+         s_.browserPurpose == AppState::BrowserPurpose::LOAD_SAMPLE_EDITOR ||
+         s_.browserPurpose == AppState::BrowserPurpose::LOAD_MOONSET) &&
         sourceId >= 0 && static_cast<size_t>(sourceId) < host_.project().instruments.size()) {
         Instrument& ins = host_.edit_project().instruments[static_cast<size_t>(sourceId)];
         if (songcore::instrument_has_default_name(ins) ||
@@ -440,7 +449,8 @@ void InputDispatcher::browser_confirm() {
 
     // FOLDER = REMEMBER: sample loads only (not an SF from a sampler slot); saved on exit.
     if ((s_.browserPurpose == AppState::BrowserPurpose::LOAD_SOURCE ||
-         s_.browserPurpose == AppState::BrowserPurpose::LOAD_SAMPLE_EDITOR) &&
+         s_.browserPurpose == AppState::BrowserPurpose::LOAD_SAMPLE_EDITOR ||
+         s_.browserPurpose == AppState::BrowserPurpose::LOAD_MOONSET) &&
         !is_soundfont_extension(ext)) {
         s_.settings.lastSampleFolder = b.currentDirectory;
     }
@@ -450,6 +460,12 @@ void InputDispatcher::browser_confirm() {
         close_file_browser();
         s_.currentScreen = ScreenType::SAMPLE_EDITOR;
         init_sample_editor_state();
+        return;
+    }
+    if (s_.browserPurpose == AppState::BrowserPurpose::LOAD_MOONSET) {
+        close_file_browser();
+        s_.currentScreen = ScreenType::MOONSET;
+        init_moonset_state();
         return;
     }
 

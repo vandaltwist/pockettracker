@@ -157,19 +157,77 @@ inline void sample_editor_step_col(AppState& s, int delta) {
     }
 }
 
-// MOONSET: rows walk within the block; LEFT/RIGHT change the block.
+// MOONSET: the sample rows walk the sparse map; DOWN from the last row enters the granular block,
+// UP from its first row comes back. Inside the block, rows walk the focused column.
+inline void moonset_keep_granular_visible(AppState& s) {
+    MoonsetState& m = s.moonset;
+    const int count = moonset_granular_row_count(m.granularColumn);
+    const int vis   = MoonsetState::GRANULAR_VISIBLE;
+    if (m.granularRow < m.granularTop) m.granularTop = m.granularRow;
+    if (m.granularRow >= m.granularTop + vis) m.granularTop = m.granularRow - vis + 1;
+    m.granularTop = std::clamp(m.granularTop, 0, std::max(0, count - vis));
+}
+
+inline void moonset_enter_granular(AppState& s) {
+    MoonsetState& m = s.moonset;
+    m.granularFocus = true;
+    m.pageScrollPx  = MoonsetState::PAGE_SCROLL_MAX;
+    m.granularColumn = 0;
+    m.granularRow    = 0;
+    m.granularTop    = 0;
+    moonset_keep_granular_visible(s);
+}
+
 inline void moonset_step_row(AppState& s, int delta) {
     MoonsetState& m = s.moonset;
-    const int count = moonset_row_count(m.cursorColumn);
-    if (count <= 0) { m.cursorRow = 0; return; }
-    m.cursorRow = std::clamp(m.cursorRow + delta, 0, count - 1);
+
+    if (m.granularFocus) {
+        if (delta < 0 && m.granularRow == 0) {   // back to LOAD / SAVE / OVERWRITE
+            m.granularFocus = false;
+            m.pageScrollPx  = 0;
+            m.cursorRow     = 19;
+            m.cursorCol     = std::min(m.cursorCol,
+                                       MoonsetModule::max_col_for_row(19, m.sliceMethod));
+            return;
+        }
+        const int count = moonset_granular_row_count(m.granularColumn);
+        if (count <= 0) return;
+        m.granularRow = std::clamp(m.granularRow + delta, 0, count - 1);
+        moonset_keep_granular_visible(s);
+        return;
+    }
+
+    if (delta > 0 && m.cursorRow == 19) {   // DOWN from the last sample row enters GRAIN
+        moonset_enter_granular(s);
+        return;
+    }
+
+    const int newRow = (delta < 0) ? MoonsetModule::row_above(m.cursorRow, m.sliceMethod)
+                                   : MoonsetModule::row_below(m.cursorRow, m.sliceMethod);
+    m.cursorRow = newRow;
+    m.cursorCol = std::min(m.cursorCol, MoonsetModule::max_col_for_row(newRow, m.sliceMethod));
 }
 
 inline void moonset_step_col(AppState& s, int delta) {
     MoonsetState& m = s.moonset;
-    m.cursorColumn = std::clamp(m.cursorColumn + delta, 0, 2);
-    const int count = moonset_row_count(m.cursorColumn);
-    if (count > 0 && m.cursorRow >= count) m.cursorRow = count - 1;
+
+    if (m.granularFocus) {
+        m.granularColumn = std::clamp(m.granularColumn + delta, 0, 2);
+        const int count = moonset_granular_row_count(m.granularColumn);
+        if (count > 0) m.granularRow = std::min(m.granularRow, count - 1);
+        moonset_keep_granular_visible(s);
+        return;
+    }
+
+    const int  maxCol = MoonsetModule::max_col_for_row(m.cursorRow, m.sliceMethod);
+    const bool isOps  = (m.cursorRow == 13 || m.cursorRow == 14);
+
+    if (isOps) {
+        m.cursorCol = (delta < 0) ? ((m.cursorCol == 0) ? maxCol : m.cursorCol - 1)
+                                  : ((m.cursorCol + 1) % (maxCol + 1));
+    } else {
+        m.cursorCol = std::clamp(m.cursorCol + delta, 0, maxCol);
+    }
 }
 
 inline void instrument_step_row(AppState& s, int delta) {

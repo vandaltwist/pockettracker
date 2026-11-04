@@ -1069,6 +1069,56 @@ class InputDispatcher {
     void close_moonset();
     void init_moonset_state();
 
+    // "ARE YOU SURE?" on B over a modified sample.
+    bool moonset_close_open() const { return on_moonset() && s_.moonset.showConfirmClose; }
+    GestureResult moonset_close_layer(Gesture g);
+
+    void moonset_audition();
+
+    // Rows 3..8: the D-pad drags the selection instead of moving a cursor.
+    bool on_moonset_selection_row() const {
+        return on_moonset() && !s_.moonset.granularFocus &&
+               s_.moonset.cursorRow >= 3 && s_.moonset.cursorRow <= 8;
+    }
+    void nudge_moonset_selection_edge(int64_t delta);
+
+    // Row 11's POSITION cell: A+DPAD drags the boundary under the cursor.
+    bool on_moonset_slice_marker_row() const {
+        return on_moonset() && !s_.moonset.granularFocus && s_.moonset.cursorRow == 11 &&
+               s_.moonset.cursorCol == 1 &&
+               s_.moonset.sliceMethod != MoonsetModule::SLICE_OFF;
+    }
+    void nudge_moonset_slice_marker(int64_t delta);
+
+    void select_moonset_slice();
+    void materialise_moonset_markers();
+    void reset_moonset_slice_marker();
+    void tap_moonset_slice_marker();
+
+    void handle_moonset_record_toggle();
+    void refresh_moonset_input_devices();
+    void refresh_moonset_record();
+
+    void apply_moonset_rate_and_bits();
+    void moonset_confirm();
+
+    songcore::SampleSync planned_moonset_sync() const;
+    void apply_moonset_sync();
+
+    // ── The TSTRETCH box ────────────────────────────────────────────────────────────────────────
+    bool moonset_stretch_open() const { return on_moonset() && s_.moonset.stretchOpen; }
+    GestureResult moonset_stretch_layer(Gesture g);
+    void open_moonset_stretch();
+    void moonset_stretch_edit(InputAction (*fn)(const CursorContext&));
+
+    void bake_moonset_pending_pitch();
+    std::vector<int> compute_moonset_slice_cue_points() const;
+    void refresh_moonset_view(bool reset_selection);
+    void save_moonset_sample_to(const std::string& path, bool adopt_name);
+    void moonset_chop();
+    std::vector<std::pair<int64_t, int64_t>> current_moonset_slices() const;
+    void run_due_moonset_preview_restore(bool force = false);
+
     // What the editor's buttons leave for later (not drawn, so not in `s_.sampleEditor`).
     struct SamplePending {
         bool      previewRestore     = false;   // run_due_sample_preview_restore
@@ -1080,6 +1130,17 @@ class InputDispatcher {
         float sliceTapPlayhead = -1.0f;
     };
     SamplePending samplePending_{};
+
+    // What the editor's buttons leave for later (not drawn, so not in `s_.moonset`).
+    struct MoonsetPending {
+        bool      previewRestore     = false;   // run_due_moonset_preview_restore
+        long long previewRestoreAtMs = 0;
+        int       previewRestoreInst = 0;
+
+        // The playhead when A went down on the tap cell (0..1, −1 = nothing sounding).
+        float sliceTapPlayhead = -1.0f;
+    };
+    MoonsetPending moonsetPending_{};
 
     SampleEditorModule sample_{};
     MoonsetModule      moonset_{};

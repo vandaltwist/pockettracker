@@ -34,6 +34,7 @@ void push_instrument_params(Engine& engine, const Instrument& ins, const Routing
     push_instrument_playback_params(engine, ins);
     // The granular blocks ride with the playback params, keyed by the slot the note will play from.
     pt::GranularSettings gs;
+    gs.master = ins.granular.master;
     gs.grain.state   = ins.granular.grain.state;
     gs.grain.position = ins.granular.grain.position;
     gs.grain.size    = ins.granular.grain.size;
@@ -52,6 +53,40 @@ void push_instrument_params(Engine& engine, const Instrument& ins, const Routing
     gs.motion.rev    = ins.granular.motion.rev;
     gs.motion.elastic = ins.granular.motion.elastic;
     gs.motion.chaos   = ins.granular.motion.chaos;
+    gs.grain.time = ins.granular.grain.time;
+    gs.grain.density_div = ins.granular.grain.density_div;
+    gs.grain.window = ins.granular.grain.window;
+    gs.grain.spread = ins.granular.grain.spread;
+    gs.grain.attack = ins.granular.grain.attack;
+    gs.grain.decay = ins.granular.grain.decay;
+    gs.grain.pan = ins.granular.grain.pan;
+    gs.grain.jitter = ins.granular.grain.jitter;
+    gs.grain.mix = ins.granular.grain.mix;
+    gs.roam.speed_div = ins.granular.roam.speed_div;
+    gs.roam.freeze = ins.granular.roam.freeze;
+    gs.roam.dcurve = ins.granular.roam.dcurve;
+    gs.roam.dir = ins.granular.roam.dir;
+    gs.roam.curve = ins.granular.roam.curve;
+    gs.roam.bpm = ins.granular.roam.bpm;
+    gs.roam.drift = ins.granular.roam.drift;
+    gs.roam.step_rate = ins.granular.roam.step_rate;
+    gs.roam.inertia = ins.granular.roam.inertia;
+    gs.roam.target = ins.granular.roam.target;
+    gs.roam.tlock = ins.granular.roam.tlock;
+    gs.motion.stutter = ins.granular.motion.stutter;
+    gs.motion.tapestop = ins.granular.motion.tapestop;
+    gs.motion.tunnel = ins.granular.motion.tunnel;
+    gs.motion.probability = ins.granular.motion.probability;
+    gs.motion.lfo_depth = ins.granular.motion.lfo_depth;
+    gs.motion.step_glide = ins.granular.motion.step_glide;
+    gs.motion.trigger = ins.granular.motion.trigger;
+    gs.motion.spin = ins.granular.motion.spin;
+    gs.motion.factor = ins.granular.motion.factor;
+    for (int k = 0; k < pt::GRAN_MODS; ++k) {
+        const auto& m = ins.granular.mods[k];
+        gs.mods[k].target = m.target; gs.mods[k].src = m.src; gs.mods[k].amount = m.amount;
+        gs.mods[k].rate = m.rate; gs.mods[k].shape = m.shape; gs.mods[k].bus = m.bus;
+    }
     engine.setGranularParams(ins.sampleId, gs);
     push_instrument_mod_eq_sends(engine, ins, tempo, sampleRate);
     // The SF ADSR override — a live key is scheduled with no push, so the engine's copy must be current.

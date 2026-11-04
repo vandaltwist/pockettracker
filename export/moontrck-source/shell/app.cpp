@@ -1358,7 +1358,7 @@ int run(const AppConfig& cfg) {
     make_app_folders(cfg, filesystem);
 
     Screen screen;
-    if (!screen.video.open("PocketTracker", ui::DESIGN_W, ui::DESIGN_H, /*fullscreen=*/false,
+    if (!screen.video.open("MoonTRCK", ui::DESIGN_W, ui::DESIGN_H, /*fullscreen=*/false,
                            /*resizable=*/cfg.windowed)) {
         return 1;
     }

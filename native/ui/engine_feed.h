@@ -51,7 +51,7 @@ private:
                 source  = 3;
                 instrId = state.eq.caller.instrId;
                 break;
-            default: break;   // MASTER, SAMPLE_EDITOR_FX → the master bus
+            default: break;   // MASTER, SAMPLE_EDITOR_FX, MOONSET_FX → the master bus
         }
 
         if (host.spectrum_for_source(source, instrId, EQ_SPECTRUM_BINS, eqSpectrumRaw_)) {

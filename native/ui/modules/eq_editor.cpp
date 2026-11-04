@@ -270,6 +270,7 @@ void EqModule::draw_header(Canvas& c, int x, int y, const EqState& s) const {
         case EqCallerContext::Kind::DELAY_IN:         caller = "DLY IN"; break;
         case EqCallerContext::Kind::INSTRUMENT:       caller = "INST " + songcore::hex2(s.caller.instrId); break;
         case EqCallerContext::Kind::SAMPLE_EDITOR_FX: caller = "SAMPLE"; break;
+case EqCallerContext::Kind::MOONSET_FX:       caller = "MOONSET"; break;
     }
     c.draw_text(caller, x + 10 + 8 * CHAR_W, hY, t.textParam, CHAR_SPACING, FONT_SCALE);
 }

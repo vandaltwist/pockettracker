@@ -24,7 +24,7 @@ const std::vector<std::string>& eq_band_type_names();
 
 // Which EQ slot reference opened the editor.
 struct EqCallerContext {
-    enum class Kind { MASTER, REVERB_IN, DELAY_IN, INSTRUMENT, SAMPLE_EDITOR_FX };
+    enum class Kind { MASTER, REVERB_IN, DELAY_IN, INSTRUMENT, SAMPLE_EDITOR_FX, MOONSET_FX };
 
     Kind kind    = Kind::MASTER;
     int  instrId = 0;  // INSTRUMENT only
@@ -34,6 +34,7 @@ struct EqCallerContext {
     static EqCallerContext delay_in() { return {Kind::DELAY_IN, 0}; }
     static EqCallerContext instrument(int id) { return {Kind::INSTRUMENT, id}; }
     static EqCallerContext sample_editor_fx() { return {Kind::SAMPLE_EDITOR_FX, 0}; }
+static EqCallerContext moonset_fx() { return {Kind::MOONSET_FX, 0}; }
 };
 
 struct EqEditorState {

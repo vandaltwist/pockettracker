@@ -29,6 +29,7 @@ enum class InstrumentCell {
     SLICE, LOOP, START, LOOP_START, END, LOOP_END, REVERSE,
     // granular (MOONGRANULAR)
     GRAIN_SIZE, GRAIN_DENSITY, GRAIN_PITCH, SCAN_POS, GRAIN_DIR,
+    SMP_GAIN, NORM, XFADE, PLAY, ATTACK, RELEASE, KEYTRK, GLIDE,
     // EXTERNAL
     MIDI_CHANNEL, MIDI_BANK, MIDI_PROGRAM, MIDI_LENGTH, CC_NUMBER, CC_VALUE, MIDI_BEND,
 };
@@ -104,21 +105,31 @@ inline constexpr InstrumentRow EXTERNAL[] = {
     {K::SPACER},                                         // 13
     {K::SINGLE, C::MIDI_BEND},                           // 14
 };
-// Granular (MOONGRANULAR): sampler-like source + grain params.
+// Granular (MOONGRANULAR): the full sampler table with the 3 grain rows inserted after VOL/TSP/PAN.
 inline constexpr InstrumentRow GRANULAR[] = {
     {K::NAME, C::TYPE, C::SOURCE_LOAD, C::SOURCE_EDIT},  //  0
     {K::SINGLE, C::NAME},                                //  1
     {K::TRIPLE, C::ROOT, C::DETUNE, C::TIC},             //  2
     {K::TRIPLE, C::VOL, C::TSP, C::PAN},                 //  3
-    {K::SPACER},                                         //  4
-    {K::SOURCE, C::PRESET_SAVE, C::PRESET_LOAD},         //  5
-    {K::SPACER},                                         //  6
-    {K::DUAL, C::GRAIN_SIZE, C::GRAIN_DENSITY},          //  7
-    {K::DUAL, C::GRAIN_PITCH, C::SCAN_POS},              //  8
-    {K::SINGLE, C::GRAIN_DIR},                           //  9
-    {K::SPACER},                                         // 10
-    {K::DUAL, C::REV, C::DEL},                           // 11
-    {K::DUAL, C::EQ, C::SLICE},                          // 12
+    {K::DUAL, C::GRAIN_SIZE, C::GRAIN_DENSITY},          //  4
+    {K::DUAL, C::GRAIN_PITCH, C::SCAN_POS},              //  5
+    {K::SINGLE, C::GRAIN_DIR},                           //  6
+    {K::SPACER},                                         //  7
+    {K::SOURCE, C::PRESET_SAVE, C::PRESET_LOAD},         //  8
+    {K::SPACER},                                         //  9
+    {K::DUAL, C::DRIVE, C::FILTER},                      // 10
+    {K::DUAL, C::CRUSH, C::FREQ},                        // 11
+    {K::DUAL, C::DOWNSAMPLE, C::RES},                    // 12
+    {K::SPACER},                                         // 13
+    {K::DUAL, C::REV, C::DEL},                           // 14
+    {K::DUAL, C::EQ, C::SLICE},                          // 15
+    {K::DUAL, C::LOOP, C::START},                        // 16
+    {K::DUAL, C::LOOP_START, C::END},                    // 17
+    {K::DUAL, C::LOOP_END, C::REVERSE},                  // 18
+    {K::DUAL, C::SMP_GAIN, C::NORM},                     // 19
+    {K::DUAL, C::XFADE, C::PLAY},                        // 20
+    {K::DUAL, C::ATTACK, C::RELEASE},                    // 21
+    {K::DUAL, C::KEYTRK, C::GLIDE},                      // 22
 };
 
 }  // namespace instrument_rows

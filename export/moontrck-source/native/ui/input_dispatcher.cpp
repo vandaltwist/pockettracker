@@ -24,6 +24,12 @@ void InputDispatcher::set_now(long long now_ms) {
     run_due_autosave();
     run_midi_hotplug();                 // before the dismiss, so its message is seen this frame
     run_due_status_dismiss();
+    // MOONSET's live grains: the waveform draws where each grain of the cloud is reading right now.
+    s_.moonset.nowMs = now_ms;
+    if (s_.currentScreen == ScreenType::MOONSET)
+        s_.moonset.grainHeadCount = host_.grain_positions(s_.moonset.grainHeads, MoonsetState::GRAIN_HEADS_MAX);
+    else
+        s_.moonset.grainHeadCount = 0;
     run_instrument_entry_push();
     run_mapped_cc_dirty();
     // What a live MIDI key plays: on PHRASE the instrument of the note under the cursor, else the one

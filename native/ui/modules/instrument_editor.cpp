@@ -74,6 +74,14 @@ const char* cell_label(Cell cell, int cc_slot_index) {
         case Cell::GRAIN_PITCH:  return "G PITCH";
         case Cell::SCAN_POS:     return "SCAN";
         case Cell::GRAIN_DIR:    return "G DIR";
+        case Cell::SMP_GAIN:     return "SMP GAIN";
+        case Cell::NORM:         return "NORM";
+        case Cell::XFADE:        return "XFADE";
+        case Cell::PLAY:         return "PLAY";
+        case Cell::ATTACK:       return "ATTACK";
+        case Cell::RELEASE:      return "RELEASE";
+        case Cell::KEYTRK:       return "KEYTRK";
+        case Cell::GLIDE:        return "GLIDE";
         case Cell::MIDI_CHANNEL: return "CHAN";
         case Cell::MIDI_BANK:    return "BANK";
         case Cell::MIDI_PROGRAM: return "PROG";
@@ -134,6 +142,14 @@ std::string cell_text(Cell cell, int cc_slot_index, const InstrumentEditorState&
         case Cell::GRAIN_PITCH:    return hex2(ins.granular.grain.pitch);
         case Cell::SCAN_POS:       return hex2(ins.granular.grain.position);
         case Cell::GRAIN_DIR:      return ins.granular.motion.rev != 0 ? "REV" : "FWD";
+        case Cell::SMP_GAIN:       return hex2(ins.sampleGain);
+        case Cell::NORM:           return "NORM";
+        case Cell::XFADE:          return hex2(ins.xfade);
+        case Cell::PLAY:           return "PLAY";
+        case Cell::ATTACK:         return hex2(ins.attack);
+        case Cell::RELEASE:        return hex2(ins.release);
+        case Cell::KEYTRK:         return hex2(ins.keyTrack);
+        case Cell::GLIDE:          return hex2(ins.glide);
         // CHAN is stored 0-15 and shown 1-16.
         case Cell::MIDI_CHANNEL: return dec2(clamp(ins.midiChannel, 0, 15) + 1);
         // 14-bit, so four hex digits.
@@ -179,11 +195,30 @@ void InstrumentEditorModule::draw(Canvas& c, int x, int y, const InstrumentEdito
 
     int rowY = y + TEXT_PADDING;
 
+    const int rows = instrument_row_count(type);
+    const int rowH = (type == songcore::InstrumentType::GRANULAR) ? (ROW_HEIGHT - 3) : ROW_HEIGHT;
+
+    // Scroll: keep the cursor visible for tall layouts (GRANULAR has 22 rows).
+    int scrollPx = 0;
+    if (type == songcore::InstrumentType::GRANULAR) {
+        const int availH = DESIGN_H - (y + TEXT_PADDING) - (ROW_HEIGHT + 14) - 40;  // leave room for title + status/right bar
+        const int visibleRows = availH / rowH;
+        int firstVisible = 0;
+        if (s.cursorRow > visibleRows / 2) {
+            firstVisible = s.cursorRow - (visibleRows / 2);
+        }
+        if (firstVisible < 0) firstVisible = 0;
+        const int maxFirst = rows - visibleRows;
+        if (firstVisible > maxFirst && maxFirst > 0) firstVisible = maxFirst;
+        scrollPx = firstVisible * rowH;
+    }
+
+    rowY = y + TEXT_PADDING - scrollPx;
+
     c.draw_text("INSTRUMENT " + hex2(ins.id), nameX, rowY, t.textTitle, CHAR_SPACING, FONT_SCALE);
     rowY += ROW_HEIGHT + 14;
 
-    const int rows = instrument_row_count(type);
-    for (int row = 0; row < rows; ++row, rowY += ROW_HEIGHT) {
+    for (int row = 0; row < rows; ++row, rowY += rowH) {
         const InstrumentRow r     = instrument_row(type, row);
         const int           textY = rowY + TEXT_PADDING;
         const auto on = [&](int i) {
@@ -367,6 +402,14 @@ CursorContext InstrumentEditorModule::cursor_context(const InstrumentEditorState
         case Cell::GRAIN_PITCH:    return cc::plain_byte(ins.granular.grain.pitch, 0x80);
         case Cell::SCAN_POS:       return cc::plain_byte(ins.granular.grain.position, 0x00);
         case Cell::GRAIN_DIR:      return cc::toggle_binary(ins.granular.motion.rev != 0);
+        case Cell::SMP_GAIN:       return cc::plain_byte(ins.sampleGain, 0x80);
+        case Cell::NORM:           return cc::none();
+        case Cell::XFADE:          return cc::plain_byte(ins.xfade, 0x00);
+        case Cell::PLAY:           return cc::none();
+        case Cell::ATTACK:         return cc::plain_byte(ins.attack, 0x00);
+        case Cell::RELEASE:        return cc::plain_byte(ins.release, 0x00);
+        case Cell::KEYTRK:         return cc::plain_byte(ins.keyTrack, 0x00);
+        case Cell::GLIDE:          return cc::plain_byte(ins.glide, 0x00);
 
         // Steps the stored 0-15, wrapping as the wire does.
         case Cell::MIDI_CHANNEL:
@@ -509,6 +552,14 @@ InstrumentInputResult InstrumentEditorModule::handle_input(Instrument& ins, int 
         case Cell::GRAIN_PITCH:    b255(ins.granular.grain.pitch);   break;
         case Cell::SCAN_POS:       b255(ins.granular.grain.position); break;
         case Cell::GRAIN_DIR:      if (isSet) ins.granular.motion.rev = (v == 1) ? 0xFF : 0x00; break;
+        case Cell::SMP_GAIN:       b255(ins.sampleGain); break;
+        case Cell::NORM:           break;  // button: no-op for now
+        case Cell::XFADE:          b255(ins.xfade); break;
+        case Cell::PLAY:           break;  // button: no-op for now
+        case Cell::ATTACK:         b255(ins.attack); break;
+        case Cell::RELEASE:        b255(ins.release); break;
+        case Cell::KEYTRK:         b255(ins.keyTrack); break;
+        case Cell::GLIDE:          b255(ins.glide); break;
 
         case Cell::MIDI_CHANNEL: if (isSet) ins.midiChannel = clamp(v, 0, 15); break;  // stored 0-15
         case Cell::MIDI_BANK:    optional(ins.midiBank, 16383);   break;

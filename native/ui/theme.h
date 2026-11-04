@@ -42,6 +42,9 @@ struct Theme {
     // The `>` playback marker. Its default is lifted from `rowPlayback`; once in a file, used as typed.
     Argb textPlayhead = 0xFF00E000;
 
+    // Red markers the granular cloud draws on the waveform: GRAIN head, ROAM end, spray, MOTION on.
+    Argb textGranular = 0xFFFF0000;
+
     // ── Visualizer (oscilloscope bar) ────────────────────────────────────────────────────────────
     Argb vizBackground = 0xFF0A0A0A;
     Argb vizCenterLine = 0xFF333333;

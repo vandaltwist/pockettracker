@@ -7,6 +7,7 @@
 // Instrument.sampleId (the slot index). No floating point, so a .ptp round-trips exactly.
 
 #include <cstddef>
+#include <cstring>
 #include <cstdint>
 #include <iterator>
 #include <string>
@@ -431,6 +432,7 @@ struct Instrument {
             int decay     = 0x00;
             int pan       = 0x00;
             int jitter    = 0x00;
+            int mix       = 0xFF;   // 0xFF = cloud only, lower = sample + cloud, 0x00 = sample only
         } grain{};
         struct Roam {
             bool state    = false;
@@ -468,17 +470,72 @@ struct Instrument {
             int spin         = 0x00;
             int factor       = 0x00;
         } motion{};
+        bool master = true;   // A/B: false = the sample plays normally, no cloud (saved as "master")
+        // v2: up to 8 modulation rows (the double-click popup). amount 0x80 = none.
+        // target / src / shape mirror pt::GranTarget / GranSource / GranLfoShape (granular-voice.h).
+        struct Mod {
+            int target = 0;
+            int src    = 0;
+            int amount = 0x80;
+            int rate   = 0x80;
+            int shape  = 0;
+            int bus    = 0;
+            bool operator==(const Mod& o) const {
+                return target == o.target && src == o.src && amount == o.amount &&
+                       rate == o.rate && shape == o.shape && bus == o.bus;
+            }
+        } mods[8]{};
 
         bool operator==(const GranularParams& o) const {
-            return grain.state == o.grain.state && grain.position == o.grain.position &&
-                   grain.size == o.grain.size && grain.density == o.grain.density &&
-                   grain.spray == o.grain.spray && grain.pitch == o.grain.pitch &&
-                   roam.state == o.roam.state && roam.mode == o.roam.mode &&
-                   roam.range == o.roam.range && roam.wander == o.roam.wander &&
-                   roam.speed == o.roam.speed && roam.smooth == o.roam.smooth &&
-                   motion.state == o.motion.state && motion.jump == o.motion.jump &&
-                   motion.hold == o.motion.hold && motion.rev == o.motion.rev &&
-                   motion.elastic == o.motion.elastic && motion.chaos == o.motion.chaos;
+            // Every cell, so an edit of any of them reaches the engine (the old version compared a few).
+            for (int k = 0; k < 8; ++k) if (!(mods[k] == o.mods[k])) return false;
+            return master == o.master && grain.state == o.grain.state &&
+                   grain.position == o.grain.position &&
+                   grain.size == o.grain.size &&
+                   grain.density == o.grain.density &&
+                   grain.spray == o.grain.spray &&
+                   grain.pitch == o.grain.pitch &&
+                   grain.time == o.grain.time &&
+                   grain.density_div == o.grain.density_div &&
+                   grain.window == o.grain.window &&
+                   grain.spread == o.grain.spread &&
+                   grain.attack == o.grain.attack &&
+                   grain.decay == o.grain.decay &&
+                   grain.pan == o.grain.pan &&
+                   grain.jitter == o.grain.jitter &&
+                   grain.mix == o.grain.mix &&
+                   roam.state == o.roam.state &&
+                   roam.mode == o.roam.mode &&
+                   roam.range == o.roam.range &&
+                   roam.wander == o.roam.wander &&
+                   roam.speed == o.roam.speed &&
+                   roam.speed_div == o.roam.speed_div &&
+                   roam.smooth == o.roam.smooth &&
+                   roam.freeze == o.roam.freeze &&
+                   roam.dcurve == o.roam.dcurve &&
+                   roam.dir == o.roam.dir &&
+                   roam.curve == o.roam.curve &&
+                   roam.bpm == o.roam.bpm &&
+                   roam.drift == o.roam.drift &&
+                   roam.step_rate == o.roam.step_rate &&
+                   roam.inertia == o.roam.inertia &&
+                   roam.target == o.roam.target &&
+                   roam.tlock == o.roam.tlock &&
+                   motion.state == o.motion.state &&
+                   motion.jump == o.motion.jump &&
+                   motion.hold == o.motion.hold &&
+                   motion.rev == o.motion.rev &&
+                   motion.elastic == o.motion.elastic &&
+                   motion.chaos == o.motion.chaos &&
+                   motion.stutter == o.motion.stutter &&
+                   motion.tapestop == o.motion.tapestop &&
+                   motion.tunnel == o.motion.tunnel &&
+                   motion.probability == o.motion.probability &&
+                   motion.lfo_depth == o.motion.lfo_depth &&
+                   motion.step_glide == o.motion.step_glide &&
+                   motion.trigger == o.motion.trigger &&
+                   motion.spin == o.motion.spin &&
+                   motion.factor == o.motion.factor;
         }
         bool operator!=(const GranularParams& o) const { return !(*this == o); }
     } granular{};

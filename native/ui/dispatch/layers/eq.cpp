@@ -115,6 +115,10 @@ void InputDispatcher::apply_caller_eq_slot_change(int new_slot) {
             // No engine call: the sample editor's EQ is read on APPLY.
             s_.sampleEditor.fxEqSlot = new_slot;
             break;
+        case EqCallerContext::Kind::MOONSET_FX:
+            // No engine call: the MOONSET EQ is read on APPLY.
+            s_.moonset.fxEqSlot = new_slot;
+            break;
     }
 
     // Dirty and armed, without mark_modified's heavy push.

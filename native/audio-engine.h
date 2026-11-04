@@ -157,6 +157,8 @@ public:
     void setLiveInput(LiveInputSource* source) { liveInput.store(source, std::memory_order_release); }
 
     int tempo() const { return currentTempo.load(std::memory_order_relaxed); }
+    // A message other code can send to the granular voices (bus 8..15 only; 0..7 are the sidechains).
+    void setGranBus(int idx, float v) { if (idx >= 8 && idx < 16) granBus[idx] = v < 0.f ? 0.f : (v > 1.f ? 1.f : v); }
 
     // Auditions play on this ninth lane, so they never steal a song track's voice.
     static const int PREVIEW_LANE = 8;
@@ -951,6 +953,9 @@ private:
     std::mutex spectrumMutex;
 
     // This block's peaks, written by processAudioBlock and read by processLiveBlock.
+    // Granular modulation buses (read by GranularVoice, GS_BUS). 0..7 = the output peak of track 1..8
+    // of the PREVIOUS block (sidechain); 8..15 = free messages, written by setGranBus().
+    float granBus[16] = {0};
     float framePeaksPerTrackL[8] = {0};
     float framePeaksPerTrackR[8] = {0};
     float frameSendPeakRevL = 0.0f, frameSendPeakRevR = 0.0f;
