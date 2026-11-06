@@ -28,6 +28,7 @@ class RecViz {
     struct Params {
         int   track     = -1;    // -1 master, 0..7 song tracks, 8 preview lane
         Axis  axis      = Axis::Pan;
+        bool  stereo    = true;
         float gate      = -72.f;  // seuil de base (dB)
         float timePow   = 2.9f;   // compression du passé
         float bass      = 34.f;   // atténuation des graves (dB)
@@ -105,8 +106,9 @@ class RecViz {
         uint64_t w = wpos_.load(std::memory_order_relaxed);
         float pk = 0.f;
         for (int i = 0; i < frames; ++i) {
-            ringL_[(w + i) & MASK] = l[i];
-            ringR_[(w + i) & MASK] = r ? r[i] : l[i];
+            const float mono = r ? 0.5f * (l[i] + r[i]) : l[i];
+            ringL_[(w + i) & MASK] = p.stereo ? l[i] : mono;
+            ringR_[(w + i) & MASK] = p.stereo && r ? r[i] : (p.stereo ? l[i] : mono);
             pk = std::max(pk, std::max(std::fabs(l[i]), r ? std::fabs(r[i]) : 0.f));
         }
         if (frames > 0) peak_.store(pk, std::memory_order_relaxed);
@@ -139,6 +141,7 @@ class RecViz {
     // menuAdjust(±1) gauche/droite (menuAdjust(±1, true) = pas x5). click(x, y) pour la souris.
     static constexpr int MENU_N = 15;   // VIZ 0..6, SAMPLE/REC 7..10, PRESETS 11..14
     static constexpr int VIZ_MENU_N = 7;
+    static constexpr int MOONVIZ_MENU_N = 8;
     bool menuOpen() const { return menu_; }
     bool visualizerMenu() const { return visualizerOnly_; }
     int menuSelection() const { return menuSel_; }
@@ -146,11 +149,27 @@ class RecViz {
     void openVisualizerMenu() { menu_ = true; visualizerOnly_ = true; menuSel_ = 0; }
     void closeMenu() { menu_ = false; visualizerOnly_ = false; }
     void menuMove(int d) {
-        const int count = visualizerOnly_ ? VIZ_MENU_N : MENU_N;
+        if (visualizerOnly_) {
+            const int column = menuSel_ / 4;
+            const int row = ((menuSel_ % 4) + d + 4) % 4;
+            menuSel_ = column * 4 + row;
+            return;
+        }
+        const int count = MENU_N;
         menuSel_ = ((menuSel_ + d) % count + count) % count;
+    }
+    void menuMoveHorizontal(int d) {
+        if (!visualizerOnly_) return;
+        menuSel_ = (menuSel_ + d * 4 + MOONVIZ_MENU_N) % MOONVIZ_MENU_N;
     }
     void menuAdjust(int d, bool big = false) {
         auto clampf = [](float v, float lo, float hi) { return std::min(hi, std::max(lo, v)); };
+        if (visualizerOnly_ && menuSel_ == 7) {
+            p.stereo = !p.stereo;
+            reset();
+            dirty_ = true;
+            return;
+        }
         switch (menuSel_) {
             case 0: p.gate    = clampf(std::round(p.gate + d * (big ? 5 : 1)), -90.f, -10.f); break;
             case 1: p.timePow = clampf(std::round((p.timePow + d * 0.1f) * 10.f) / 10.f, 1.5f, 3.5f); break;
@@ -763,6 +782,11 @@ void RecViz::draw(Cv& c, int x, int y, int w, int h, int cs, int fs,
 
 // Instance unique : le thread audio y pousse (push), l'UI la dessine (update + draw).
 inline RecViz& rec_viz() {
+    static RecViz v;
+    return v;
+}
+
+inline RecViz& moonviz_viz() {
     static RecViz v;
     return v;
 }

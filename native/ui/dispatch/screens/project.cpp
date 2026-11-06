@@ -32,14 +32,14 @@ GestureResult InputDispatcher::project_screen(Gesture g) {
 }
 
 GestureResult InputDispatcher::settings_screen(Gesture g) {
-    RecViz& viz = rec_viz();
+    RecViz& viz = moonviz_viz();
     if (viz.menuOpen() && viz.visualizerMenu()) {
         switch (g) {
             case Gesture::DPAD_UP:    viz.menuMove(-1); return GestureResult::TAKEN;
             case Gesture::DPAD_DOWN:  viz.menuMove(+1); return GestureResult::TAKEN;
-            case Gesture::DPAD_LEFT:
+            case Gesture::DPAD_LEFT:  viz.menuMoveHorizontal(-1); return GestureResult::TAKEN;
+            case Gesture::DPAD_RIGHT: viz.menuMoveHorizontal(+1); return GestureResult::TAKEN;
             case Gesture::A_LEFT:     viz.menuAdjust(-1); return GestureResult::TAKEN;
-            case Gesture::DPAD_RIGHT:
             case Gesture::A_RIGHT:    viz.menuAdjust(+1); return GestureResult::TAKEN;
             case Gesture::A_UP:       viz.menuAdjust(+1, true); return GestureResult::TAKEN;
             case Gesture::A_DOWN:     viz.menuAdjust(-1, true); return GestureResult::TAKEN;
@@ -196,7 +196,7 @@ void InputDispatcher::settings_action() {
     switch (static_cast<SettingsRow>(s_.settingsCursorRow)) {
         case SettingsRow::VISUALIZER:
             if (s_.settingsCursorColumn == 2 && s_.theme.visualizerType == VisualizerType::MOONVIZ)
-                rec_viz().openVisualizerMenu();
+                moonviz_viz().openVisualizerMenu();
             break;
 
         case SettingsRow::THEME:

@@ -179,7 +179,10 @@ struct AppState {
 
     // ── The visualizer: filled once a frame; null is silence ─────────────────────────────────────
     const float* waveform       = nullptr;  // WAVEFORM_SIZE master samples
+    const float* waveformRight  = nullptr;  // WAVEFORM_SIZE master right channel
     const float* trackWaveforms = nullptr;  // TRACK_WAVEFORM_COUNT × WAVEFORM_SIZE, flat (OCTA)
+    const float* trackWaveformsL = nullptr; // per-track left channel, MOONVIZ
+    const float* trackWaveformsR = nullptr; // per-track right channel, MOONVIZ
     const float* spectrum       = nullptr;  // NUM_BARS magnitudes (SPECTRUM modes)
 
     // Bit N set once track N has had a note scheduled this phrase.

@@ -25,8 +25,8 @@ void OscilloscopeModule::draw(Canvas& c, int x, int y, const OscilloscopeState& 
             draw_scope(c, x, y, s.waveform, t);
             break;
         case VisualizerType::MOONVIZ:
-            pt::ui::rec_viz().draw(c, x, y, WIDTH, HEIGHT, 1, 1, &t,
-                                   !pt::ui::rec_viz().visualizerMenu());
+            pt::ui::moonviz_viz().draw(c, x, y, WIDTH, HEIGHT, 1, 1, &t,
+                                       !pt::ui::moonviz_viz().visualizerMenu());
             break;
         case VisualizerType::FLAT:
             draw_flat(c, x, y, t);

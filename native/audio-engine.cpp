@@ -678,6 +678,15 @@ void AudioEngine::getWaveform(float* outBuffer, int bufferSize) {
     }
 }
 
+void AudioEngine::getStereoWaveform(float* outLeft, float* outRight, int bufferSize) {
+    std::lock_guard<std::mutex> lock(waveformMutex);
+    for (int i = 0; i < bufferSize && i < WAVEFORM_SIZE; i++) {
+        int readIndex = (waveformIndex + i) % WAVEFORM_SIZE;
+        outLeft[i] = waveformBuffer[readIndex];
+        outRight[i] = waveformBufferR[readIndex];
+    }
+}
+
 void AudioEngine::getTrackPeaks(float* outBuffer) {
     std::lock_guard<std::mutex> lock(peakMutex);
     for (int i = 0; i < 8; i++) {
@@ -714,12 +723,18 @@ void AudioEngine::decayWaveform() {
 
     for (int i = 0; i < WAVEFORM_SIZE; i++) {
         waveformBuffer[i] *= WAVEFORM_DECAY;
+        waveformBufferR[i] *= WAVEFORM_DECAY;
         if (fabsf(waveformBuffer[i]) < 0.001f) waveformBuffer[i] = 0.0f;
+        if (fabsf(waveformBufferR[i]) < 0.001f) waveformBufferR[i] = 0.0f;
     }
     for (int t = 0; t < TRACK_WAVEFORM_COUNT; t++) {
         for (int i = 0; i < WAVEFORM_SIZE; i++) {
             trackWaveformBuffer[t][i] *= WAVEFORM_DECAY;
+            trackWaveformBufferL[t][i] *= WAVEFORM_DECAY;
+            trackWaveformBufferR[t][i] *= WAVEFORM_DECAY;
             if (fabsf(trackWaveformBuffer[t][i]) < 0.001f) trackWaveformBuffer[t][i] = 0.0f;
+            if (fabsf(trackWaveformBufferL[t][i]) < 0.001f) trackWaveformBufferL[t][i] = 0.0f;
+            if (fabsf(trackWaveformBufferR[t][i]) < 0.001f) trackWaveformBufferR[t][i] = 0.0f;
         }
     }
 }
@@ -732,6 +747,20 @@ void AudioEngine::getTrackWaveforms(float* outBuffer, bool* activeFlags) {
         for (int i = 0; i < WAVEFORM_SIZE; i++) {
             int readIdx = (trackWaveformIndex + i) % WAVEFORM_SIZE;
             outBuffer[t * WAVEFORM_SIZE + i] = trackWaveformBuffer[t][readIdx];
+        }
+    }
+}
+
+void AudioEngine::getTrackWaveformsStereo(float* outLeft, float* outRight, bool* activeFlags) {
+    lastTrackWaveformReadMs.store(nowMs(), std::memory_order_relaxed);
+    std::lock_guard<std::mutex> lock(waveformMutex);
+    for (int t = 0; t < TRACK_WAVEFORM_COUNT; t++) {
+        activeFlags[t] = trackHasVoice[t];
+        for (int i = 0; i < WAVEFORM_SIZE; i++) {
+            int readIdx = (trackWaveformIndex + i) % WAVEFORM_SIZE;
+            const int outputIndex = t * WAVEFORM_SIZE + i;
+            outLeft[outputIndex] = trackWaveformBufferL[t][readIdx];
+            outRight[outputIndex] = trackWaveformBufferR[t][readIdx];
         }
     }
 }

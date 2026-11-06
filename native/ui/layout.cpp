@@ -39,12 +39,15 @@ void TrackerLayout::draw_frame(Canvas& c, const AppState& s) {
 
     if (!s.project) return;
 
-    if (s.currentScreen == ScreenType::SETTINGS && rec_viz().visualizerMenu()) {
+    if (s.currentScreen == ScreenType::SETTINGS && moonviz_viz().visualizerMenu()) {
         SettingsState state{s.settings};
         state.theme = s.theme;
         state.moonvizSettingsOpen = true;
         state.waveform = s.waveform;
+        state.waveformRight = s.waveformRight;
         state.trackWaveforms = s.trackWaveforms;
+        state.trackWaveformsL = s.trackWaveformsL;
+        state.trackWaveformsR = s.trackWaveformsR;
         settings_.draw(c, 0, 0, state);
         return;
     }
@@ -125,12 +128,16 @@ void TrackerLayout::draw_scope_strip(Canvas& c, const AppState& s) {
     }
 
     if (t.visualizerType == VisualizerType::MOONVIZ) {
-        const int track = pt::ui::rec_viz().p.track;
+        RecViz& viz = pt::ui::moonviz_viz();
+        const int track = viz.p.track;
         const float* source = s.waveform;
-        if (track >= 0)
-            source = s.trackWaveforms ? s.trackWaveforms + track * WAVEFORM_SIZE : nullptr;
-        if (source) pt::ui::rec_viz().push(source, nullptr, WAVEFORM_SIZE);
-        pt::ui::rec_viz().update();
+        const float* sourceRight = s.waveformRight;
+        if (track >= 0) {
+            source = s.trackWaveformsL ? s.trackWaveformsL + track * WAVEFORM_SIZE : nullptr;
+            sourceRight = s.trackWaveformsR ? s.trackWaveformsR + track * WAVEFORM_SIZE : nullptr;
+        }
+        if (source) viz.push(source, sourceRight, WAVEFORM_SIZE);
+        pt::ui::moonviz_viz().update();
     }
 
     oscilloscope_.draw(c, SIDE_SPACER, SCREEN_SPACER, os);

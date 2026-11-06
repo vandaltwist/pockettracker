@@ -332,9 +332,11 @@ public:
     void refreshSoundingInstrument(int instrumentId);
 
     void getWaveform(float* outBuffer, int bufferSize);
+    void getStereoWaveform(float* outLeft, float* outRight, int bufferSize);
 
     // The OCTA scopes: TRACK_WAVEFORM_COUNT × WAVEFORM_SIZE floats, and which lanes sounded last block.
     void getTrackWaveforms(float* outBuffer, bool* activeFlags);
+    void getTrackWaveformsStereo(float* outLeft, float* outRight, bool* activeFlags);
 
     void getSpectrumMagnitudes(int numBins, float* out);
 
@@ -937,6 +939,7 @@ private:
     // The oscilloscope's ring of recent output.
     static const int WAVEFORM_SIZE = 620;
     float waveformBuffer[WAVEFORM_SIZE] = {};
+    float waveformBufferR[WAVEFORM_SIZE] = {};
     int waveformIndex = 0;
     std::mutex waveformMutex;
 
@@ -1021,6 +1024,8 @@ private:
     // The OCTA scopes: 8 tracks plus the preview lane.
     static const int TRACK_WAVEFORM_COUNT = 9;
     float trackWaveformBuffer[TRACK_WAVEFORM_COUNT][WAVEFORM_SIZE] = {};
+    float trackWaveformBufferL[TRACK_WAVEFORM_COUNT][WAVEFORM_SIZE] = {};
+    float trackWaveformBufferR[TRACK_WAVEFORM_COUNT][WAVEFORM_SIZE] = {};
     int   trackWaveformIndex = 0;
     bool  trackHasVoice[TRACK_WAVEFORM_COUNT] = {};
 

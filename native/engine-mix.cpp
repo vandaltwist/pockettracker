@@ -1484,6 +1484,8 @@ void AudioEngine::captureTrackScopes(const BlockMix& b) {
             // Ã— masterVolEnd: the accumulators are filled pre-master, and OCTA shows what leaves it.
             trackWaveformBuffer[t][trackWaveformIndex] =
                 (trackWaveAccumL[t][i] + trackWaveAccumR[t][i]) * 0.5f * b.masterVolEnd;
+            trackWaveformBufferL[t][trackWaveformIndex] = trackWaveAccumL[t][i] * b.masterVolEnd;
+            trackWaveformBufferR[t][trackWaveformIndex] = trackWaveAccumR[t][i] * b.masterVolEnd;
         }
         trackWaveformIndex = (trackWaveformIndex + 1) % WAVEFORM_SIZE;
     }
@@ -1641,6 +1643,7 @@ void AudioEngine::processLiveBlock(float* output, int numFrames, int channelCoun
                 waveformDownsampleCounter++;
                 if (waveformDownsampleCounter >= WAVEFORM_DOWNSAMPLE) {
                     waveformBuffer[waveformIndex] = output[i * channelCount];
+                    waveformBufferR[waveformIndex] = output[i * channelCount + 1];
                     waveformIndex = (waveformIndex + 1) % WAVEFORM_SIZE;
                     waveformDownsampleCounter = 0;
                 }

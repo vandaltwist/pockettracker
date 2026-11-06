@@ -112,6 +112,7 @@ bool load_settings(FileSystem& fs, SettingsValues& values, Theme& theme) {
         r.track = clamp(get_int(o, "track", r.track), -1, 8);
         r.axis   = get_int(o, "axis", static_cast<int>(r.axis)) == 1 ? RecViz::Axis::Freq
                                                                     : RecViz::Axis::Pan;
+        r.stereo = get_bool(o, "stereo", r.stereo);
         r.gate   = clampf(get_float(o, "gate",     r.gate),     -90.f, -10.f);
         r.timePow = clampf(get_float(o, "time",    r.timePow),   1.5f,  3.5f);
         r.bass   = clampf(get_float(o, "bass",     r.bass),      0.f,  40.f);
@@ -125,6 +126,9 @@ bool load_settings(FileSystem& fs, SettingsValues& values, Theme& theme) {
 
     if (const auto it = j.find("rec"); it != j.end() && it->is_object()) {
         read_params(*it, rec_viz().p);
+    }
+    if (const auto it = j.find("moonviz"); it != j.end() && it->is_object()) {
+        read_params(*it, moonviz_viz().p);
     }
     if (const auto it = j.find("rec_presets"); it != j.end() && it->is_array()) {
         int i = 0;
@@ -218,12 +222,14 @@ std::string serialize_settings(const SettingsValues& values, const Theme& theme)
 
     auto write_params = [](const RecViz::Params& r) {
         return json{{"track", r.track},               {"axis", static_cast<int>(r.axis)},
-                    {"gate", r.gate},                {"time", r.timePow},
+                    {"stereo", r.stereo},             {"gate", r.gate},
+                    {"time", r.timePow},
                     {"bass", r.bass},                   {"trail", r.fall},      {"spread", r.spread},
                     {"mic_gain", r.micGainDb},          {"start", r.startMode}, {"click", r.clickOn},
                     {"duration", r.recordMaxSeconds}};
     };
     j["rec"] = write_params(rec_viz().p);
+    j["moonviz"] = write_params(moonviz_viz().p);
 
     json presets = json::array();
     for (int i = 0; i < RecViz::PRESET_N; ++i) {

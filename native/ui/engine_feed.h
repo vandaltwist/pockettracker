@@ -110,15 +110,21 @@ private:
         const VisualizerType vt = state.theme.visualizerType;
         const bool octa     = (vt == VisualizerType::OCTA || vt == VisualizerType::OCTA_FULL);
         const bool spectrum = (vt == VisualizerType::SPECTRUM || vt == VisualizerType::SPECTRUM_PEAKS);
-        const bool moonvizTrack = vt == VisualizerType::MOONVIZ && rec_viz().p.track >= 0;
+        const bool moonvizTrack = vt == VisualizerType::MOONVIZ && moonviz_viz().p.track >= 0;
 
         // Ask only for what the mode draws: the engine fills these only while they are read.
         if (octa || moonvizTrack) {
-            engine.getTrackWaveforms(trackWaveforms_, activeFlags_);
+            engine.getTrackWaveformsStereo(trackWaveformsL_, trackWaveformsR_, activeFlags_);
+            for (int i = 0; i < TRACK_WAVEFORM_COUNT * WAVEFORM_SIZE; ++i)
+                trackWaveforms_[i] = 0.5f * (trackWaveformsL_[i] + trackWaveformsR_[i]);
             state.trackWaveforms    = trackWaveforms_;
+            state.trackWaveformsL  = trackWaveformsL_;
+            state.trackWaveformsR  = trackWaveformsR_;
             state.previewLaneActive = activeFlags_[PREVIEW_LANE];
         } else {
             state.trackWaveforms    = nullptr;
+            state.trackWaveformsL  = nullptr;
+            state.trackWaveformsR  = nullptr;
             state.previewLaneActive = false;
         }
 
@@ -357,7 +363,10 @@ private:
     }
 
     float waveform_[WAVEFORM_SIZE]                            = {};
+    float waveformRight_[WAVEFORM_SIZE]                       = {};
     float trackWaveforms_[TRACK_WAVEFORM_COUNT * WAVEFORM_SIZE] = {};
+    float trackWaveformsL_[TRACK_WAVEFORM_COUNT * WAVEFORM_SIZE] = {};
+    float trackWaveformsR_[TRACK_WAVEFORM_COUNT * WAVEFORM_SIZE] = {};
     bool  activeFlags_[TRACK_WAVEFORM_COUNT]                  = {};
     float spectrum_[OscilloscopeModule::NUM_BARS]             = {};
 

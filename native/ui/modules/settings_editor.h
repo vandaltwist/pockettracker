@@ -158,7 +158,10 @@ struct SettingsState {
     std::string themeName   = "CLASSIC";
     bool moonvizSettingsOpen = false;
     const float* waveform = nullptr;
+    const float* waveformRight = nullptr;
     const float* trackWaveforms = nullptr;
+    const float* trackWaveformsL = nullptr;
+    const float* trackWaveformsR = nullptr;
 
     PlatformCaps caps{};
     Theme        theme = theme_classic();

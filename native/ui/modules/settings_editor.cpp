@@ -46,11 +46,14 @@ void SettingsModule::draw(Canvas& c, int x, int y, const SettingsState& s) const
                 s.moonvizSettingsOpen ? DESIGN_H : HEIGHT, t.background);
 
     if (s.moonvizSettingsOpen) {
-        RecViz& viz = rec_viz();
+        RecViz& viz = moonviz_viz();
         const float* source = s.waveform;
-        if (viz.p.track >= 0)
-            source = s.trackWaveforms ? s.trackWaveforms + viz.p.track * WAVEFORM_SIZE : nullptr;
-        if (source) viz.push(source, nullptr, WAVEFORM_SIZE);
+        const float* sourceRight = s.waveformRight;
+        if (viz.p.track >= 0) {
+            source = s.trackWaveformsL ? s.trackWaveformsL + viz.p.track * WAVEFORM_SIZE : nullptr;
+            sourceRight = s.trackWaveformsR ? s.trackWaveformsR + viz.p.track * WAVEFORM_SIZE : nullptr;
+        }
+        if (source) viz.push(source, sourceRight, WAVEFORM_SIZE);
         viz.update();
         c.draw_text("MOONVIZ", x + 16, y + 7, t.textTitle, CHAR_SPACING, FONT_SCALE);
         viz.draw(c, x, y + 28, DESIGN_W, 278, CHAR_SPACING, FONT_SCALE, &t, false);
@@ -66,7 +69,7 @@ void SettingsModule::draw(Canvas& c, int x, int y, const SettingsState& s) const
         const auto& p = viz.p;
         const char* trackName = p.track < 0 ? "MASTER" : (p.track < 8 ? nullptr : "PREVIEW");
         const std::string sourceName = trackName ? trackName : "TRACK " + std::to_string(p.track + 1);
-        const std::string values[7] = {
+        const std::string values[8] = {
             std::to_string(static_cast<int>(std::lround(p.gate))) + "DB",
             one_decimal(p.timePow),
             std::to_string(static_cast<int>(std::lround(p.bass))) + "DB",
@@ -74,13 +77,14 @@ void SettingsModule::draw(Canvas& c, int x, int y, const SettingsState& s) const
             p.axis == RecViz::Axis::Pan ? "PAN" : "FREQ",
             "x" + one_decimal(p.spread),
             sourceName,
+            p.stereo ? "STEREO" : "MONO",
         };
-        static const char* const labels[7] = {"GATE", "TIME", "BASS", "TRAIL", "AXIS", "SPREAD", "SOURCE"};
+        static const char* const labels[8] = {"GATE", "TIME", "BASS", "TRAIL", "AXIS", "SPREAD", "SOURCE", "MODE"};
         constexpr int MARGIN = 16, GAP = 16;
         constexpr int CELL_W = (DESIGN_W - 2 * MARGIN - GAP) / 2;
         constexpr int ROW_H = 31;
         const int selected = viz.menuSelection();
-        for (int i = 0; i < 7; ++i) {
+        for (int i = 0; i < 8; ++i) {
             const int column = i / 4;
             const int row = i % 4;
             const int cellX = x + MARGIN + column * (CELL_W + GAP);
