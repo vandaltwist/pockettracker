@@ -2,6 +2,7 @@
 
 #include "ui/dispatch/dispatch_common.h"
 
+#include "ui/modules/rec_viz.h"
 #include "ui/navigation.h"
 
 #include <algorithm>
@@ -31,6 +32,23 @@ GestureResult InputDispatcher::project_screen(Gesture g) {
 }
 
 GestureResult InputDispatcher::settings_screen(Gesture g) {
+    RecViz& viz = rec_viz();
+    if (viz.menuOpen() && viz.visualizerMenu()) {
+        switch (g) {
+            case Gesture::DPAD_UP:    viz.menuMove(-1); return GestureResult::TAKEN;
+            case Gesture::DPAD_DOWN:  viz.menuMove(+1); return GestureResult::TAKEN;
+            case Gesture::DPAD_LEFT:
+            case Gesture::A_LEFT:     viz.menuAdjust(-1); return GestureResult::TAKEN;
+            case Gesture::DPAD_RIGHT:
+            case Gesture::A_RIGHT:    viz.menuAdjust(+1); return GestureResult::TAKEN;
+            case Gesture::A_UP:       viz.menuAdjust(+1, true); return GestureResult::TAKEN;
+            case Gesture::A_DOWN:     viz.menuAdjust(-1, true); return GestureResult::TAKEN;
+            case Gesture::A:
+            case Gesture::B:
+            case Gesture::A_B:        viz.closeMenu(); return GestureResult::TAKEN;
+            default:                  return GestureResult::PASS;
+        }
+    }
     switch (g) {
         case Gesture::A: settings_action();                  return GestureResult::TAKEN;
         case Gesture::B: leave_to(s_.settingsReturnScreen);  return GestureResult::TAKEN;
@@ -176,6 +194,11 @@ void InputDispatcher::tap_tempo() {
 
 void InputDispatcher::settings_action() {
     switch (static_cast<SettingsRow>(s_.settingsCursorRow)) {
+        case SettingsRow::VISUALIZER:
+            if (s_.settingsCursorColumn == 2 && s_.theme.visualizerType == VisualizerType::MOONVIZ)
+                rec_viz().openVisualizerMenu();
+            break;
+
         case SettingsRow::THEME:
             open_theme_editor();
             break;

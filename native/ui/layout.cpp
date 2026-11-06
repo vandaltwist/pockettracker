@@ -309,6 +309,7 @@ SettingsState settings_state(const AppState& s) {
     ss.themeName    = s.theme.name;
     ss.caps         = s.caps;
     ss.theme        = s.theme;
+    ss.moonvizSettingsOpen = rec_viz().visualizerMenu();
     return ss;
 }
 

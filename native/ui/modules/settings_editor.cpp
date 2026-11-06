@@ -4,6 +4,7 @@
 
 #include "ui/helpers.h"
 #include "ui/input_config.h"   // abxy_name
+#include "ui/modules/rec_viz.h"
 
 namespace pt::ui {
 
@@ -40,6 +41,46 @@ void SettingsModule::draw(Canvas& c, int x, int y, const SettingsState& s) const
     const SettingsValues& v = s.values;
 
     c.fill_rect(x, y, WIDTH, HEIGHT, t.background);
+
+    if (s.moonvizSettingsOpen) {
+        RecViz& viz = rec_viz();
+        c.draw_text("MOONVIZ", x + NAME_X, y + TEXT_PADDING, t.textTitle, CHAR_SPACING, FONT_SCALE);
+        viz.draw(c, x + 12, y + 30, WIDTH - 24, 194, CHAR_SPACING, FONT_SCALE, &t, false);
+
+        const int settingsY = y + 230;
+        c.draw_text("VIZ", x + NAME_X, settingsY, t.textTitle, CHAR_SPACING, FONT_SCALE);
+
+        auto one_decimal = [](float value) {
+            char text[16];
+            std::snprintf(text, sizeof(text), "%.1f", value);
+            return std::string(text);
+        };
+        const auto& p = viz.p;
+        const std::string values[6] = {
+            std::to_string(static_cast<int>(std::lround(p.gate))) + "DB",
+            one_decimal(p.timePow),
+            std::to_string(static_cast<int>(std::lround(p.bass))) + "DB",
+            one_decimal(p.fall),
+            p.axis == RecViz::Axis::Pan ? "PAN" : "FREQ",
+            "x" + one_decimal(p.spread),
+        };
+        static const char* const labels[6] = {"GATE", "TIME", "BASS", "TRAIL", "AXIS", "SPREAD"};
+        constexpr int CELL_W = (WIDTH - 36) / 2;
+        constexpr int ROW_H = 39;
+        const int selected = viz.menuSelection();
+        for (int i = 0; i < 6; ++i) {
+            const int column = i / 3;
+            const int row = i % 3;
+            const int cellX = x + 12 + column * (CELL_W + 12);
+            const int cellY = settingsY + ROW_H + row * ROW_H;
+            const bool current = i == selected;
+            c.draw_text(labels[i], cellX + 4, cellY + TEXT_PADDING,
+                        current ? cursor_mark_ink(t) : t.textParam, CHAR_SPACING, FONT_SCALE);
+            draw_cursor_cell(c, values[i], cellX + CELL_W - 78, cellY + TEXT_PADDING,
+                             current, t.textValue, t);
+        }
+        return;
+    }
 
     const int labelX = x + NAME_X;
     const int val1X  = x + VAL1_X;
@@ -160,7 +201,18 @@ void SettingsModule::draw(Canvas& c, int x, int y, const SettingsState& s) const
         const std::vector<std::string>& names = visualizer_names();
         const int index = clamp(static_cast<int>(t.visualizerType), 0,
                                 static_cast<int>(names.size()) - 1);
-        param_row(SettingsRow::VISUALIZER, "VISUALIZER", names[static_cast<size_t>(index)]);
+        const SettingsRow row = SettingsRow::VISUALIZER;
+        if (t.visualizerType == VisualizerType::MOONVIZ) {
+            const int ry = rowY(row);
+            c.draw_text("VISUALIZER", labelX, ry + TEXT_PADDING,
+                        on_row(row) ? cursor_mark_ink(t) : t.textParam, CHAR_SPACING, FONT_SCALE);
+            draw_cursor_cell(c, names[static_cast<size_t>(index)], val1X, ry + TEXT_PADDING,
+                             on_cell(row, 1), t.textValue, t);
+            draw_cursor_cell(c, "SET", val2X, ry + TEXT_PADDING,
+                             on_cell(row, 2), t.textValue, t);
+        } else {
+            param_row(row, "VISUALIZER", names[static_cast<size_t>(index)]);
+        }
     }
 
     {
@@ -250,6 +302,7 @@ CursorContext SettingsModule::cursor_context(const SettingsState& s) const {
         case SettingsRow::NAV:        return cc::toggle_binary(v.navSongRelative);
 
         case SettingsRow::VISUALIZER:
+            if (s.cursorColumn == 2) return cc::read_only();
             return cc::enum_cycle(static_cast<int>(s.theme.visualizerType),
                                   static_cast<int>(visualizer_names().size()));
 
@@ -336,8 +389,9 @@ SettingsInputResult SettingsModule::handle_input(SettingsValues& v, Theme& theme
         case SettingsRow::TRACE:     v.traceEnabled       = on; break;
 
         case SettingsRow::VISUALIZER:
-            theme.visualizerType =
-                static_cast<VisualizerType>(index_in(static_cast<int>(visualizer_names().size())));
+            if (cursor_column == 1)
+                theme.visualizerType =
+                    static_cast<VisualizerType>(index_in(static_cast<int>(visualizer_names().size())));
             break;
 
         case SettingsRow::HELP: v.helpMode = clamp(value, 0, 2); break;

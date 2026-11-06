@@ -155,6 +155,7 @@ struct SettingsState {
     std::string audioOutText = "SYSTEM";
     std::string appVersion{};
     std::string themeName   = "CLASSIC";
+    bool moonvizSettingsOpen = false;
 
     PlatformCaps caps{};
     Theme        theme = theme_classic();

@@ -17,6 +17,8 @@
 #include <string>
 #include <vector>
 
+#include "ui/theme.h"
+
 namespace pt::ui {
 
 class RecViz {
@@ -135,10 +137,17 @@ class RecViz {
     // Branche tes touches ainsi : toggleMenu() sur J ; quand menuOpen() : menuMove(±1) haut/bas,
     // menuAdjust(±1) gauche/droite (menuAdjust(±1, true) = pas x5). click(x, y) pour la souris.
     static constexpr int MENU_N = 14;   // VIZ 0..5, SAMPLE/REC 6..9, PRESETS 10..13
+    static constexpr int VIZ_MENU_N = 6;
     bool menuOpen() const { return menu_; }
-    void toggleMenu() { menu_ = !menu_; }
-    void closeMenu() { menu_ = false; }
-    void menuMove(int d) { menuSel_ = ((menuSel_ + d) % MENU_N + MENU_N) % MENU_N; }
+    bool visualizerMenu() const { return visualizerOnly_; }
+    int menuSelection() const { return menuSel_; }
+    void toggleMenu() { menu_ = !menu_; visualizerOnly_ = false; }
+    void openVisualizerMenu() { menu_ = true; visualizerOnly_ = true; menuSel_ = 0; }
+    void closeMenu() { menu_ = false; visualizerOnly_ = false; }
+    void menuMove(int d) {
+        const int count = visualizerOnly_ ? VIZ_MENU_N : MENU_N;
+        menuSel_ = ((menuSel_ + d) % count + count) % count;
+    }
     void menuAdjust(int d, bool big = false) {
         auto clampf = [](float v, float lo, float hi) { return std::min(hi, std::max(lo, v)); };
         switch (menuSel_) {
@@ -206,7 +215,8 @@ class RecViz {
     }
 
     template <class Cv>
-    void draw(Cv& c, int x, int y, int w, int h, int cs, int fs) const;
+    void draw(Cv& c, int x, int y, int w, int h, int cs, int fs,
+              const Theme* theme = nullptr, bool showMenu = true) const;
 
   private:
     static constexpr uint64_t CAP = 65536, MASK = CAP - 1;
@@ -219,6 +229,7 @@ class RecViz {
     int                       sr_ = 48000;
     int                       fed_ = 0;
     bool                      menu_ = false;
+    bool                      visualizerOnly_ = false;
     int                       menuSel_ = 0;
     Params                    presets_[PRESET_N];
     bool                      presetUsed_[PRESET_N] = {false};
@@ -565,10 +576,26 @@ class RecViz {
 };
 
 template <class Cv>
-void RecViz::draw(Cv& c, int x, int y, int w, int h, int cs, int fs) const {
-    const uint32_t BLACK = 0xFF000000u, WHITE = 0xFFFFFFFFu, GRID = 0xFF4D4D4Du, DIMTXT = 0xFFB0B0B0u;
+void RecViz::draw(Cv& c, int x, int y, int w, int h, int cs, int fs,
+                  const Theme* theme, bool showMenu) const {
+    const uint32_t BACK = theme ? theme->vizBackground : 0xFF000000u;
+    const uint32_t WAVE = theme ? theme->vizWave : 0xFFFFFFFFu;
+    const uint32_t GRID = theme ? theme->vizCenterLine : 0xFF4D4D4Du;
+    const uint32_t DIMTXT = theme ? theme->textParam : 0xFFB0B0B0u;
+    const uint32_t TEXT = theme ? theme->textValue : 0xFFFFFFFFu;
+    const uint32_t SELECT = theme ? theme->rowCursor : 0xFFFFFFFFu;
+    const uint32_t SELECT_TEXT = theme ? theme->background : 0xFF000000u;
     auto tw  = [&](const std::string& s) { return static_cast<int>(Cv::text_width(s, cs, fs)); };
-    auto txt = [&](const std::string& s, int tx, int ty, uint32_t col = 0xFFFFFFFFu) { c.draw_text(s, x + tx, y + ty, col, cs, fs); };
+    auto txt = [&](const std::string& s, int tx, int ty, uint32_t col) { c.draw_text(s, x + tx, y + ty, col, cs, fs); };
+    auto runColor = [&](uint8_t level) {
+        const float k = (float)level / 255.0f;
+        auto channel = [&](int shift) {
+            const float a = (float)((BACK >> shift) & 0xFFu);
+            const float b = (float)((WAVE >> shift) & 0xFFu);
+            return (uint32_t)std::clamp((int)std::lround(a + (b - a) * k), 0, 255);
+        };
+        return 0xFF000000u | (channel(16) << 16) | (channel(8) << 8) | channel(0);
+    };
 
     // Disposition verticale (rien n'est écrit par-dessus les courbes) :
     //   bandeau haut : « L SPECTRUM » à gauche, seuils à droite
@@ -595,8 +622,8 @@ void RecViz::draw(Cv& c, int x, int y, int w, int h, int cs, int fs) const {
     const bool  f  = built_.axis == Axis::Freq;
     const int   ml = G.ml, pw = G.pw, ph = G.ph, oy[2] = {G.oy0, G.oy1};
 
-    c.fill_rect(x, y, w, h, BLACK);
-    for (int q = 0; q < 2; ++q) c.stroke_rect(x + ml, y + oy[q], pw, ph, WHITE);
+    c.fill_rect(x, y, w, h, BACK);
+    for (int q = 0; q < 2; ++q) c.stroke_rect(x + ml, y + oy[q], pw, ph, WAVE);
 
     // repères de temps dans le couloir central
     const int   labY = oy[0] + ph + (gap - G.ch) / 2;
@@ -612,13 +639,13 @@ void RecViz::draw(Cv& c, int x, int y, int w, int h, int cs, int fs) const {
 
     // formes : graves pleins, médiums continus, aigus pointillés
     for (const Run& r : runs_) {
-        const uint32_t col = 0xFF000000u | (static_cast<uint32_t>(r.g) * 0x010101u);
+        const uint32_t col = runColor(r.g);
         c.fill_rect(x + r.x, y + r.y, r.len, 1, col);
     }
 
     auto tick = [&](int yy, const std::string& lb) {
         if (!lb.empty()) txt(lb, ml - 6 - tw(lb), yy - G.ch / 2, DIMTXT);
-        c.fill_rect(x + ml - 3, y + yy, 3, 1, WHITE);
+        c.fill_rect(x + ml - 3, y + yy, 3, 1, WAVE);
     };
     if (f) {
         const float fr[5] = {200.f, 500.f, 1000.f, 2000.f, 5000.f};
@@ -634,15 +661,15 @@ void RecViz::draw(Cv& c, int x, int y, int w, int h, int cs, int fs) const {
     }
 
     // Bouton « J:SET » (coin haut-droit du panneau L) + menu de réglages.
-    {
+    if (showMenu) {
         const std::string bl = "SET";
         const int bw = tw(bl) + 6, bh = G.ch + 4, bx = ml + pw - bw - 2, by = oy[0] + 2;
-        c.fill_rect(x + bx, y + by, bw, bh, menu_ ? WHITE : BLACK);
-        c.stroke_rect(x + bx, y + by, bw, bh, WHITE);
-        txt(bl, bx + 3, by + 2, menu_ ? BLACK : WHITE);
+        c.fill_rect(x + bx, y + by, bw, bh, menu_ ? SELECT : BACK);
+        c.stroke_rect(x + bx, y + by, bw, bh, WAVE);
+        txt(bl, bx + 3, by + 2, menu_ ? SELECT_TEXT : WAVE);
         btn_[0] = x + bx; btn_[1] = y + by; btn_[2] = bw; btn_[3] = bh;
     }
-    if (menu_) {
+    if (showMenu && menu_) {
         auto f1 = [](float v) { char b[16]; std::snprintf(b, sizeof b, "%.1f", v); return std::string(b); };
         static const char* START_NAMES[5] = {"DIRECT", "1/4", "2/4", "1 BAR", "2 BAR"};
         // Deux sections : les réglages du VISUALISEUR, puis ceux du SAMPLE / REC. Les en-têtes ne sont
@@ -661,29 +688,31 @@ void RecViz::draw(Cv& c, int x, int y, int w, int h, int cs, int fs) const {
             std::to_string(presetSlot_ + 1) + "/8" + (presetUsed(presetSlot_) ? "*" : "-"),
             "STORE", presetUsed(presetSlot_) ? "GO" : "EMPTY", "CLEAR"};
 
-        enum { NROWS = 3 + MENU_N };          // 3 en-têtes + MENU_N réglages
-        std::string lab[NROWS];
-        int         item[NROWS];              // index du réglage, -1 pour un en-tête
+        const int nRows = visualizerOnly_ ? 1 + VIZ_MENU_N : 3 + MENU_N;
+        std::vector<std::string> lab(static_cast<size_t>(nRows));
+        std::vector<int> item(static_cast<size_t>(nRows)); // index du réglage, -1 pour un en-tête
         int         n = 0;
         lab[n] = "VIZ";           item[n] = -1; ++n;
         for (int i = 0; i < 6; ++i) { lab[n] = VIZ_LBL[i];    item[n] = i;     ++n; }
-        lab[n] = "SAMPLE / REC";  item[n] = -1; ++n;
-        for (int i = 0; i < 4; ++i) { lab[n] = SAMPLE_LBL[i]; item[n] = 6 + i; ++n; }
-        lab[n] = "PRESETS";        item[n] = -1; ++n;
-        for (int i = 0; i < 4; ++i) { lab[n] = PRESET_LBL[i]; item[n] = 10 + i; ++n; }
+        if (!visualizerOnly_) {
+            lab[n] = "SAMPLE / REC";  item[n] = -1; ++n;
+            for (int i = 0; i < 4; ++i) { lab[n] = SAMPLE_LBL[i]; item[n] = 6 + i; ++n; }
+            lab[n] = "PRESETS";        item[n] = -1; ++n;
+            for (int i = 0; i < 4; ++i) { lab[n] = PRESET_LBL[i]; item[n] = 10 + i; ++n; }
+        }
 
         const int rowH = G.ch + 4, pad = 6;
         const int fit  = std::max(3, (h - 2 * pad) / rowH);     // lignes qui tiennent dans le panneau
-        const int vis  = std::min<int>(NROWS, fit);
+        const int vis  = std::min(nRows, fit);
         int selRow = 0;
-        for (int r = 0; r < NROWS; ++r) if (item[r] == menuSel_) selRow = r;
+        for (int r = 0; r < nRows; ++r) if (item[r] == menuSel_) selRow = r;
         // Fenêtre déroulante : elle suit le curseur, qui reste donc toujours visible.
-        const int first = std::max(0, std::min(selRow - vis / 2, NROWS - vis));
+        const int first = std::max(0, std::min(selRow - vis / 2, nRows - vis));
 
         const int bw = tw("MIC GAIN") + tw("2 BAR") + 4 * pad + 6, bh = vis * rowH + 2 * pad;
         const int bx = (w - bw) / 2, by = std::max(0, (h - bh) / 2);
-        c.fill_rect(x + bx, y + by, bw, bh, BLACK);
-        c.stroke_rect(x + bx, y + by, bw, bh, WHITE);
+        c.fill_rect(x + bx, y + by, bw, bh, BACK);
+        c.stroke_rect(x + bx, y + by, bw, bh, WAVE);
         int ry = by + pad;
         for (int r = first; r < first + vis; ++r, ry += rowH) {
             if (item[r] < 0) {   // en-tête de section
@@ -692,19 +721,19 @@ void RecViz::draw(Cv& c, int x, int y, int w, int h, int cs, int fs) const {
                 continue;
             }
             const bool sel = (item[r] == menuSel_);
-            if (sel) c.fill_rect(x + bx + 2, y + ry, bw - 8, rowH, WHITE);
-            const uint32_t col = sel ? BLACK : WHITE;
+            if (sel) c.fill_rect(x + bx + 2, y + ry, bw - 8, rowH, SELECT);
+            const uint32_t col = sel ? SELECT_TEXT : TEXT;
             txt(lab[r], bx + pad + 2, ry + 2, col);
             const std::string& v = VAL[item[r]];
             txt(v, bx + bw - pad - 3 - tw(v), ry + 2, col);
         }
         // Barre de défilement : la fenêtre est plus courte que la liste.
-        if (vis < NROWS) {
+        if (vis < nRows) {
             const int sbX = bx + bw - 4, top = by + pad, sh = vis * rowH;
-            const int th  = std::max(10, sh * vis / NROWS);
-            const int ty  = top + (sh - th) * first / std::max(1, NROWS - vis);
+            const int th  = std::max(10, sh * vis / nRows);
+            const int ty  = top + (sh - th) * first / std::max(1, nRows - vis);
             c.fill_rect(x + sbX, y + top, 1, sh, GRID);
-            c.fill_rect(x + sbX - 1, y + ty, 3, th, WHITE);
+            c.fill_rect(x + sbX - 1, y + ty, 3, th, WAVE);
         }
     }
 
@@ -712,16 +741,16 @@ void RecViz::draw(Cv& c, int x, int y, int w, int h, int cs, int fs) const {
     if (receiving() && calib_ == 0) {
         const std::string st = "IN " + std::to_string(static_cast<int>(std::lround(peakDb()))) +
                                "DB  GATE " + std::to_string(static_cast<int>(std::lround(built_.gate)));
-        txt(st, ml + 4, oy[0] + 3, 0xFF808080u);
+        txt(st, ml + 4, oy[0] + 3, DIMTXT);
     }
 
     // Aucune donnée audio reçue : on le dit (sinon l'écran reste désespérément vide).
     if (!receiving()) {
         const std::string m = "NO AUDIO INPUT";
-        txt(m, ml + (pw - tw(m)) / 2, oy[0] + (ph - G.ch) / 2, WHITE);
+        txt(m, ml + (pw - tw(m)) / 2, oy[0] + (ph - G.ch) / 2, WAVE);
     } else if (calib_ > 0) {
         const std::string m = "CALIBRATING... KEEP QUIET";
-        txt(m, ml + (pw - tw(m)) / 2, oy[0] + (ph - G.ch) / 2, WHITE);
+        txt(m, ml + (pw - tw(m)) / 2, oy[0] + (ph - G.ch) / 2, WAVE);
     }
 }
 

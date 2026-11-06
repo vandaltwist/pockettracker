@@ -19,7 +19,7 @@ if (-not (Test-Path -LiteralPath $zip)) {
 }
 
 Write-Host "Uploading $zip to $Ip ..." -ForegroundColor Cyan
-scp $zip "root@${Ip}:/tmp/moontrck.zip"
+scp -O $zip "root@${Ip}:/tmp/moontrck.zip"
 if ($LASTEXITCODE -ne 0) { throw "scp failed" }
 
 # ⚠️ Do NOT use `pkill -f MoonTRCK`: this very command line contains ".../MoonTRCK.aarch64", so the

@@ -112,9 +112,10 @@ inline int settings_first_visible_row(const PlatformCaps& caps) {
 
 // Does this row have a second column? LAYOUT's exists only for a skinned layout.
 inline bool settings_row_has_second_column(SettingsRow row, const PlatformCaps& caps,
-                                           bool layoutHasSkins) {
+                                           bool layoutHasSkins, bool moonvizSelected = false) {
     switch (row) {
         case SettingsRow::LAYOUT:    return caps.touchLayouts && layoutHasSkins;
+        case SettingsRow::VISUALIZER: return moonvizSelected;
         case SettingsRow::OVERLAY:   // STR
         case SettingsRow::BTN_SOUND: // VOL
         case SettingsRow::BTN_VIBRO: // POW

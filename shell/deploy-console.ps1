@@ -40,7 +40,7 @@ Write-Host ("Cible  : root@" + $Ip)
 Write-Host ""
 
 Write-Host "Envoi du binaire ..." -ForegroundColor Cyan
-scp -q $bin "root@${Ip}:/tmp/MoonTRCK.new"
+scp -O -q $bin "root@${Ip}:/tmp/MoonTRCK.new"
 if ($LASTEXITCODE -ne 0) { throw "scp a echoue (console allumee ? bon IP ? mauvais mot de passe ?)" }
 
 # One remote session. Kept free of double quotes and of the string "MoonTRCK.aarch64" in any

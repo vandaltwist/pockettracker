@@ -40,7 +40,7 @@ float get_float(const json& j, const char* key, float fallback) {
 int clamp(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
 float clampf(float v, float lo, float hi) { return v < lo ? lo : (v > hi ? hi : v); }
 
-constexpr int VISUALIZER_COUNT = 6;   // VisualizerType — SCOPE … SPECTRUM_PEAKS
+constexpr int VISUALIZER_COUNT = 7;   // VisualizerType — SCOPE … MOONVIZ
 
 }  // namespace
 

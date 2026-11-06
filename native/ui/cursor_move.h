@@ -633,7 +633,9 @@ inline void move_cursor_right(AppState& s) {
             const bool hasSkins   = s.settings.skinCount > 0;
             if (row == SettingsRow::BTN_MAP && s.settingsCursorColumn < 3)
                 s.settingsCursorColumn++;
-            else if (settings_row_has_second_column(row, s.caps, hasSkins) && s.settingsCursorColumn < 2)
+            else if (settings_row_has_second_column(row, s.caps, hasSkins,
+                                                    s.theme.visualizerType == VisualizerType::MOONVIZ) &&
+                     s.settingsCursorColumn < 2)
                 s.settingsCursorColumn = 2;
             return;
         }

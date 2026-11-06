@@ -1508,13 +1508,14 @@ inline constexpr HelpEntry HELP_ENTRIES[] = {
       "holding it."},
      {"A+D-PAD turns it on or off"}},
     /* SET_VISUALIZER */
-    {"VISUALIZER: the top strip", "A wave, a wave per track, or", "a spectrum.",
+    {"VISUALIZER: the top strip", "A wave, tracks, spectrum, or", "MOONviz contours.",
      {"SCOPE shows the sound as a wave,",
       "FLAT shows nothing. OCTA and",
       "OCTA.F show a small wave for",
       "each track. SPECT and SPCT.P",
-      "show the spectrum."},
-     {"A+D-PAD picks the mode"}},
+      "show the spectrum. MOONviz is",
+      "the REC contour visualizer."},
+     {"A+D-PAD picks the mode", "Select MOONviz, then A on SET"}},
     /* SET_THEME */
     {"THEME: the colours", "A opens the theme editor,", "where every colour is a row.",
      {"The theme editor shows every",
