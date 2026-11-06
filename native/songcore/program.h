@@ -98,7 +98,7 @@ struct SamplerNoteArgs {
     float pan = 0.5f;
     int   startPointOverride = -1;
     int   endPointOverride = -1;
-    int   tableId = -1;
+    int   sliceIndex       = -1;    int   tableId = -1;
     int   tableTicRate = 6;
     int   noteOctave = 4;
     int   notePitch = 0;
@@ -213,6 +213,7 @@ inline SamplerNoteArgs derive_sampler_note(const NoteOnPayload& n, int64_t frame
                 effEnd = clampi(static_cast<int>((sliceEnd * 255LL) / sampleLength), 0, 255);
             }
         }
+        a.sliceIndex = sliceIndex;
     }
 
     // PIT after slice selection; ARP after that (pitch only — the slice is already resolved).

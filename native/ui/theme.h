@@ -11,7 +11,7 @@ namespace pt::ui {
 
 using Argb = uint32_t;  // 0xAARRGGBB
 
-enum class VisualizerType { SCOPE, FLAT, OCTA, OCTA_FULL, SPECTRUM, SPECTRUM_PEAKS };
+enum class VisualizerType { SCOPE, FLAT, OCTA, OCTA_FULL, SPECTRUM, SPECTRUM_PEAKS, MOONVIZ };
 
 struct Theme {
     std::string name = "CLASSIC";

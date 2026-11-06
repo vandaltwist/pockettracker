@@ -399,6 +399,11 @@ struct Instrument {
     int eqSlot = -1;
     int slicingMode = 0;
     std::vector<int64_t> sliceMarkers;
+    // MOONSET slice editor state (persisted so it survives leaving the page).
+    int  moonSliceMethod      = 2;   // 0 TRANSIENT, 1 DIVIDE, 2 OFF, 3 MANUAL
+    int  moonSliceSensitivity = 64;
+    int  moonSliceDivisions   = 8;
+    bool moonSliceFollow      = true;
 
     // OFF exempts the instrument from the scale quantizer, chain TSP and project transpose (a kit).
     bool transposeEnabled = true;
@@ -432,6 +437,11 @@ struct Instrument {
             int decay     = 0x00;
             int pan       = 0x00;
             int jitter    = 0x00;
+            // STRETCH: 0 = frozen texture, 0xFF = the full ratio. `ratio` = target/source length,
+            // encoded 0.25..4.0 (pt::gran_stretch_ratio). Fits a sample to DURATION/NEW BPM at a
+            // constant pitch, and the GT_STRETCH modulator rides on `stretch`.
+            int stretch   = 0x00;
+            int ratio     = 0x80;
             int mix       = 0xFF;   // 0xFF = cloud only, lower = sample + cloud, 0x00 = sample only
         } grain{};
         struct Roam {
@@ -452,6 +462,7 @@ struct Instrument {
             int inertia   = 0x00;
             int target    = 0x00;
             int tlock     = 0x00;
+            int mix       = 0xFF;   // per-layer mix (0x00 = sample only, 0xFF = cloud only)
         } roam{};
         struct Motion {
             bool state       = false;
@@ -469,6 +480,7 @@ struct Instrument {
             int trigger      = 0x00;
             int spin         = 0x00;
             int factor       = 0x00;
+            int mix          = 0xFF;   // per-layer mix (0x00 = sample only, 0xFF = cloud only)
         } motion{};
         bool master = true;   // A/B: false = the sample plays normally, no cloud (saved as "master")
         // v2: up to 8 modulation rows (the double-click popup). amount 0x80 = none.
@@ -485,6 +497,15 @@ struct Instrument {
                        rate == o.rate && shape == o.shape && bus == o.bus;
             }
         } mods[8]{};
+
+        // Per-cell bypass (INSTRUMENT page OFF switch): the engine uses a neutral value when set.
+        struct Bypass {
+            bool size = false, density = false, pitch = false, position = false, dir = false;
+            bool operator==(const Bypass& o) const {
+                return size == o.size && density == o.density && pitch == o.pitch &&
+                       position == o.position && dir == o.dir;
+            }
+        } bypass;
 
         bool operator==(const GranularParams& o) const {
             // Every cell, so an edit of any of them reaches the engine (the old version compared a few).
@@ -521,6 +542,7 @@ struct Instrument {
                    roam.inertia == o.roam.inertia &&
                    roam.target == o.roam.target &&
                    roam.tlock == o.roam.tlock &&
+                    roam.mix == o.roam.mix &&
                    motion.state == o.motion.state &&
                    motion.jump == o.motion.jump &&
                    motion.hold == o.motion.hold &&
@@ -535,7 +557,9 @@ struct Instrument {
                    motion.step_glide == o.motion.step_glide &&
                    motion.trigger == o.motion.trigger &&
                    motion.spin == o.motion.spin &&
-                   motion.factor == o.motion.factor;
+                   motion.factor == o.motion.factor &&
+                    motion.mix == o.motion.mix &&
+                    bypass == o.bypass;
         }
         bool operator!=(const GranularParams& o) const { return !(*this == o); }
     } granular{};

@@ -47,15 +47,17 @@ inline int page_clamping(int value, int direction, int count) {
     return std::clamp(value + direction * 16, 0, count - 1);
 }
 
-/** `base`, or the first free `base_0001`, `base_0002`, … — a WAV name in `dir` that nothing holds yet. */
-inline std::string free_wav_stem(FileSystem& fs, const std::string& dir, const std::string& base) {
+/** `base`, or the first free `base1`, `base2`, … — a name in `dir` with `ext` that nothing holds yet. */
+inline std::string free_file_stem(FileSystem& fs, const std::string& dir, const std::string& base,
+                                  const std::string& ext) {
     std::string stem = base;
-    for (int n = 1; fs.file_exists(dir + "/" + stem + ".wav"); ++n) {
-        char suffix[16];   // "_%04d" of an int can be 12 bytes (-Wformat-truncation)
-        std::snprintf(suffix, sizeof(suffix), "_%04d", n);
-        stem = base + suffix;
-    }
+    for (int n = 1; fs.file_exists(dir + "/" + stem + ext); ++n) stem = base + std::to_string(n);
     return stem;
+}
+
+/** The same, for a WAV. */
+inline std::string free_wav_stem(FileSystem& fs, const std::string& dir, const std::string& base) {
+    return free_file_stem(fs, dir, base, ".wav");
 }
 
 /** The 20 characters a slot's name is cut to when it is taken from a file. One writer, two readers. */

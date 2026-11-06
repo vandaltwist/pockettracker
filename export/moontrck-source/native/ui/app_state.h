@@ -421,7 +421,7 @@ inline bool modal_backdrop_active(const AppState& s) {
     // A load is not here: its strip dims nothing.
     return s.qwerty.isOpen || s.confirm.is_open() || s.fxHelper.isOpen || s.mapPicker.isOpen ||
            s.helpFull || s.renderDialog.isOpen || send_editor_drawn(s) || stretch_editor_up(s) || moonset_stretch_up(s) ||
-           (s.currentScreen == ScreenType::MOONSET && s.moonset.granularFocus && s.moonset.modOpen);
+           false;
 }
 
 // Does a full-screen module own the frame (no furniture)? ⚠️ `draw` and `has_falling_meters` both ask

@@ -147,19 +147,21 @@ void InputDispatcher::theme_row_action() {
 }
 
 void InputDispatcher::save_theme_as(const std::string& dir, const std::string& typed_text) {
-    // Sanitized filename (empty → THEME.ptt), raw name inside.
-    const std::string safe = safe_file_name(typed_text);
-    const std::string file = (safe.empty() ? std::string("THEME") : safe) + ".ptt";
-    const std::string path = dir + "/" + file;
+    // Sanitized and auto-numbered: a second THEME becomes THEME1, never a silent overwrite.
+    std::string base = safe_file_name(typed_text);
+    if (base.empty()) base = safe_file_name(s_.theme.name);
+    if (base.empty()) base = "THEME";
+    const std::string stem = free_file_stem(fs_, dir, base, ".ptt");
+    const std::string path = dir + "/" + stem + ".ptt";
 
     Theme to_save = s_.theme;
-    if (!typed_text.empty()) to_save.name = typed_text;
+    to_save.name  = stem;   // the file's own name, so the number shows when it is loaded back
 
     // ⚠️ The live theme keeps its name: the built-in cycle keys off it. Loading the file sets it.
     const bool ok = save_theme_file(fs_, path, to_save);
 
     // ⚠️ A full card or a read-only mount must not report success.
-    set_status(s_, ok ? "THEME SAVED" : "SAVE FAILED", ok);
+    set_status(s_, ok ? ("THEME SAVED: " + stem) : "SAVE FAILED", ok);
 
     open_theme_editor();
 }

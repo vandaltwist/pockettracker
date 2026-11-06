@@ -164,7 +164,8 @@ public:
     static const int PREVIEW_LANE = 8;
 
     int getActiveVoiceCount();
-
+    // The slice index (-1 if none) of the most recent sounding voice on this instrument.
+    int getActiveSliceForInstrument(int instrumentId);
     // Each track's sounding note as octave*12+pitch, or -1. Reads both voice pools.
     void getTrackActiveNotes(int* out, int trackCount);
 
@@ -259,7 +260,7 @@ public:
                       int noteOctave = 4, int notePitch = 0,
                       float pslInitialOffset = 0.0f, float pslDuration = 0.0f,
                       float pbnRate = 0.0f, float vibratoSpeed = 0.0f, float vibratoDepth = 0.0f,
-                      int tableStartRow = -1);
+                      int tableStartRow = -1, bool isGranular = false);
 
     // The sequencer's path: a note by instrument number, resolved against the program table when it
     // fires — the only moment a table row could have changed it. `tempo` is the schedule-time tempo.
@@ -702,7 +703,7 @@ private:
         struct Sampler {
             bool     active = false, fading = false;
             int      trackId = -1, instrId = -1, tableId = -1, note = -1, loopStart = 0, loopEnd = 0;
-            uint32_t sampleGen = 0;
+            int      sliceIndex = -1;            uint32_t sampleGen = 0;
             double   position  = 0.0;
             int      lanes[TABLE_LANES] = {-1, -1, -1};
         } sampler[MAX_VOICES];
@@ -1072,6 +1073,7 @@ private:
     float*  recordDataR()  { return recordBufR; }
     int     recordLength() const { return recordLength_; }
     float   recordPeak() const { return recordPeak_.load(std::memory_order_relaxed); }
+float   granBusLevel(int idx) const { return (idx >= 0 && idx < 16) ? granBus[idx] : 0.0f; }
     const float* recordBufferL() const { return recordBufL; }
     const float* recordBufferR() const { return recordBufR; }
     // Called by the backend's capture thread: appends input frames to the record buffer.

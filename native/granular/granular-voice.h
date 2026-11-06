@@ -23,7 +23,9 @@ namespace pt {
 // ---- Modulation vocabulary (stored in the project BY VALUE: never reorder, only append) ----------
 enum GranTarget : int {
     GT_NONE = 0, GT_POSITION, GT_SIZE, GT_DENSITY, GT_SPRAY, GT_PITCH, GT_JITTER, GT_REV, GT_JUMP,
-    GT_CHAOS, GT_STEREO, GT_ROAM_SPEED, GT_ROAM_RANGE, GT_LEVEL, GT_COUNT
+    GT_CHAOS, GT_STEREO, GT_ROAM_SPEED, GT_ROAM_RANGE, GT_LEVEL,
+    // Appended: a project written before STRETCH keeps its byte values.
+    GT_STRETCH, GT_COUNT
 };
 enum GranSource : int { GS_NONE = 0, GS_LFO, GS_RANDOM, GS_BUS, GS_COUNT };
 enum GranLfoShape : int { GL_SIN = 0, GL_TRI, GL_SAW, GL_SQR, GL_COUNT };
@@ -51,7 +53,16 @@ struct GranularSettings {
         int  decay     = 0x00;   // extra fade-out of every grain (0..50 % of its length)
         int  pan       = 0x00;   // random pan per grain
         int  jitter    = 0x00;   // random pitch per grain (up to +-12 semitones)
+        // STRETCH: how much the cloud's read head advances by itself, 0 = frozen texture, 0xFF = the
+        // full ratio. `ratio` is the target length / source length, encoded 0.25..4.0 (see stretchRatio()).
+        int  stretch   = 0x00;
+        int  ratio     = 0x80;
         int  mix       = 0xFF;   // 0xFF = the cloud alone (v1), lower = the normal sample + the cloud, 0x00 = the sample alone
+        // Per-cell bypass (INSTRUMENT page OFF switch): the engine substitutes a neutral value.
+        bool bypass_size     = false;
+        bool bypass_density = false;
+        bool bypass_pitch    = false;
+        bool bypass_position= false;
     } grain;
     struct Roam {
         bool state     = false;
@@ -71,6 +82,8 @@ struct GranularSettings {
         int  inertia   = 0x00;   // extra slew
         int  target    = 0x00;   // a place the head is pulled to...
         int  tlock     = 0x00;   // ...by this much
+        int  mix       = 0xFF;   // per-layer mix (0x00 = sample only, 0xFF = cloud only)
+
     } roam;
     struct Motion {
         bool state     = false;
@@ -88,6 +101,9 @@ struct GranularSettings {
         int  trigger   = 0x00;   // reserved
         int  spin      = 0x00;   // the stereo image rotates
         int  factor    = 0x00;   // reserved
+        int  mix          = 0xFF;   // per-layer mix (0x00 = sample only, 0xFF = cloud only)
+
+        bool bypass_dir = false;
     } motion;
     // One modulation row. amount: 0x80 = none, 0xFF = +100 %, 0x00 = -100 % (inverted).
     struct Mod {
@@ -103,6 +119,12 @@ struct GranularSettings {
 // Note values of TIME = BPM, in quarter notes. Same order as ui/modules/granular_ui.h GRAN_DIVS.
 inline constexpr float GRAN_BEATS[15] = {16.f, 8.f, 4.f, 2.f, 1.f, 0.5f, 0.25f, 0.125f, 0.0625f,
                                          0.6667f, 0.3333f, 0.1667f, 1.5f, 0.75f, 0.375f};
+
+// STRETCH's ratio byte -> target length / source length. 0 = 0.25x (four times shorter),
+// 0x80 ~= 1x, 0xFF = 4x (four times longer). Exponential so the middle is unison.
+inline float gran_stretch_ratio(int byte) {
+    return 0.25f * std::pow(16.0f, (float)std::clamp(byte, 0, 255) / 255.0f);
+}
 
 // Grain windows, built once at program start (no work on the audio thread).
 struct GrainWindowTable {
@@ -185,29 +207,35 @@ public:
                    float sampleRate, int startOverride = -1, float bpm = 0.0f, const float* bus = nullptr) {
         if (!running_) return;
         cfg_        = p;
+        // Per-cell bypass: substitute the neutral value so the sound ignores the cell.
+        if (cfg_.grain.bypass_size)      cfg_.grain.size     = 0x40;
+        if (cfg_.grain.bypass_density)   cfg_.grain.density  = 0x80;
+        if (cfg_.grain.bypass_pitch)     cfg_.grain.pitch    = 0x80;
+        if (cfg_.grain.bypass_position)  cfg_.grain.position = 0x00;
+        if (cfg_.motion.bypass_dir)      cfg_.motion.rev     = 0x00;
         bpm_        = bpm;
         bus_        = bus;
         length_     = std::max(length, 2);
         sampleRate_ = sampleRate > 0.0f ? sampleRate : 48000.0f;
         noteRate_   = noteRate > 0.0f ? noteRate : 1.0f;
-        enabled_    = p.grain.state && p.master;
+        enabled_    = (p.grain.state || p.roam.state || p.motion.state) && p.master;
 
         if (startOverride >= 0) startOverride_ = startOverride;
         const float pos = (startOverride_ >= 0)
             ? (float)std::clamp(startOverride_, 0, 255) / 255.0f
-            : (float)std::clamp(p.grain.position, 0, 255) / 255.0f;
+            : (float)std::clamp(cfg_.grain.position, 0, 255) / 255.0f;
         position_.set(pos, sounding, frames);
-        size_.set((float)std::clamp(p.grain.size, 0, 255), sounding, frames);
-        density_.set((float)std::clamp(p.grain.density, 0, 255), sounding, frames);
+        size_.set((float)std::clamp(cfg_.grain.size, 0, 255), sounding, frames);
+        density_.set((float)std::clamp(cfg_.grain.density, 0, 255), sounding, frames);
         spray_.set((float)std::clamp(p.grain.spray, 0, 255) / 255.0f, sounding, frames);
-        pitch_.set((float)std::clamp(p.grain.pitch, 0, 255), sounding, frames);
+        pitch_.set((float)std::clamp(cfg_.grain.pitch, 0, 255), sounding, frames);
         mix_.set((float)std::clamp(p.grain.mix, 0, 255) / 255.0f, sounding, frames);
         // Mixed with the sample, the cloud is brought to about the sample's own level (a dense cloud of
         // long grains is several times louder than its source). Cloud alone (mix 0xFF) is left as it was.
         float comp = 1.0f;
         if (p.grain.mix < 255) {
-            const float ms   = 1.0f + (float)std::clamp(p.grain.size, 0, 255) * (999.0f / 255.0f);
-            const float dens = 1.0f + (float)std::clamp(p.grain.density, 0, 255) * (199.0f / 255.0f);
+            const float ms   = 1.0f + (float)std::clamp(cfg_.grain.size, 0, 255) * (999.0f / 255.0f);
+            const float dens = 1.0f + (float)std::clamp(cfg_.grain.density, 0, 255) * (199.0f / 255.0f);
             const float overlap = ms * 0.001f * dens;
             comp = 1.0f / std::sqrt(std::max(1.0f, overlap * 0.375f));
         }
@@ -271,9 +299,10 @@ public:
         }
         return n;
     }
-    // Where the read head is, 0..1 of the window: POSITION + ROAM + the modulation on POSITION.
+    // Where the read head is, 0..1 of the window: POSITION + ROAM + the modulation on POSITION,
+    // plus the automatic advance of STRETCH.
     float headFraction() const {
-        float p = position_.value() + mod_[GT_POSITION] + roamSmooth_;
+        float p = position_.value() + mod_[GT_POSITION] + roamSmooth_ + (float)headPhase_;
         return p - std::floor(p);
     }
     int  windowStart() const { return winOn_ ? winStart_ : 0; }
@@ -323,13 +352,6 @@ private:
         const float* rsrc = right ? right : left;
         for (GranularGrain& g : grains_) {
             if (!g.on) continue;
-            if (winOn_) {   // a grain loops inside the window instead of reading outside it
-                const double wlo = (double)winStart_, span = (double)(std::min(winEnd_, length_ - 1) - winStart_);
-                if (span >= 2.0) {
-                    if (g.pos >= wlo + span)  g.pos = wlo + std::fmod(g.pos - wlo, span);
-                    else if (g.pos < wlo)     g.pos = wlo + span - std::fmod(wlo - g.pos, span);
-                }
-            }
             const int idx = (int)g.pos;
             if (idx < 0 || idx >= length_ - 1) { g.on = false; continue; }
             if (read) {
@@ -375,6 +397,7 @@ private:
         for (int i = 0; i < GRAN_MODS; ++i) { lfoPh_[i] = 0.0f; shVal_[i] = 0.0f; }
         roamPh_ = 0.0f; roamTarget_ = 0.0f; walk_ = 0.0f; walk2_ = 0.0f; driftAcc_ = 0.0f;
         roamSmooth_ = 0.0f; posLfo_ = 0.0f; spinPh_ = 0.0f; tapeT_ = 0.0f; tapeMul_ = 1.0f;
+        headPhase_ = 0.0;
         haveLast_ = false; lastStart_ = 0.0; stutterLeft_ = 0;
     }
 
@@ -447,6 +470,7 @@ private:
                 case 0: off = shapeCurve(rm.dcurve, 1.0f - std::fabs(2.0f * roamPh_ - 1.0f)) * range; break;   // BOUNCE
                 case 1: off = roamPh_ * range; break;                                                            // LOOP
                 case 2: off = walk_ * range; break;                                                              // DRIFT
+                case 4: off = 0.0f; break;                                                                       // SLC: head locked to the slice start
                 default: off = roamTarget_ * range; break;                                                       // RANDOM
             }
             if (rm.wander > 0 && rm.freeze == 0)
@@ -460,6 +484,24 @@ private:
         const float tau = (float)rm.smooth / 255.0f * 0.5f + (float)rm.inertia / 255.0f * 1.0f;
         if (tau > 0.0005f) roamSmooth_ += (off - roamSmooth_) * (1.0f - expf(-dt / tau));
         else roamSmooth_ = off;
+
+        // ---- STRETCH: the head advances by itself, at a constant pitch ----------------------
+        // The grains keep their own step (noteRate), so slowing the head stretches the sample in
+        // time without lowering it. 0 = the frozen texture of v1; 0xFF = the full DURATION/NEW BPM
+        // ratio. The LFO on GT_STRETCH rides on the same value, hence the clamp.
+        const float stretchAmt =
+            std::clamp((float)std::clamp(cfg_.grain.stretch, 0, 255) / 255.0f + mod_[GT_STRETCH],
+                       0.0f, 1.0f);
+        if (stretchAmt > 0.0f) {
+            const double spanFrames =
+                winOn_ ? (double)std::max(1, std::min(winEnd_, length_ - 1) - winStart_)
+                       : (double)std::max(1, length_ - 1);
+            const double windowSec = spanFrames / (double)std::max(1.0f, sampleRate_);
+            const double ratio     = (double)gran_stretch_ratio(cfg_.grain.ratio);
+            const double speed     = 1.0 / std::max(0.001, ratio * windowSec);   // fraction / second
+            headPhase_ += speed * (double)stretchAmt * (double)dt;
+            headPhase_ -= std::floor(headPhase_);
+        }
 
         // ---- MOTION: things that evolve while the note sounds -------------------------------
         const auto& mo = cfg_.motion;
@@ -498,14 +540,12 @@ private:
                                : std::clamp(mod_[GT_CHAOS], 0.0f, 1.0f);
 
         // ---- position -----------------------------------------------------------------------
-        float basePos = position_.next() + mod_[GT_POSITION] + roamSmooth_;
+        float basePos = position_.next() + mod_[GT_POSITION] + roamSmooth_ + (float)headPhase_;
         if (mv && mo.lfo_depth > 0) basePos += sinf(6.28318530718f * posLfo_) * (float)mo.lfo_depth / 255.0f * 0.25f;
         if (cfg_.roam.state && cfg_.roam.tlock > 0) {
             const float k = (float)cfg_.roam.tlock / 255.0f;
             basePos = basePos + ((float)cfg_.roam.target / 255.0f - basePos) * k;
         }
-        basePos -= floorf(basePos);
-
         const float spray = std::clamp(spray_.next() + mod_[GT_SPRAY], 0.0f, 1.0f) * 0.5f;
         const double wLo = winOn_ ? (double)winStart_ : 0.0;
         const double wHi = winOn_ ? (double)std::min(winEnd_, length_ - 1) : (double)(length_ - 1);
@@ -513,6 +553,7 @@ private:
         double start = wLo + (double)basePos * (wSpan - 1.0);
         if (spray > 0.0f) start += (double)rndb() * (double)spray * wSpan;
         if (chaos > 0.0f) start += (double)rndb() * (double)chaos * 0.25 * wSpan;
+        start = std::clamp(start, 0.0, (double)(length_ - 1));
 
         const float pJump = mv ? std::clamp((float)mo.jump / 255.0f + mod_[GT_JUMP], 0.0f, 1.0f)
                                : std::clamp(mod_[GT_JUMP], 0.0f, 1.0f);
@@ -591,6 +632,7 @@ private:
     float    lfoPh_[GRAN_MODS] = {}, shVal_[GRAN_MODS] = {};
     float    roamPh_ = 0, roamTarget_ = 0, walk_ = 0, walk2_ = 0, driftAcc_ = 0, roamSmooth_ = 0;
     float    posLfo_ = 0, spinPh_ = 0, tapeT_ = 0, tapeMul_ = 1;
+    double   headPhase_ = 0.0;   // STRETCH: the head's automatic advance, 0..1 of the window
     bool     haveLast_ = false;
     double   lastStart_ = 0.0;
     int      stutterLeft_ = 0;

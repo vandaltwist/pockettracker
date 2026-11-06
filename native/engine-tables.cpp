@@ -728,9 +728,9 @@ void AudioEngine::publishVoiceView() {
         d.active    = src.isActive;
         d.fading    = src.isFadingOut;
         d.trackId   = src.trackId;
-        d.instrId   = src.instrId;
-        d.tableId   = src.tableId;
-        d.note      = src.noteOctave * 12 + src.notePitch;
+        d.instrId    = src.instrId;
+        d.sliceIndex = src.sliceIndex;
+        d.tableId    = src.tableId;        d.note      = src.noteOctave * 12 + src.notePitch;
         d.loopStart = src.actualLoopStart;
         d.loopEnd   = src.actualLoopEnd;
         d.sampleGen = src.sampleGen;

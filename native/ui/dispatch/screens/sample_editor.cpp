@@ -177,6 +177,11 @@ GestureResult InputDispatcher::sample_editor_screen(Gesture g) {
             }
             return GestureResult::TAKEN;
 
+        // SHIFT + PLAY: silence the arrangement, so the sample being auditioned is heard on its own.
+        case Gesture::Y_X:
+            if (host_.is_playing()) host_.stop();
+            return GestureResult::TAKEN;
+
 
         case Gesture::A_UP:
             if (se.cursorRow == 5 && se.cursorCol == 0) return GestureResult::TAKEN;

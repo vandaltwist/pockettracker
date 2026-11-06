@@ -91,5 +91,15 @@ int AudioEngine::detectTransients(int id, int sensitivity, int* outMarkers, int 
         }
     }
 
+    // Low sensitivity (0..40): keep only one transient out of two, so the slices are
+    // spaced out instead of staying too close together.
+    if (sensitivity <= 40 && markerCount > 1) {
+        int kept = 0;
+        for (int i = 0; i < markerCount; i += 2) {
+            outMarkers[kept++] = outMarkers[i];
+        }
+        markerCount = kept;
+    }
+
     return markerCount;
 }

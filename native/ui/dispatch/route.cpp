@@ -20,6 +20,7 @@ const InputDispatcher::Layer InputDispatcher::LAYERS[] = {
     {&InputDispatcher::eq_open,            &InputDispatcher::eq_layer},
     {&InputDispatcher::send_editor_open,   &InputDispatcher::send_editor_layer},
     {&InputDispatcher::stretch_editor_open, &InputDispatcher::stretch_editor_layer},
+    {&InputDispatcher::moonset_stretch_page_open, &InputDispatcher::moonset_stretch_page_layer},
     {&InputDispatcher::moonset_stretch_open, &InputDispatcher::moonset_stretch_layer},
     {&InputDispatcher::fx_helper_open,     &InputDispatcher::fx_helper_layer},
     {&InputDispatcher::map_picker_open,    &InputDispatcher::map_picker_layer},

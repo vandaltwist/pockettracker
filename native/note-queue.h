@@ -50,6 +50,7 @@ struct ScheduledNote {
     float pan;               // 0 left, 0.5 centre, 1 right
     int startPointOverride;  // -1 = the instrument's
     int endPointOverride;    // CUT slice end; -1 = the instrument's
+    int sliceIndex = -1;     // resolved slice for granular/sampler playback (-1 = none)
 
     int tableId;             // -1 = none
     int tableTicRate;        // ticks per table row

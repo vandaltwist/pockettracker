@@ -8,6 +8,7 @@
 #include "ui/helpers.h"
 #include "ui/modules/confirm_dialog.h"
 #include "ui/modules/granular_ui.h"
+#include "granular/granular-voice.h"   // GranTarget / GranSource
 #include "ui/modules/rec_viz.h"
 
 namespace pt::ui {
@@ -118,6 +119,7 @@ int MoonsetModule::row_below(int row, int slice_method) {
         case 11: return 13;
         case 14: return 16;
         case 16: return 18;
+        case 18: return 19;
         case 19: return 1;    // wrap to the first row
         default: return row + 1;
     }
@@ -125,15 +127,14 @@ int MoonsetModule::row_below(int row, int slice_method) {
 
 int MoonsetModule::max_col_for_row(int row, int slice_method) {
     if (row == 1 || row == 2) return 2;
-    if (row == 5) return 2;          // RECORD: REC / INPUT / SET (LOOP moved to Y)
+    if (row == 5) return 3;          // RECORD: REC / REC WAV / INPUT / SET (left to right)
     if (row >= 3 && row <= 7) return 1;          // the selection's two edges (START / END)
     if (row == 8) return 2;                      // START / END / LOOP checkbox
     if (row == 10) return slice_has_parameter(slice_method) ? 1 : 0;
-    if (row == 11) return 1;
-    if (row == 13 || row == 14) return 5;        // six ops per row
+    if (row == 11) return 1;    if (row == 13 || row == 14) return 5;        // six ops per row
     if (row == 16) return 2;                     // TYPE / VALUE / APPLY
     if (row == 18) return 0;                     // NAME — the whole row is one cell
-    if (row == 19) return (slice_method == SLICE_OFF) ? 2 : 3;   // CHOP only exists with slices
+    if (row == 19) return (slice_method == SLICE_OFF) ? 2 : 3;   // LOAD / SAVE / OVERWRITE / CHOP
     return 0;
 }
 
@@ -191,13 +192,14 @@ int MoonsetState::slice_index_ceiling() const {
         case MoonsetModule::SLICE_MANUAL:    return markers + 1;
         case MoonsetModule::SLICE_DIVIDE:
             return markers > 0 ? markers : std::max(sliceDivisions - 1, 0);
+        case MoonsetModule::SLICE_OFF:       return (marker_count() > 0) ? marker_count() : 0;
         default:                                  return 0;
     }
 }
 
 void MoonsetState::slice_bounds(int idx, int64_t& start, int64_t& end) const {
     const int64_t total = static_cast<int64_t>(totalFrames);
-    if (sliceMethod == MoonsetModule::SLICE_OFF) {
+    if (sliceMethod == MoonsetModule::SLICE_OFF && (idx == 0 || marker_count() == 0)) {
         start = 0;
         end   = total;
         return;
@@ -228,6 +230,14 @@ int64_t MoonsetState::effective_slice_position() const {
     int64_t start = 0, end = 0;
     slice_bounds(sliceIndex, start, end);
     return start;
+}
+
+int MoonsetState::reading_slice_index() const {
+    // -1 = no tracker slice is sounding: the cloud reads the WHOLE sample at GRAIN POSITION. The
+    // slicing tool's cursor is deliberately NOT a fallback — TRANSIENT/DIVIDE/MANUAL exist to cut
+    // the sample, and must never drive the grain or its red animation.
+    if (granularSliceIndex < 0) return -1;
+    return std::clamp(granularSliceIndex, 0, slice_index_ceiling());
 }
 
 int64_t MoonsetState::view_start() const {
@@ -353,7 +363,7 @@ void draw_ops_row(Canvas& c, int x, int y, const std::vector<std::string>& ops, 
 void MoonsetModule::draw(Canvas& c, int x, int y, const MoonsetState& s,
                          const songcore::Instrument::GranularParams& g, const Theme& t) const {
     c.fill_rect(x, y, WIDTH, HEIGHT, t.background);
-    const int oy = y - s.pageScrollPx;
+    const int oy = y;
 
     // ── Header, then rows 1 and 2, then the waveform ─────────────────────────────────────────────
     {
@@ -391,17 +401,20 @@ void MoonsetModule::draw(Canvas& c, int x, int y, const MoonsetState& s,
         const bool cur = (s.cursorRow == 5);
         const int ty = ry + TEXT_PADDING;
         const bool     onRecCell = (cur && s.cursorCol == 0);
-        const uint32_t recInk = s.recordActive
+        const bool     onWavCell = (cur && s.cursorCol == 1);
+        const uint32_t recInk = s.recordActive && !s.recordToWav
             ? (s.recordLevel > 0.01f ? 0xFFFF0000u : 0xFFFFAA00u)   // red if sound, amber if silent
             : t.textValue;
-        c.draw_text("RECORD", x + 10, ty, onRecCell ? cursor_mark_ink(t) : t.textParam,
+        c.draw_text("RECORD", x + 10, ty,
+                    (onRecCell || onWavCell) ? cursor_mark_ink(t) : t.textParam,
                     CHAR_SPACING, FONT_SCALE);
-        if (s.recordActive && !s.recordFailed && s.recordFrames >= s.recordSkipFrames) {
+        if (s.recordActive && !s.recordToWav && !s.recordFailed &&
+            s.recordFrames >= s.recordSkipFrames) {
             // « REC » puis le temps COLLÉ et plus petit : la cellule reste dans sa place devant INPUT.
             char tb[24];
             std::snprintf(tb, sizeof(tb), "%.1fs", (s.recordFrames - s.recordSkipFrames) / 48000.0f);
             const std::string timeStr = tb;
-            const int recX = x + 175, fs2 = FONT_SCALE - 1, cs2 = 1, gap = 3;
+            const int recX = x + 120, fs2 = FONT_SCALE - 1, cs2 = 1, gap = 3;
             const int wRec = Canvas::text_width("REC", CHAR_SPACING, FONT_SCALE);
             const int wAll = wRec + gap + Canvas::text_width(timeStr, cs2, fs2);
             if (onRecCell)
@@ -412,121 +425,151 @@ void MoonsetModule::draw(Canvas& c, int x, int y, const MoonsetState& s,
             c.draw_text(timeStr, recX + wRec + gap, ty + (FONT_SCALE - fs2) * 5 / 2, ink, cs2, fs2);
         } else {
             const std::string recText = s.recordFailed ? std::string("FAILED")
-                                      : s.recordActive ? std::string("COUNT-IN")
-                                                       : std::string("REC");
-            draw_cursor_cell(c, recText, x + 175, ty, onRecCell, recInk, t);
+                                      : (s.recordActive && !s.recordToWav) ? std::string("COUNT-IN")
+                                                                           : std::string("REC");
+            draw_cursor_cell(c, recText, x + 120, ty, onRecCell, recInk, t);
         }
+
+        // REC WAV: the same capture, written to a new file instead of into the instrument.
+        const uint32_t wavInk = s.recordActive && s.recordToWav
+            ? (s.recordLevel > 0.01f ? 0xFFFF0000u : 0xFFFFAA00u)
+            : t.textValue;
+        if (s.recordActive && s.recordToWav && !s.recordFailed &&
+            s.recordFrames >= s.recordSkipFrames) {
+            char tb[24];
+            std::snprintf(tb, sizeof(tb), "%.1fs", (s.recordFrames - s.recordSkipFrames) / 48000.0f);
+            const std::string timeStr = tb;
+            const int recX = x + 230, fs2 = FONT_SCALE - 1, cs2 = 1, gap = 3;
+            const int wRec = Canvas::text_width("REC", CHAR_SPACING, FONT_SCALE);
+            const int wAll = wRec + gap + Canvas::text_width(timeStr, cs2, fs2);
+            if (onWavCell)
+                c.fill_rect(recX - CHAR_SPACING, ty - TEXT_PADDING, wAll + 2 * CHAR_SPACING, ROW_HEIGHT,
+                            t.rowCursor);
+            const uint32_t ink = onWavCell ? cursor_cell_ink(t) : wavInk;
+            c.draw_text("REC", recX, ty, ink, CHAR_SPACING, FONT_SCALE);
+            c.draw_text(timeStr, recX + wRec + gap, ty + (FONT_SCALE - fs2) * 5 / 2, ink, cs2, fs2);
+        } else {
+            const std::string wavText = (s.recordActive && s.recordToWav) ? std::string("COUNT-IN")
+                                                                          : std::string("REC WAV");
+            draw_cursor_cell(c, wavText, x + 230, ty, onWavCell, wavInk, t);
+        }
+
         std::string inputName = s.recordInputDevice.empty() ? "DEF" : s.recordInputDevice.substr(0, 3);
         while (!inputName.empty() && inputName.back() == ' ') inputName.pop_back();   // "M1 MASTER" -> "M1"
-        c.draw_text("INPUT", x + 335, ty, cur && s.cursorCol == 1 ? cursor_mark_ink(t) : t.textParam,
+        c.draw_text("INPUT", x + 370, ty, cur && s.cursorCol == 2 ? cursor_mark_ink(t) : t.textParam,
                     CHAR_SPACING, FONT_SCALE);
-        draw_cursor_cell(c, inputName, x + 410, ty, cur && s.cursorCol == 1, t.textValue, t);
-        c.draw_text("SET", x + 535, ty, cur && s.cursorCol == 2 ? cursor_mark_ink(t) : t.textParam,
+        draw_cursor_cell(c, inputName, x + 460, ty, cur && s.cursorCol == 2, t.textValue, t);
+        c.draw_text("SET", x + 520, ty, cur && s.cursorCol == 3 ? cursor_mark_ink(t) : t.textParam,
                     CHAR_SPACING, FONT_SCALE);
-        draw_cursor_cell(c, rec_viz().menuOpen() ? "ON" : "OFF", x + 590, ty,
-                         cur && s.cursorCol == 2, t.textValue, t);
+        draw_cursor_cell(c, rec_viz().menuOpen() ? "ON" : "OFF", x + 575, ty,
+                         cur && s.cursorCol == 3, t.textValue, t);
     }
 
     draw_waveform(c, x, oy + WAVEFORM_Y, s, t, &g);
 
-    {   // Row 8 — the selection, in frames
-        const int  ry  = oy + content_y(8);
-        const bool cur = (s.cursorRow == 8);
-        const int ty = ry + TEXT_PADDING;
-        c.draw_text("SELECTION", x + 10, ty, cur ? cursor_mark_ink(t) : t.textParam, CHAR_SPACING,
-                    FONT_SCALE);
-        draw_cursor_cell(c, hex_padded(s.selectionStart, 8), x + 180, ty, cur && s.cursorCol == 0,
-                         t.textValue, t);
-        draw_cursor_cell(c, hex_padded(s.selectionEnd, 8), x + 335, ty, cur && s.cursorCol == 1,
-                         t.textValue, t);
-        c.draw_text("LOOP", x + 490, ty, cur && s.cursorCol == 2 ? cursor_mark_ink(t) : t.textParam,
-                    CHAR_SPACING, FONT_SCALE);
-        draw_cursor_cell(c, s.loopPreview ? "ON" : "OFF", x + 545, ty, cur && s.cursorCol == 2,
-                          t.textValue, t);
-    }
-
-    {   // Row 10 — the slice METHOD, and its one parameter (SENS or BY, depending)
-        const int  ry  = oy + content_y(10);
-        const bool cur = (s.cursorRow == 10);
-        const int ty = ry + TEXT_PADDING;
-        c.draw_text("SLICE", x + 10, ty, cur ? cursor_mark_ink(t) : t.textParam, CHAR_SPACING, FONT_SCALE);
-        draw_cursor_cell(c, at(slice_methods(), s.sliceMethod), x + 175, ty,
-                         cur && s.cursorCol == 0, t.textValue, t);
-        if (slice_has_parameter(s.sliceMethod)) {
-            const bool        onVal = (cur && s.cursorCol == 1);
-            const std::string lbl   = (s.sliceMethod == SLICE_TRANSIENT) ? "SENS" : "BY";
-            const std::string val   = hex2(s.sliceMethod == SLICE_TRANSIENT ? s.sliceSensitivity
-                                                                            : s.sliceDivisions);
-            c.draw_text(lbl, x + 335, ty, onVal ? cursor_mark_ink(t) : t.textParam, CHAR_SPACING, FONT_SCALE);
-            draw_cursor_cell(c, val, x + 410, ty, onVal, t.textValue, t);
+    // SHIFT swaps ONLY this section (SELECTION ... LOAD). The four header rows and the waveform -
+    // its red playhead included - stay on screen above it.
+    if (s.granularFocus) {
+        draw_moonset_granular(c, x, oy + GRANULAR_Y, g, s.granularRow,
+                              s.granularColumn, s.granularTop, t, s.sliceReading, &s);
+    } else {
+        {   // Row 8 — the selection, in frames
+            const int  ry  = oy + content_y(8);
+            const bool cur = (s.cursorRow == 8);
+            const int ty = ry + TEXT_PADDING;
+            c.draw_text("SELECTION", x + 10, ty, cur ? cursor_mark_ink(t) : t.textParam, CHAR_SPACING,
+                        FONT_SCALE);
+            draw_cursor_cell(c, hex_padded(s.selectionStart, 8), x + 180, ty, cur && s.cursorCol == 0,
+                             t.textValue, t);
+            draw_cursor_cell(c, hex_padded(s.selectionEnd, 8), x + 335, ty, cur && s.cursorCol == 1,
+                             t.textValue, t);
+            c.draw_text("LOOP", x + 490, ty, cur && s.cursorCol == 2 ? cursor_mark_ink(t) : t.textParam,
+                        CHAR_SPACING, FONT_SCALE);
+            draw_cursor_cell(c, s.loopPreview ? "ON" : "OFF", x + 545, ty, cur && s.cursorCol == 2,
+                              t.textValue, t);
         }
-    }
-
-    if (s.sliceMethod != SLICE_OFF) {   // Row 11 — which slice, and where it starts
-        const int  ry  = oy + content_y(11);
-        const bool cur = (s.cursorRow == 11);
-        const int ty = ry + TEXT_PADDING;
-
-        // ⚠️ The row has no label, so the cursor's fill is the only sign the cursor is here.
-        draw_cursor_cell(c, hex2(s.sliceIndex), x + 175, ty, cur && s.cursorCol == 0, t.textValue, t);
-        if (s.sliceMethod == SLICE_TRANSIENT || s.sliceMethod == SLICE_MANUAL) {
-            // How many the index can reach. DIVIDE draws none: its BY cell above says it.
-            const int total = s.slice_index_ceiling() + 1;
-            c.draw_text("/" + hex2(total), x + 175 + 2 * CHAR_W, ty, t.textParam, CHAR_SPACING, FONT_SCALE);
+    
+        {   // Row 10 — the slice METHOD, and its one parameter (SENS or BY, depending)
+            const int  ry  = oy + content_y(10);
+            const bool cur = (s.cursorRow == 10);
+            const int ty = ry + TEXT_PADDING;
+            c.draw_text("SLICE", x + 10, ty, cur ? cursor_mark_ink(t) : t.textParam, CHAR_SPACING, FONT_SCALE);
+            draw_cursor_cell(c, at(slice_methods(), s.sliceMethod), x + 175, ty,
+                             cur && s.cursorCol == 0, t.textValue, t);
+            if (slice_has_parameter(s.sliceMethod)) {
+                const bool        onVal = (cur && s.cursorCol == 1);
+                const std::string lbl   = (s.sliceMethod == SLICE_TRANSIENT) ? "SENS" : "BY";
+                const std::string val   = hex2(s.sliceMethod == SLICE_TRANSIENT ? s.sliceSensitivity
+                                                                                : s.sliceDivisions);
+                c.draw_text(lbl, x + 335, ty, onVal ? cursor_mark_ink(t) : t.textParam, CHAR_SPACING, FONT_SCALE);
+                draw_cursor_cell(c, val, x + 410, ty, onVal, t.textValue, t);
+            }
         }
-        draw_cursor_cell(c, hex_padded(s.effective_slice_position(), 8), x + 335, ty, cur && s.cursorCol == 1,
-                         t.textValue, t);
-    }
-
-    draw_ops_row(c, x, oy + content_y(13), ops_row1(), s.cursorRow == 13, s.cursorCol, t);
-    draw_ops_row(c, x, oy + content_y(14), ops_row2(), s.cursorRow == 14, s.cursorCol, t);
-
-    {   // Row 16 — the FX row. Its VALUE cell is the one cell in the app with three vocabularies.
-        const int  ry  = oy + content_y(16);
-        const bool cur = (s.cursorRow == 16);
-        const int ty = ry + TEXT_PADDING;
-        c.draw_text("EFFECT", x + 10, ty, cur ? cursor_mark_ink(t) : t.textParam, CHAR_SPACING, FONT_SCALE);
-        draw_cursor_cell(c, at(fx_types(), s.fxType), x + 180, ty, cur && s.cursorCol == 0,
-                         t.textValue, t);
-
-        const bool onVal = (cur && s.cursorCol == 1);
-        if (s.fxType == FX_EQ) {
-            // An EQ slot, drawn as every other EQ cell is: the number plus the ">" for its editor.
-            draw_eq_cell(c, x + 290, ty, s.fxEqSlot, onVal, t);
-        } else {
-            const std::string val = (s.fxType == FX_SYNC) ? at(sync_types(), s.syncType)
-                                                          : hex2(s.fxValue);
-            draw_cursor_cell(c, val, x + 290, ty, onVal, t.textValue, t);
+    
+        if (s.sliceMethod != SLICE_OFF) {   // Row 11 — which slice, and where it starts
+            const int  ry  = oy + content_y(11);
+            const bool cur = (s.cursorRow == 11);
+            const int ty = ry + TEXT_PADDING;
+    
+            // ⚠️ The row has no label, so the cursor's fill is the only sign the cursor is here.
+            draw_cursor_cell(c, hex2(s.sliceIndex), x + 175, ty, cur && s.cursorCol == 0, t.textValue, t);
+            if (s.sliceMethod == SLICE_TRANSIENT || s.sliceMethod == SLICE_MANUAL) {
+                // How many the index can reach. DIVIDE draws none: its BY cell above says it.
+                const int total = s.slice_index_ceiling() + 1;
+                c.draw_text("/" + hex2(total), x + 175 + 2 * CHAR_W, ty, t.textParam, CHAR_SPACING, FONT_SCALE);
+            }
+            draw_cursor_cell(c, hex_padded(s.effective_slice_position(), 8), x + 335, ty, cur && s.cursorCol == 1,
+                             t.textValue, t);
         }
-        draw_cursor_cell(c, "APPLY", x + 440, ty, cur && s.cursorCol == 2, t.textValue, t);
-    }
+    
+        draw_ops_row(c, x, oy + content_y(13), ops_row1(), s.cursorRow == 13, s.cursorCol, t);
+        draw_ops_row(c, x, oy + content_y(14), ops_row2(), s.cursorRow == 14, s.cursorCol, t);
+    
+        {   // Row 16 — the FX row. Its VALUE cell is the one cell in the app with three vocabularies.
+            const int  ry  = oy + content_y(16);
+            const bool cur = (s.cursorRow == 16);
+            const int ty = ry + TEXT_PADDING;
+            c.draw_text("EFFECT", x + 10, ty, cur ? cursor_mark_ink(t) : t.textParam, CHAR_SPACING, FONT_SCALE);
+            draw_cursor_cell(c, at(fx_types(), s.fxType), x + 180, ty, cur && s.cursorCol == 0,
+                             t.textValue, t);
+    
+            const bool onVal = (cur && s.cursorCol == 1);
+            if (s.fxType == FX_EQ) {
+                // An EQ slot, drawn as every other EQ cell is: the number plus the ">" for its editor.
+                draw_eq_cell(c, x + 290, ty, s.fxEqSlot, onVal, t);
+            } else {
+                const std::string val = (s.fxType == FX_SYNC) ? at(sync_types(), s.syncType)
+                                                              : hex2(s.fxValue);
+                draw_cursor_cell(c, val, x + 290, ty, onVal, t.textValue, t);
+            }
+            draw_cursor_cell(c, "APPLY", x + 440, ty, cur && s.cursorCol == 2, t.textValue, t);
+        }
+    
+        {   // Row 18 — NAME. One cell, and no column: the row and the cell are the same thing.
+            const int  ry  = oy + content_y(18);
+            const bool cur = (s.cursorRow == 18);
+            const int ty = ry + TEXT_PADDING;
+            c.draw_text("NAME", x + 10, ty, cur ? cursor_mark_ink(t) : t.textParam, CHAR_SPACING, FONT_SCALE);
+            draw_cursor_cell(c, s.sampleName, x + 120, ty, cur, t.textValue, t);
+        }
+    
+        {   // Row 19 — LOAD / SAVE / OVERWRITE, and CHOP when there are slices to chop
+            const int  ry  = oy + content_y(19);
+            const bool cur = (s.cursorRow == 19);
+            const int ty = ry + TEXT_PADDING;
+            auto btn = [&](const char* text, int bx, int i) {
+                draw_cursor_cell(c, text, bx, ty, cur && s.cursorCol == i, t.textValue, t);
+            };
+            btn("LOAD",      x + 120, 0);
+            btn("SAVE",      x + 230, 1);
+            btn("OVERWRITE", x + 335, 2);
+            if (s.sliceMethod != SLICE_OFF) btn("CHOP", x + 510, 3);
+        }
 
-    {   // Row 18 — NAME. One cell, and no column: the row and the cell are the same thing.
-        const int  ry  = oy + content_y(18);
-        const bool cur = (s.cursorRow == 18);
-        const int ty = ry + TEXT_PADDING;
-        c.draw_text("NAME", x + 10, ty, cur ? cursor_mark_ink(t) : t.textParam, CHAR_SPACING, FONT_SCALE);
-        draw_cursor_cell(c, s.sampleName, x + 120, ty, cur, t.textValue, t);
-    }
+    }   // granularFocus
 
-    {   // Row 19 — LOAD / SAVE / OVERWRITE, and CHOP when there are slices to chop
-        const int  ry  = oy + content_y(19);
-        const bool cur = (s.cursorRow == 19);
-        const int ty = ry + TEXT_PADDING;
-        auto btn = [&](const char* text, int bx, int i) {
-            draw_cursor_cell(c, text, bx, ty, cur && s.cursorCol == i, t.textValue, t);
-        };
-        btn("LOAD",      x + 120, 0);
-        btn("SAVE",      x + 230, 1);
-        btn("OVERWRITE", x + 335, 2);
-        if (s.sliceMethod != SLICE_OFF) btn("CHOP", x + 510, 3);
-    }
-
-    // The granular block, scrolled with the page (pageScrollPx): two rows peek under the sample
-    // rows, seven fill the screen once the block takes the cursor.
-    draw_moonset_granular(c, x, oy + GRANULAR_Y, g, s.granularRow,
-                          s.granularColumn, s.granularTop, t);
-
+    draw_moonset_mod_window(c, s, g, t);
+    if (s.presetMenuOpen) draw_moonset_preset_menu(c, s, t);
     if (s.showConfirmClose) draw_confirm_dialog(c, x, y, t);
 }
 
@@ -654,93 +697,135 @@ void MoonsetModule::draw_waveform(Canvas& c, int x, int y, const MoonsetState& s
                    /*thickness=*/2);
     }
 
-    // ── Granular preview markers on the waveform (red, like the MOONSET page) ───────────────────
-    // Shows how GRAIN / ROAM / MOTION will read the current slice. The grain head is anchored at the
-    // start of the selected slice; `grain.position` then offsets the read head inside it:
-    // 0 = slice start, 128 = slice middle, 255 = slice end.
-    if (g && s.totalFrames > 0) {
-        const int   totalF = static_cast<int>(s.totalFrames);
-        auto        grain_x = [&](int pos01) {
-            return frame_x(static_cast<float>(pos01) / 255.0f * static_cast<float>(totalF));
+    // ── The granular visualizer: where and how the cloud reads the sample ───────────────────────
+    // Red = the cloud. Every line moves with GRAIN / ROAM / MOTION and the MOD rows, even at rest:
+    //   tall thick line ... the head: POS + ROAM + position LFO (the point the grains start from)
+    //   thin lines ........ one per grain, moving at its own speed (PITCH, JITTER, TAPESTOP, CHAOS);
+    //                       height = the window now (SHAPE of the grain), thin trace = its course left
+    //   "<" on a grain .... it plays backwards (REV)       hollow square ... a grain skipped (PROB)
+    //   top bracket ....... SPRAY (and a second one for CHAOS)   bottom bar ... ROAM range + its marker
+    //   white line ........ the dry sample (MIX under FF); text = what the cloud does right now
+    // Playing: the engine's real grain positions are drawn; at rest, the same logic is simulated.
+    if (g && g->master && s.totalFrames > 0) {
+        const float totalF = static_cast<float>(s.totalFrames);
+        auto nx = [&](float n) { return frame_x(std::clamp(n, 0.0f, 1.0f) * totalF); };
+        const Argb red = t.textGranular;
+
+        int64_t sliceStartF = 0, sliceEndF = s.totalFrames;
+        // Only when the tracker is really sounding a slice (SLICE FOLLOW). The slicing tool is a
+        // cutter, not a transport: TRANSIENT/DIVIDE/MANUAL never turn this on.
+        const int  readSlice = s.reading_slice_index();
+        const bool hasSlice  = readSlice >= 0;
+        if (hasSlice) {
+            // SLICE FOLLOW: while the tracker plays a slice, the cloud reads THAT slice. Paused, it
+            // reads the whole sample at GRAIN POSITION. The engine already resolves the note's slice
+            // in program.h; this keeps the drawing on the same one.
+            s.slice_bounds(readSlice, sliceStartF, sliceEndF);
+        }
+        const float lo = static_cast<float>(sliceStartF) / totalF;
+        const float hi = static_cast<float>(sliceEndF) / totalF;
+
+        s.preview.advance(*g, s.nowMs, lo, hi, hasSlice,
+                          totalF / static_cast<float>(std::max(s.sampleRate, 1)), 120.0f);
+        const GrainPreview& pv = s.preview;
+
+        auto inside = [&](float px) { return px >= static_cast<float>(wfLeft) && px <= static_cast<float>(wfRight); };
+        auto hline  = [&](float xa, float xb, int yy, int h) {   // clipped horizontal bar
+            const int l = std::max(static_cast<int>(std::min(xa, xb)), wfLeft);
+            const int r = std::min(static_cast<int>(std::max(xa, xb)), wfLast);
+            if (r > l) c.fill_rect(l, yy, r - l, h, red);
         };
 
-        // Slice bounds in 0..255 space (absolute sample position when no slice is active).
-        int64_t sliceStartF = 0, sliceEndF = totalF;
-        bool    hasSlice    = false;
-        if (s.sliceMethod != SLICE_OFF) {
-            if (s.sliceMethod == SLICE_DIVIDE && s.sliceDivisions > 0) {
-                sliceStartF = (static_cast<int64_t>(s.sliceIndex) * totalF) / s.sliceDivisions;
-                sliceEndF   = std::min((static_cast<int64_t>(s.sliceIndex + 1) * totalF) /
-                                       s.sliceDivisions, static_cast<int64_t>(totalF));
-            } else {
-                s.slice_bounds(s.sliceIndex, sliceStartF, sliceEndF);
-            }
-            hasSlice = true;
-        }
-        const int sliceStart01 = static_cast<int>(
-            static_cast<float>(sliceStartF) / totalF * 255.0f);
-        const int sliceEnd01   = static_cast<int>(
-            static_cast<float>(sliceEndF)   / totalF * 255.0f);
-        const int sliceSize01  = std::max(0, sliceEnd01 - sliceStart01);
-
-        // Effective grain position: anchored to slice start, moved by `grain.position`.
-        int effectiveGrain01 = g->grain.position;          // absolute when no slice
-        if (hasSlice && sliceSize01 > 0) {
-            effectiveGrain01 = sliceStart01 +
-                (static_cast<int>(static_cast<float>(g->grain.position) / 255.0f *
-                                   static_cast<float>(sliceSize01)));
-        }
-
-        // Slice bounds drawn in red (start + end lines + fill between).
+        // Slice bounds: the zone the grains read in (and loop inside).
         if (hasSlice) {
-            const float sx = grain_x(sliceStart01);
-            const float ex = grain_x(sliceEnd01);
-            if (sx >= static_cast<float>(wfLeft) && sx <= static_cast<float>(wfRight))
-                v_line(c, static_cast<int>(sx), y, WAVEFORM_H, t.textGranular);
-            if (ex >= static_cast<float>(wfLeft) && ex <= static_cast<float>(wfRight))
-                v_line(c, static_cast<int>(ex), y, WAVEFORM_H, t.textGranular);
-            c.fill_rect(static_cast<int>(sx), y + WAVEFORM_H - 4,
-                        std::max(1, static_cast<int>(ex - sx)), 4, t.textGranular);
+            const float sx = nx(lo), ex = nx(hi);
+            if (inside(sx)) v_line(c, static_cast<int>(sx), y, WAVEFORM_H, red);
+            if (inside(ex)) v_line(c, std::min(static_cast<int>(ex), wfLast), y, WAVEFORM_H, red);
+            hline(sx, ex, y + WAVEFORM_H - 3, 3);
         }
 
-        // GRAIN head: solid red vertical line at the effective position.
-        if (g->grain.state) {
-            const float gx = grain_x(effectiveGrain01);
-            if (gx >= static_cast<float>(wfLeft) && gx <= static_cast<float>(wfRight))
-                v_line(c, static_cast<int>(gx), y, WAVEFORM_H, t.textGranular);
-        }
-
-        // ROAM range: red horizontal bar at the bottom, from head toward slice end.
+        // ROAM: the range the head travels, and where it is on it right now.
         if (g->roam.state) {
-            const int roamEnd01 = std::min(effectiveGrain01 + g->roam.range,
-                                           hasSlice ? sliceEnd01 : 255);
-            const float lx      = grain_x(effectiveGrain01);
-            const float rx      = grain_x(roamEnd01);
-            const int   left    = static_cast<int>(lx);
-            const int   right   = static_cast<int>(rx);
-            if (right > left && right >= wfLeft && left <= wfRight) {
-                const int cl = std::max(left, wfLeft);
-                const int cr = std::min(right, wfLast);
-                c.fill_rect(cl, y + WAVEFORM_H - 3, cr - cl, 3, t.textGranular);
+            const float ax = nx(pv.anchor), rx = nx(pv.rangeEnd);
+            hline(ax, rx, y + WAVEFORM_H - 10, 2);
+            if (inside(ax)) v_line(c, static_cast<int>(ax), y + WAVEFORM_H - 13, 8, red);
+            if (g->roam.tlock > 0) {
+                const float tx = nx(static_cast<float>(g->roam.target) / 255.0f);
+                if (inside(tx)) v_line(c, static_cast<int>(tx), y + WAVEFORM_H - 20, 6, red);
             }
         }
 
-        // GRAIN spray: red vertical lines left/right of the effective head.
-        if (g->grain.spray > 0) {
-            const int sprayL = std::max(effectiveGrain01 - g->grain.spray, hasSlice ? sliceStart01 : 0);
-            const int sprayR = std::min(effectiveGrain01 + g->grain.spray, hasSlice ? sliceEnd01 : 255);
-            const float lx   = grain_x(sprayL);
-            const float rx   = grain_x(sprayR);
-            if (lx >= static_cast<float>(wfLeft) && lx <= static_cast<float>(wfRight))
-                v_line(c, static_cast<int>(lx), y, WAVEFORM_H, t.textGranular);
-            if (rx >= static_cast<float>(wfLeft) && rx <= static_cast<float>(wfRight))
-                v_line(c, static_cast<int>(rx), y, WAVEFORM_H, t.textGranular);
+        // SPRAY (and CHAOS): the brackets the grains start inside.
+        if (g->grain.state) {
+            const float hl = nx(pv.head - pv.sprayHalf), hr = nx(pv.head + pv.sprayHalf);
+            if (pv.sprayHalf > 0.0f) {
+                hline(hl, hr, y + 3, 1);
+                if (inside(hl)) v_line(c, static_cast<int>(hl), y + 3, 6, red);
+                if (inside(hr)) v_line(c, std::min(static_cast<int>(hr), wfLast), y + 3, 6, red);
+            }
+            if (pv.chaosHalf > 0.0f)
+                hline(nx(pv.head - pv.chaosHalf), nx(pv.head + pv.chaosHalf), y + 11, 1);
         }
 
-        // MOTION active: red block at the waveform's top-right corner.
-        if (g->motion.state) {
-            c.fill_rect(wfRight - 4, y, 4, 8, t.textGranular);
+        // The grains.
+        if (g->grain.state) {
+            // Engine grain positions (accurate during playback) on top of the animated simulation:
+            // the simulation runs in every case, so the three columns stay animated while playing.
+            if (s.grainHeadCount > 0) {
+                const int n = std::min(s.grainHeadCount, MoonsetState::GRAIN_HEADS_MAX);
+                for (int i = 0; i < n; ++i) {
+                    const float px = nx(s.grainHeads[i]);
+                    if (inside(px)) v_line(c, std::min(static_cast<int>(px), wfLast), midY - 24, 48, red);
+                }
+            }
+            // Animated simulation (runs at rest AND during playback):
+            for (const auto& gr : pv.g) {
+                if (!gr.on) continue;
+                hline(nx(gr.pos), nx(GrainPreview::end_pos(gr)), midY, 1);   // its course left
+            }
+            for (const auto& gr : pv.g) {
+                if (!gr.on) continue;
+                const float px = nx(gr.pos);
+                if (!inside(px)) continue;
+                const int   x  = std::min(static_cast<int>(px), wfLast);
+                const int   lh = 8 + static_cast<int>(static_cast<float>(WAVEFORM_H - 24) * GrainPreview::window_gain(gr));
+                const int   ty = midY - lh / 2;
+                v_line(c, x, ty, lh, red);
+                if (gr.rev) {          // "<" : reads backwards
+                    c.fill_rect(x + 2, ty - 5, 1, 1, red); c.fill_rect(x + 1, ty - 4, 1, 1, red);
+                    c.fill_rect(x,     ty - 3, 1, 1, red); c.fill_rect(x + 1, ty - 2, 1, 1, red);
+                    c.fill_rect(x + 2, ty - 1, 1, 1, red);
+                }
+            }
+            // The head itself.
+            const float hx = nx(pv.head);
+            if (inside(hx)) v_line(c, std::min(static_cast<int>(hx), wfLast), y, WAVEFORM_H, red, 2);
+
+            // A skipped grain (PROB): a hollow square where it would have been, for a moment.
+            if (s.nowMs - pv.lastSkipMs < 180) {
+                const float kx = nx(pv.lastSkipAt);
+                if (inside(kx)) {
+                    const int x0 = static_cast<int>(kx) - 3, y0 = midY - 3;
+                    c.fill_rect(x0, y0, 7, 1, red); c.fill_rect(x0, y0 + 6, 7, 1, red);
+                    c.fill_rect(x0, y0, 1, 7, red); c.fill_rect(x0 + 6, y0, 1, 7, red);
+                }
+            }
         }
+
+        // The dry sample (MIX under FF): a white line at normal speed.
+        const float mixN   = static_cast<float>(std::clamp(g->grain.mix, 0, 255)) / 255.0f;
+        const float dryGn  = g->grain.state ? std::min(1.0f, 2.0f * (1.0f - mixN)) : 1.0f;
+        if (dryGn > 0.01f) {
+            const float dx = nx(pv.dryPos);
+            if (inside(dx)) v_line(c, std::min(static_cast<int>(dx), wfLast), y + WAVEFORM_H - 40, 40,
+                                   t.vizWave, dryGn > 0.5f ? 2 : 1);
+        }
+
+        // What the cloud is doing, in numbers.
+        char info[64];
+        std::snprintf(info, sizeof info, "%dHZ %dMS %+.1fST N%d", static_cast<int>(pv.densHz),
+                      static_cast<int>(pv.sizeMs), pv.semis, pv.count);
+        c.draw_text(info, wfLeft + 4, y + 16, red, CHAR_SPACING, FONT_SCALE);
     }
 }
 
@@ -801,7 +886,8 @@ CursorContext MoonsetModule::cursor_context(const MoonsetState& s) const {
         case 5:
             switch (s.cursorCol) {
                 case 0: return cc::toggle_binary(s.recordActive);   // REC toggle
-                case 1: {
+                case 1: return cc::none();                          // REC WAV: an action, not a value
+                case 2: {
                     // ⚠️ DEFAULT is the empty choice and stays IN the list, so the cycle can come back
                     // to it — otherwise a device, once picked, could never be cleared.
                     std::vector<std::string> devices{"DEFAULT"};
@@ -809,8 +895,7 @@ CursorContext MoonsetModule::cursor_context(const MoonsetState& s) const {
                     return cc::toggle_ternary(s.recordInputDevice.empty() ? "DEFAULT" : s.recordInputDevice,
                                               devices);
                 }
-                case 2: return cc::toggle_binary(rec_viz().menuOpen());
-                case 3: return cc::toggle_binary(s.loopPreview);            // LOOP
+                case 3: return cc::toggle_binary(rec_viz().menuOpen());
                 default: return cc::none();
             }
 
@@ -910,7 +995,7 @@ MoonsetInputResult MoonsetModule::handle_input(MoonsetState& s,
         case 5:
             switch (s.cursorCol) {
                 case 0: s.recordActive = (v == 1);  r.modified = true; break;   // REC toggle via arrow keys
-                case 1: {
+                case 2: {
                     // Cycle through input device names; "DEFAULT"/index 0 clears.
                     if (v <= 0 || v > static_cast<int>(s.audioInputDevices.size()))
                         s.recordInputDevice.clear();
@@ -919,13 +1004,20 @@ MoonsetInputResult MoonsetModule::handle_input(MoonsetState& s,
                     r.modified = true;
                     break;
                 }
-                case 3: s.loopPreview = (v == 1); r.modified = true; break;
                 default: break;
             }
             break;
 
         case 8:
-            if (s.cursorCol == 2) { s.loopPreview = (v == 1); r.modified = true; }
+            // LOOP: a plain binary cell. Its value only changes when the requested one differs, so a
+            // held arrow does not keep reporting an edit it did not make.
+            if (s.cursorCol == 2) {
+                const bool nv = (v == 1);
+                if (nv != s.loopPreview) {
+                    s.loopPreview = nv;
+                    r.modified    = true;
+                }
+            }
             break;
 
         case 10:
@@ -1127,19 +1219,25 @@ namespace {
 
 const char* const GRAIN_LABELS[] = {
     "STATE", "POSITION", "SIZE", "DENSITY", "SPRAY", "PITCH", "TIME",
-    "WINDOW", "SPREAD", "G ATTACK", "G DECAY", "G PAN", "P JITTER", "MIX",
+    "WINDOW", "SPREAD", "G ATTACK", "G DECAY", "G PAN", "P JITTER", "STRETCH", "MIX",
 };
 const char* const ROAM_LABELS[] = {
     "STATE", "MODE", "RANGE", "WANDER", "SPEED", "SMOOTH", "BPM", "FREEZE",
-    "D CURVE", "DIR", "CURVE", "DRIFT", "STEPRATE", "INERTIA", "TARGET", "T LOCK",
+    "D CURVE", "DIR", "CURVE", "DRIFT", "STEPRATE", "INERTIA", "TARGET", "T LOCK", "MIX",
 };
 const char* const MOTION_LABELS[] = {
     "STATE", "JUMP", "HOLD", "REV", "ELASTIC", "CHAOS", "STUTTER", "TAPESTOP",
-    "TUNNEL", "PROB", "LFO DPTH", "STEPGLD", "TRIGRATE", "SPIN", "FACTOR",
+    "TUNNEL", "PROB", "LFO DPTH", "STEPGLD", "TRIGRATE", "SPIN", "FACTOR", "MIX",
 };
 constexpr int GRAIN_ROWS  = static_cast<int>(sizeof(GRAIN_LABELS) / sizeof(GRAIN_LABELS[0]));
 constexpr int ROAM_ROWS   = static_cast<int>(sizeof(ROAM_LABELS) / sizeof(ROAM_LABELS[0]));
 constexpr int MOTION_ROWS = static_cast<int>(sizeof(MOTION_LABELS) / sizeof(MOTION_LABELS[0]));
+
+// MIX is one parameter shown at the bottom of all three columns: the same cell, copied.
+bool is_mix_row(int col, int line) {
+    return (col == 0 && line == GRAIN_ROWS - 1) || (col == 1 && line == ROAM_ROWS - 1) ||
+           (col == 2 && line == MOTION_ROWS - 1);
+}
 
 enum class GK { BOOL, ENUM, BYTE };
 
@@ -1151,7 +1249,7 @@ struct GRowRef {
 
 const char* const TIME_OPTS[]   = {"HZ", "BPM"};
 const char* const WINDOW_OPTS[] = {"HANN", "TRI", "RECT", "GAUSS", "EXPO"};
-const char* const MODE_OPTS[]   = {"BOUNCE", "LOOP", "DRIFT", "RANDOM"};
+const char* const MODE_OPTS[]   = {"BOUNCE", "LOOP", "DRIFT", "RANDOM", "SLC"};
 const char* const FREEZE_OPTS[] = {"OFF", "ON"};
 const char* const DCURVE_OPTS[] = {"LIN", "EASE", "EXP", "SINE"};
 const char* const DIR_OPTS[]    = {"FWD", "REV", "RND"};
@@ -1227,7 +1325,8 @@ GRowRef row_ref(songcore::Instrument::GranularParams& g, int col, int line) {
                 case 10: r.value = &b.decay; break;
                 case 11: r.value = &b.pan; break;
                 case 12: r.value = &b.jitter; break;
-                case 13: r.value = &b.mix; break;
+                case 13: r.value = &b.stretch; break;
+                case 14: r.value = &b.mix; break;
                 default: break;
             }
             break;
@@ -1235,7 +1334,7 @@ GRowRef row_ref(songcore::Instrument::GranularParams& g, int col, int line) {
         case 1: {
             auto& b = g.roam;
             switch (line) {
-                case 1:  r.kind = GK::ENUM; r.value = &b.mode; r.enumCount = 4; break;
+                case 1:  r.kind = GK::ENUM; r.value = &b.mode; r.enumCount = 5; break;
                 case 2:  r.value = &b.range; break;
                 case 3:  r.value = &b.wander; break;
                 case 4:
@@ -1258,6 +1357,7 @@ GRowRef row_ref(songcore::Instrument::GranularParams& g, int col, int line) {
                 case 13: r.value = &b.inertia; break;
                 case 14: r.value = &b.target; break;
                 case 15: r.kind = GK::ENUM; r.value = &b.tlock; r.enumCount = 2; break;
+                case 16: r.value = &g.roam.mix; break;   // MIX: own mix
                 default: break;
             }
             break;
@@ -1279,6 +1379,7 @@ GRowRef row_ref(songcore::Instrument::GranularParams& g, int col, int line) {
                 case 12: r.value = &b.trigger; break;
                 case 13: r.value = &b.spin; break;
                 case 14: r.value = &b.factor; break;
+                case 15: r.value = &g.motion.mix; break;   // MIX: own mix
                 default: break;
             }
             break;
@@ -1288,18 +1389,29 @@ GRowRef row_ref(songcore::Instrument::GranularParams& g, int col, int line) {
 }
 
 int default_value(int col, int line) {
+    // A+B: 0 everywhere, except the three values that have no musical meaning at 0.
     if (col == 0) {
-        if (line == 2) return 0x40;   // SIZE
-        if (line == 3) return 0x80;   // DENSITY
-        if (line == 5) return 0x80;   // PITCH
-    } else if (col == 1) {
-        if (line == 4) return 0x80;   // SPEED
-        if (line == 5) return 0x40;   // SMOOTH
-        if (line == 6) return 0x80;   // BPM
-    } else if (col == 2) {
-        if (line == 6) return 1;      // STUTTER
+        if (line == 3)  return 0x80;   // DENSITY: one grain per millisecond
+        if (line == 5)  return 0x80;   // PITCH: centre (unison)
+        if (line == 14) return 0xFF;   // MIX: the cloud alone
     }
     return 0;
+}
+
+// A+UP / A+DOWN: ten at a time, except the cells that need a fine touch (one at a time, with the
+// held-button repeat for the long scroll).
+int granular_large_step(int col, int line) {
+    if (col == 0) {
+        switch (line) {
+            case 5:  // PITCH
+            case 11: // G PAN
+            case 12: // P JITTER
+            case 14: // MIX
+                return 1;
+            default: break;
+        }
+    }
+    return 10;
 }
 
 std::string fmt_pct(int v) {
@@ -1337,17 +1449,34 @@ std::string div_name(int index) {
 
 int moonset_granular_row_count(int col) {
     switch (col) {
-        case 0:  return GRAIN_ROWS;
+        case 0:  return GRAIN_ROWS + 1;   // + the PRESET cell
         case 1:  return ROAM_ROWS;
         case 2:  return MOTION_ROWS;
         default: return 0;
     }
 }
 
-std::string moonset_granular_value(const songcore::Instrument::GranularParams& g, int col, int line) {
+int moonset_preset_row() { return GRAIN_ROWS; }
+
+std::string moonset_granular_value(const songcore::Instrument::GranularParams& g, int col, int line, bool sliceReading) {
     if (line == 0) {
         const bool on = (col == 0) ? g.grain.state : (col == 1) ? g.roam.state : g.motion.state;
-        return on ? "ON" : "OFF";
+        std::string v = on ? "ON" : "OFF";
+        // Master/shared indicator: STATE and MIX are the cloud's master.
+        if (col == 0) v += " M";
+        return v;
+    }
+
+    // POSITION stays editable while slices are read: it is relative to the slice window, and the
+    // head has to move for SPRAY / ROAM / MOTION to travel with it.
+
+    if (is_mix_row(col, line)) {   // per-column MIX cell
+        const int v = (col == 0) ? std::clamp(g.grain.mix, 0, 255)
+                    : (col == 1) ? std::clamp(g.roam.mix, 0, 255)
+                                 : std::clamp(g.motion.mix, 0, 255);
+        std::string s = v == 0 ? "DRY" : (v == 255 ? "WET" : fmt_pct(v));
+        s += " M";
+        return s;
     }
 
     const GRowRef r = row_ref(const_cast<songcore::Instrument::GranularParams&>(g), col, line);
@@ -1371,6 +1500,8 @@ std::string moonset_granular_value(const songcore::Instrument::GranularParams& g
                 case 5:  return fmt_semis(v);
                 case 11: return fmt_signed_pct(v);
                 case 12: return fmt_ct(v);
+                case 13: return fmt_pct(v);   // STRETCH
+                case 14: return v == 0 ? "DRY" : (v == 255 ? "WET" : fmt_pct(v));
                 default: return fmt_pct(v);
             }
         case 1:
@@ -1385,16 +1516,21 @@ std::string moonset_granular_value(const songcore::Instrument::GranularParams& g
     }
 }
 
-CursorContext moonset_granular_context(const songcore::Instrument::GranularParams& g, int col, int line) {
+CursorContext moonset_granular_context(const songcore::Instrument::GranularParams& g, int col, int line, bool sliceReading) {
     if (line == 0) {
         const bool on = (col == 0) ? g.grain.state : (col == 1) ? g.roam.state : g.motion.state;
         return cc::toggle_binary(on);
     }
 
+    // POSITION stays editable while slices are read (it is relative to the slice window).
+
     const GRowRef r = row_ref(const_cast<songcore::Instrument::GranularParams&>(g), col, line);
     if (!r.value) return cc::none();
     if (r.kind == GK::ENUM) return cc::index_cycle(*r.value, r.enumCount);
-    return cc::plain_byte(*r.value, default_value(col, line));
+
+    CursorContext c = cc::plain_byte(*r.value, default_value(col, line));
+    c.largeStep = granular_large_step(col, line);
+    return c;
 }
 
 bool moonset_granular_apply(songcore::Instrument::GranularParams& g, int col, int line, int value) {
@@ -1418,21 +1554,34 @@ bool moonset_granular_apply(songcore::Instrument::GranularParams& g, int col, in
 
 void draw_moonset_granular(Canvas& c, int x, int gy,
                            const songcore::Instrument::GranularParams& g,
-                           int cursorLine, int cursorCol, int top, const Theme& t) {
+                           int cursorLine, int cursorCol, int top, const Theme& t,
+                           bool sliceReading, const MoonsetState* sp) {
     constexpr int FS  = 2;    // the block is denser than the sample rows
     constexpr int SP  = 1;
     constexpr int GCW = 5 * FS + SP;
     constexpr int GCOL = 214;
-    constexpr int RH   = 18;
-    constexpr int GAP  = 22;  // title → first row
+    constexpr int RH   = 13;  // compact: the panel shares the screen with the waveform
+    constexpr int GAP  = 14;  // title → first row
 
     static const char* const COLS[3] = {"GRAIN", "ROAM", "MOTION"};
-    const int counts[3] = {GRAIN_ROWS, ROAM_ROWS, MOTION_ROWS};
+    const int counts[3] = {GRAIN_ROWS + 1, ROAM_ROWS, MOTION_ROWS};   // GRAIN: + the PRESET cell
 
     for (int ci = 0; ci < 3; ++ci) {
         const int  cx        = x + 7 + ci * GCOL;
         const bool activeCol = (ci == cursorCol);
         c.draw_text(COLS[ci], cx + 8, gy, activeCol ? t.textTitle : t.textParam, SP, FS);
+
+        // The PRESET cell rides in the column's title line — small, so the GRAIN parameters keep their
+        // place. It still walks as the column's last row; A on it opens the SAVE / LOAD popup.
+        if (ci == 0) {
+            const std::string cell = "PRST >";
+            const int         pw   = Canvas::text_width(cell, SP, FS);
+            const int         px   = cx + GCOL - pw - 10;
+            const bool        on   = activeCol && cursorLine == GRAIN_ROWS;
+            if (on)
+                c.fill_rect(px - SP, gy - 1, pw + 2 * SP, 5 * FS + 2, t.rowCursor);
+            c.draw_text(cell, px, gy, on ? cursor_cell_ink(t) : t.textValue, SP, FS);
+        }
 
         const int count = counts[ci];
         int first = std::clamp(top, 0, std::max(0, count - MoonsetState::GRANULAR_VISIBLE));
@@ -1449,15 +1598,41 @@ void draw_moonset_granular(Canvas& c, int x, int gy,
             const int  ty   = gy + GAP + i * RH;
             const bool on   = activeCol && (line == cursorLine);
 
+            // The PRESET cell is drawn in the title line (above): its slot at the bottom stays empty.
+            // ⚠️ Keep it out of that slot, or the panel shows it twice.
+            if (ci == 0 && line == GRAIN_ROWS) continue;
+
             c.draw_text(label_for(ci, line), cx + 8, ty,
                         on ? cursor_mark_ink(t) : t.textParam, SP, FS);
 
-            const std::string val = moonset_granular_value(g, ci, line);
+            std::string val = moonset_granular_value(g, ci, line, sliceReading);
+            if (ci == 0 && line == 1 && sp && sp->trackerSliceActive) {
+                val = "SLC " + std::to_string(sp->trackerSliceDisplay + 1);
+            }
             const int vx = cx + 8 + 9 * GCW;
             if (on)
                 c.fill_rect(vx - SP, ty - 2,
                             Canvas::text_width(val, SP, FS) + 2 * SP, 5 * FS + 4, t.rowCursor);
             c.draw_text(val, vx, ty, on ? cursor_cell_ink(t) : t.textValue, SP, FS);
+
+            // Blinking red square for any cell that carries a live LFO/RANDOM/BUS modulator.
+            if (sp) {
+                const int tgt = moonset_granular_target(ci, line);
+                if (tgt != 0) {
+                    for (int k = 0; k < pt::GRAN_MODS; ++k) {
+                        if (g.mods[k].target != tgt || g.mods[k].src == pt::GS_NONE) continue;
+                        const float rateByte = (float)std::clamp(g.mods[k].rate, 0, 255) / 255.0f;
+                        const float hz = 0.05f * std::pow(400.0f, rateByte);
+                        const float ph = (float)(sp->nowMs % 100000) * 0.001f * hz;
+                        const bool on = (ph - std::floor(ph)) < 0.5f;
+                        if (on) {
+                            const int sqX = vx + (int)Canvas::text_width(val, SP, FS) + 4;
+                            c.fill_rect(sqX, ty + 2, 4, 4, t.textGranular);
+                        }
+                        break;
+                    }
+                }
+            }
         }
     }
 
@@ -1469,6 +1644,527 @@ void draw_moonset_granular(Canvas& c, int x, int gy,
         c.draw_text("V", x + 618, gy + GAP + (MoonsetState::GRANULAR_VISIBLE - 1) * RH, t.textValue, SP, FS);
     if (first > 0)
         c.draw_text("^", x + 618, gy + GAP, t.textValue, SP, FS);
+}
+
+// ── The GRAIN column's PRESET popup ─────────────────────────────────────────────────────────────
+
+void draw_moonset_preset_menu(Canvas& c, const MoonsetState& s, const Theme& t) {
+    constexpr int W    = 200;
+    constexpr int PAD  = 14;
+    constexpr int ROWS = 2;   // SAVE / LOAD
+    const int H = PAD * 2 + ROW_HEIGHT * (ROWS + 1) + 8;
+    const int X = (DESIGN_W - W) / 2;
+    const int Y = (DESIGN_H - H) / 2;
+
+    c.reset_clip();
+    draw_modal_backdrop(c);
+    draw_modal_box(c, X, Y, W, H, t);
+
+    const std::string title = "GRAIN PRESET";
+    int ty = Y + PAD + TEXT_PADDING;
+    c.draw_text(title, X + (W - Canvas::text_width(title, CHAR_SPACING, FONT_SCALE)) / 2, ty,
+                t.textTitle, CHAR_SPACING, FONT_SCALE);
+    ty += ROW_HEIGHT * 2;
+
+    draw_cursor_cell(c, "SAVE", X + PAD, ty, s.presetMenuLine == 0, t.textValue, t);
+    ty += ROW_HEIGHT;
+    draw_cursor_cell(c, "LOAD", X + PAD, ty, s.presetMenuLine == 1, t.textValue, t);
+}
+
+}  // namespace pt::ui
+
+// ── The MOD window ──────────────────────────────────────────────────────────────────────────────
+// A on a GRAIN / ROAM / MOTION cell that has a target opens it. 3 or 4 lines edit one row of
+// granular.mods: SOURCE (NONE / LFO / RANDOM / BUS), AMOUNT, then RATE + SHAPE (LFO), RATE (RANDOM)
+// or BUS (BUS). Every edit is live: the dispatcher pushes the instrument after each one.
+
+namespace pt::ui {
+
+int moonset_granular_target(int col, int line) {
+    if (col == 0) {
+        switch (line) {
+            case 1:  return pt::GT_POSITION;
+            case 2:  return pt::GT_SIZE;
+            case 3:  return pt::GT_DENSITY;
+            case 4:  return pt::GT_SPRAY;
+            case 5:  return pt::GT_PITCH;
+            case 11: return pt::GT_STEREO;   // G PAN
+            case 12: return pt::GT_JITTER;   // P JITTER
+            case 13: return pt::GT_STRETCH;  // STRETCH
+            default: return 0;
+        }
+    }
+    if (col == 1) return line == 2 ? pt::GT_ROAM_RANGE : (line == 4 ? pt::GT_ROAM_SPEED : 0);
+    if (col == 2) {
+        switch (line) {
+            case 1:  return pt::GT_JUMP;
+            case 3:  return pt::GT_REV;
+            case 5:  return pt::GT_CHAOS;
+            default: return 0;
+        }
+    }
+    return 0;
+}
+
+namespace {
+
+int mod_line_count(int src) {
+    switch (src) {
+        case pt::GS_LFO:    return 4;
+        case pt::GS_RANDOM: return 3;
+        case pt::GS_BUS:    return 3;
+        default:            return 1;
+    }
+}
+// Extra line appended to every MOD window: SLICE FOLLOW toggle.
+int mod_total_lines(int src) { return mod_line_count(src) + 1; }
+int mod_slice_line(int src) { return mod_line_count(src); }
+
+std::string mod_bus_name(int b) {
+    b = std::clamp(b, 0, pt::GRAN_BUS_COUNT - 1);
+    if (b < 8) return "TRACK " + std::to_string(b + 1);
+    return std::string("MSG ") + static_cast<char>('A' + (b - 8));
+}
+
+}  // namespace
+
+bool moonset_mod_open(songcore::Instrument::GranularParams& g, MoonsetState& s) {
+    const int target = moonset_granular_target(s.granularColumn, s.granularRow);
+    if (target == 0) return false;
+    int slot = -1;
+    for (int k = 0; k < pt::GRAN_MODS && slot < 0; ++k)
+        if (g.mods[k].target == target) slot = k;                // this cell already has a row
+    for (int k = 0; k < pt::GRAN_MODS && slot < 0; ++k)
+        if (g.mods[k].src == pt::GS_NONE) slot = k;              // else the first one doing nothing
+    if (slot < 0) return false;
+    g.mods[slot].target = target;                                // src NONE: it still sounds like before
+    s.modSlot = slot;
+    s.modLine = 0;
+    s.modOpen = true;
+    return true;
+}
+
+void moonset_mod_move(const songcore::Instrument::GranularParams& g, MoonsetState& s, int dir) {
+    const int n = mod_total_lines(g.mods[std::clamp(s.modSlot, 0, pt::GRAN_MODS - 1)].src);
+    s.modLine = std::clamp(s.modLine + dir, 0, n - 1);
+}
+
+bool moonset_mod_edit(songcore::Instrument::GranularParams& g, MoonsetState& s, int delta, bool reset) {
+    auto& m = g.mods[std::clamp(s.modSlot, 0, pt::GRAN_MODS - 1)];
+    const auto before = m;
+    auto wrap = [](int v, int n) { return ((v % n) + n) % n; };
+
+    const int baseLines = mod_line_count(m.src);
+    if (s.modLine == baseLines) {   // SLICE FOLLOW toggle line
+        bool nv = s.sliceFollow;
+        if (reset) nv = false;
+        else if (delta > 0) nv = true;
+        else if (delta < 0) nv = false;
+        else nv = !nv;
+        if (nv == s.sliceFollow) {
+            s.modLine = std::min(s.modLine, mod_total_lines(m.src) - 1);
+            return false;
+        }
+        s.sliceFollow = nv;
+        s.modLine = std::min(s.modLine, mod_total_lines(m.src) - 1);
+        return true;
+    }
+
+    switch (s.modLine) {
+        case 0:
+            m.src = reset ? pt::GS_NONE : wrap(m.src + (delta > 0 ? 1 : -1), pt::GS_COUNT);
+            break;
+        case 1:
+            m.amount = reset ? 0x80 : std::clamp(m.amount + delta, 0, 255);
+            break;
+        case 2:
+            if (m.src == pt::GS_BUS)
+                m.bus = reset ? 0 : wrap(m.bus + (delta > 0 ? 1 : -1), pt::GRAN_BUS_COUNT);
+            else
+                m.rate = reset ? 0x80 : std::clamp(m.rate + delta, 0, 255);
+            break;
+        case 3:
+            m.shape = reset ? 0 : wrap(m.shape + (delta > 0 ? 1 : -1), pt::GL_COUNT);
+            break;
+        default: break;
+    }
+    s.modLine = std::min(s.modLine, mod_total_lines(m.src) - 1);   // a shorter source drops the lines below
+    return !(m == before);
+}
+
+void draw_moonset_mod_window(Canvas& c, const MoonsetState& s, const songcore::Instrument::GranularParams& g,
+                             const Theme& t) {
+    if (!s.modOpen || !s.granularFocus) return;
+    const auto& m = g.mods[std::clamp(s.modSlot, 0, pt::GRAN_MODS - 1)];
+
+    constexpr int W = 330, PAD = 14, LX = PAD, VX = 150, VIZ_H = 54;
+    const int lines = mod_total_lines(m.src);
+    const int H = PAD * 2 + ROW_HEIGHT * (lines + 2) + VIZ_H + 8;
+    const int X = (DESIGN_W - W) / 2, Y = (DESIGN_H - H) / 2;
+
+    c.reset_clip();
+    draw_modal_backdrop(c);
+    draw_modal_box(c, X, Y, W, H, t);
+
+    static const char* const SRC[]   = {"NONE", "LFO", "RANDOM", "BUS"};
+    static const char* const SHAPE[] = {"SINE", "TRI", "SAW", "SQUARE"};
+    static const char* const COLS[]  = {"GRAIN", "ROAM", "MOTION"};
+    const std::string title = std::string("MOD ") + COLS[std::clamp(s.granularColumn, 0, 2)] + " " +
+                              label_for(s.granularColumn, s.granularRow);
+    int ty = Y + PAD + TEXT_PADDING;
+    c.draw_text(title, X + (W - Canvas::text_width(title, CHAR_SPACING, FONT_SCALE)) / 2, ty,
+                t.textTitle, CHAR_SPACING, FONT_SCALE);
+    ty += ROW_HEIGHT * 2;
+
+    auto row = [&](int line, const char* label, const std::string& value) {
+        const bool cur = (s.modLine == line);
+        c.draw_text(label, X + LX, ty, cur ? cursor_mark_ink(t) : t.textParam, CHAR_SPACING, FONT_SCALE);
+        draw_cursor_cell(c, value, X + VX, ty, cur, t.textValue, t);
+        ty += ROW_HEIGHT;
+    };
+
+    char b[16];
+    row(0, "SOURCE", SRC[std::clamp(m.src, 0, pt::GS_COUNT - 1)]);
+    if (m.src != pt::GS_NONE) {
+        const int pct = (m.amount - 0x80) * 100 / 127;
+        std::snprintf(b, sizeof b, "%+d%%", std::clamp(pct, -100, 100));
+        row(1, "AMOUNT", b);
+        if (m.src == pt::GS_BUS) {
+            row(2, "BUS", mod_bus_name(m.bus));
+        } else {
+            std::snprintf(b, sizeof b, "%02X", m.rate & 0xFF);
+            row(2, "RATE", b);
+            if (m.src == pt::GS_LFO) row(3, "SHAPE", SHAPE[std::clamp(m.shape, 0, pt::GL_COUNT - 1)]);
+        }
+    }
+
+    // ── Live visualiser of the modulation source ───────────────────────────────────────────────
+    // SLICE FOLLOW toggle (MOD window on POSITION): follows slices sent by tracker notes.
+    {
+        const bool cur = (s.modLine == mod_slice_line(m.src));
+        c.draw_text("SLICE", X + LX, ty, cur ? cursor_mark_ink(t) : t.textParam, CHAR_SPACING, FONT_SCALE);
+        draw_cursor_cell(c, s.sliceFollow ? "FOLLOW ON" : "FOLLOW OFF", X + VX, ty, cur, t.textValue, t);
+        ty += ROW_HEIGHT;
+    }
+
+    const int vX = X + PAD;
+    const int vY = ty + 4;
+    const int vW = W - PAD * 2;
+    c.fill_rect(vX, vY, vW, VIZ_H, t.vizBackground);
+    // border
+    c.fill_rect(vX, vY, vW, 1, t.textParam);
+    c.fill_rect(vX, vY + VIZ_H - 1, vW, 1, t.textParam);
+    c.fill_rect(vX, vY, 1, VIZ_H, t.textParam);
+    c.fill_rect(vX + vW - 1, vY, 1, VIZ_H, t.textParam);
+
+    auto lfoWave = [](int shape, float ph) {
+        switch (shape) {
+            case pt::GL_TRI: return 1.0f - 4.0f * std::fabs(ph - 0.5f);
+            case pt::GL_SAW: return 2.0f * ph - 1.0f;
+            case pt::GL_SQR: return ph < 0.5f ? 1.0f : -1.0f;
+            default:         return std::sin(6.28318530718f * ph);
+        }
+    };
+
+    const float midY = vY + VIZ_H * 0.5f;
+    const float amp  = VIZ_H * 0.4f;
+
+    if (m.src == pt::GS_NONE) {
+        // Flat line: no modulation.
+        c.fill_rect(vX + 1, static_cast<int>(midY), vW - 2, 1, t.textValue);
+    } else if (m.src == pt::GS_BUS) {
+        // BUS: live sidechain level of the selected track (red bar), not an LFO.
+        const float level = std::clamp(s.modBusLevel, 0.0f, 1.0f);
+        const int barH = VIZ_H - 8;
+        const int barX = vX + 2;
+        const int barY = vY + 4;
+        c.fill_rect(barX, barY, vW - 4, barH, t.vizBackground);
+        // Filled portion (level).
+        const int fillW = (int)(level * (float)(vW - 4));
+        if (fillW > 0) c.fill_rect(barX, barY, fillW, barH, t.textGranular);
+        // Tick marks (mixer channels).
+        for (int i = 1; i < 8; ++i) {
+            const int tx = vX + (vW * i) / 8;
+            c.fill_rect(tx, vY, 1, VIZ_H, t.textParam);
+        }
+        // Label.
+        const std::string lbl = mod_bus_name(m.bus);
+        c.draw_text(lbl, vX + 4, vY + VIZ_H - 12, t.textValue, CHAR_SPACING, FONT_SCALE);
+    } else {
+        const float rateByte = (m.src == pt::GS_BUS) ? 0.5f : (float)std::clamp(m.rate, 0, 255) / 255.0f;
+        const float hz = 0.05f * std::pow(400.0f, rateByte);
+        const float phase0 = (float)(s.nowMs % 100000) * 0.001f * hz;
+        // Draw one or two cycles across the width.
+        const int cycles = std::max(1, (int)std::round(hz * 1.0f));
+        const int n = std::min(cycles, 6);
+        std::vector<float> pts;
+        pts.reserve((size_t)vW);
+        for (int i = 0; i < vW; ++i) {
+            float ph = phase0 + (float)i / (float)vW * (float)n;
+            ph -= std::floor(ph);
+            float v = 0.0f;
+            if (m.src == pt::GS_LFO) {
+                v = lfoWave(m.shape, ph);
+            } else if (m.src == pt::GS_RANDOM) {
+                // Square steps: quantise the phase into a few held values.
+                const int step = (int)(ph * 8.0f);
+                // deterministic-ish pseudo-random per step
+                uint32_t r = (uint32_t)(step * 7919 + (int)(phase0 * 1000.0f));
+                r ^= r << 13; r ^= r >> 17; r ^= r << 5;
+                v = ((float)(r >> 8) / 16777216.0f) * 2.0f - 1.0f;
+            } else { // BUS
+                v = (ph < 0.5f) ? 1.0f : -1.0f;
+            }
+            pts.push_back(v);
+        }
+        for (int i = 1; i < vW; ++i) {
+            int y0 = (int)(midY - pts[(size_t)i - 1] * amp);
+            int y1 = (int)(midY - pts[(size_t)i] * amp);
+            // vertical segment
+            int lo = std::min(y0, y1), hi = std::max(y0, y1);
+            for (int yy = lo; yy <= hi; ++yy)
+                if (yy >= vY && yy < vY + VIZ_H)
+                    c.fill_rect(vX + i, yy, 1, 1, t.textGranular);
+        }
+        // Centre line
+        c.fill_rect(vX + 1, static_cast<int>(midY), vW - 2, 1, t.textParam);
+    }
+}
+
+// ─── The STRETCH page ────────────────────────────────────────────────────────────────────────────
+// Raised by A on the GRAIN column's STRETCH cell. Unlike the TSTRETCH box of the SYNC FX (which bakes
+// the sample), this one is a live performance page: ORIGIN / DURATION / NEW BPM set the target length,
+// PITCH and GRAIN shape the cloud, MASTER is how much of that length the read head actually travels,
+// and the LFO / RANDOM row below modulates that MASTER. Nothing is applied — every edit pushes the
+// instrument, so a cloud that is already sounding follows at once.
+
+namespace {
+
+// ORIGIN, DURATION, NEW BPM, PITCH, GRAIN, MASTER — the modulation rows follow.
+constexpr int STRETCH_PAGE_BASE = 6;
+constexpr int STRETCH_PAGE_MOD  = STRETCH_PAGE_BASE;   // SOURCE, then AMOUNT / RATE or BUS / SHAPE
+
+// The ratio byte is exponential: 0.25x at 0, 1x at 0x80, 4x at 0xFF (pt::gran_stretch_ratio).
+int stretch_ratio_byte(double ratio) {
+    ratio = std::clamp(ratio, 0.25, 4.0);
+    const double b = std::log(ratio / 0.25) / std::log(16.0) * 255.0;
+    return std::clamp(static_cast<int>(std::lround(b)), 0, 255);
+}
+
+std::string stretch_ratio_text(int byte) {
+    const double r = pt::gran_stretch_ratio(byte);
+    char buf[16];
+    std::snprintf(buf, sizeof(buf), "%.2fX", r);
+    return std::string(buf);
+}
+
+// The granular.mods row this page edits: the one already targeting STRETCH, else a row doing nothing,
+// else −1 (the page still opens, without its modulation lines).
+int stretch_page_find_slot(const songcore::Instrument::GranularParams& g) {
+    for (int k = 0; k < pt::GRAN_MODS; ++k)
+        if (g.mods[k].target == pt::GT_STRETCH) return k;
+    for (int k = 0; k < pt::GRAN_MODS; ++k)
+        if (g.mods[k].src == pt::GS_NONE && g.mods[k].target == 0) return k;
+    return -1;
+}
+
+int stretch_page_line_count(const songcore::Instrument::GranularParams& g, const MoonsetState& s) {
+    int n = STRETCH_PAGE_BASE;
+    if (s.stretchModSlot < 0) return n;
+    const auto& m = g.mods[std::clamp(s.stretchModSlot, 0, pt::GRAN_MODS - 1)];
+    n += 1;                                            // SOURCE
+    if (m.src != pt::GS_NONE) {
+        n += 2;                                        // AMOUNT + RATE / BUS
+        if (m.src == pt::GS_LFO) n += 1;               // SHAPE
+    }
+    return n;
+}
+
+// Changing ORIGIN moves DURATION onto the musical length the sample is closest to at that tempo.
+void snap_duration_to_origin(MoonsetState& s, int origin_bpm) {
+    if (origin_bpm <= 0 || s.sampleRate <= 0 || s.totalFrames <= 0) return;
+    const double secs  = static_cast<double>(s.totalFrames) / s.sampleRate;
+    const double beats = static_cast<double>(origin_bpm) * secs / 60.0;
+    int    best  = s.durationIndex;
+    double bestD = 1.0e9;
+    const int count = static_cast<int>(MoonsetModule::duration_values().size());
+    for (int i = 0; i < count; ++i) {
+        const double d = std::fabs(MoonsetModule::duration_beats(i) - beats);
+        if (d < bestD) { bestD = d; best = i; }
+    }
+    s.durationIndex = best;
+}
+
+// DURATION + NEW BPM -> the target length, against the sample's raw length.
+void update_stretch_ratio(MoonsetState& s, songcore::Instrument::GranularParams& g, int song_tempo) {
+    if (s.sampleRate <= 0 || s.totalFrames <= 0) return;
+    const double raw = static_cast<double>(s.totalFrames) / s.sampleRate;
+    const int    bpm = s.stretch_bpm(song_tempo);
+    if (raw <= 0.0 || bpm <= 0) return;
+    const double target = MoonsetModule::duration_beats(s.durationIndex) * 60.0 / bpm;
+    g.grain.ratio = stretch_ratio_byte(target / raw);
+}
+
+}  // namespace
+
+bool moonset_stretch_page_begin(MoonsetState& s, songcore::Instrument::GranularParams& g, int song_tempo) {
+    if (s.totalFrames <= 0) return false;
+    s.stretchModSlot  = stretch_page_find_slot(g);
+    if (s.stretchModSlot >= 0 && g.mods[s.stretchModSlot].target != pt::GT_STRETCH)
+        g.mods[s.stretchModSlot].target = pt::GT_STRETCH;   // still silent until a SOURCE is picked
+    s.stretchPageLine = 0;
+    s.stretchPageOpen = true;
+    update_stretch_ratio(s, g, song_tempo);
+    return true;
+}
+
+void moonset_stretch_page_move(const songcore::Instrument::GranularParams& g, MoonsetState& s, int dir) {
+    const int n = stretch_page_line_count(g, s);
+    if (n <= 0) return;
+    s.stretchPageLine = ((s.stretchPageLine + dir) % n + n) % n;   // wraps, like the granular block
+}
+
+bool moonset_stretch_page_edit(songcore::Instrument::GranularParams& g, MoonsetState& s, int delta,
+                               bool reset, int song_tempo) {
+    const int line  = s.stretchPageLine;
+    const int sign  = delta > 0 ? 1 : -1;
+    auto wrap = [](int v, int n) { return ((v % n) + n) % n; };
+    bool changed = false;
+
+    if (line < STRETCH_PAGE_BASE) {
+        switch (line) {
+            case 0: {   // ORIGIN: 0 = automatic (the sample's own tempo)
+                if (reset) {
+                    s.stretchOriginBpm = 0;
+                } else {
+                    const int autoBpm = s.stretchOriginBpm > 0 ? s.stretchOriginBpm
+                                                               : std::max(s.source_bpm(), song_tempo);
+                    s.stretchOriginBpm = std::clamp(autoBpm + delta, 20, 999);
+                }
+                snap_duration_to_origin(s, s.stretchOriginBpm > 0 ? s.stretchOriginBpm : s.source_bpm());
+                changed = true;
+                break;
+            }
+            case 1:     // DURATION
+                s.durationIndex = reset ? 2
+                                        : wrap(s.durationIndex + sign,
+                                               static_cast<int>(MoonsetModule::duration_values().size()));
+                changed = true;
+                break;
+            case 2:     // NEW BPM: 0 = the song's tempo
+                if (reset) {
+                    s.stretchBpm = 0;
+                } else {
+                    const int bpm = std::clamp(s.stretch_bpm(song_tempo) + delta, 20, 999);
+                    s.stretchBpm  = (bpm == song_tempo) ? 0 : bpm;   // follows the song when it matches
+                }
+                changed = true;
+                break;
+            case 3: {   // PITCH: the cloud's own pitch, +-24 semitones around 0x80
+                const int before = g.grain.pitch;
+                g.grain.pitch = reset ? 0x80 : std::clamp(g.grain.pitch + delta, 0, 255);
+                changed = (g.grain.pitch != before);
+                break;
+            }
+            case 4: {   // GRAIN: the length of one piece
+                const int before = g.grain.size;
+                g.grain.size = reset ? 0x80 : std::clamp(g.grain.size + delta, 0, 255);
+                changed = (g.grain.size != before);
+                break;
+            }
+            case 5: {   // MASTER: how much of the target length the head travels
+                const int before = g.grain.stretch;
+                g.grain.stretch = reset ? 0x00 : std::clamp(g.grain.stretch + delta, 0, 255);
+                changed = (g.grain.stretch != before);
+                break;
+            }
+            default: break;
+        }
+        if (line == 0 || line == 1 || line == 2) update_stretch_ratio(s, g, song_tempo);
+        return changed;
+    }
+
+    // ── The modulation row on MASTER ────────────────────────────────────────────────────────────
+    if (s.stretchModSlot < 0) return false;
+    auto& m = g.mods[std::clamp(s.stretchModSlot, 0, pt::GRAN_MODS - 1)];
+    const auto before = m;
+    switch (line - STRETCH_PAGE_MOD) {
+        case 0:
+            m.src = reset ? pt::GS_NONE : wrap(m.src + sign, pt::GS_COUNT);
+            break;
+        case 1:
+            m.amount = reset ? 0x80 : std::clamp(m.amount + delta, 0, 255);
+            break;
+        case 2:
+            if (m.src == pt::GS_BUS)
+                m.bus = reset ? 0 : wrap(m.bus + sign, pt::GRAN_BUS_COUNT);
+            else
+                m.rate = reset ? 0x80 : std::clamp(m.rate + delta, 0, 255);
+            break;
+        case 3:
+            m.shape = reset ? 0 : wrap(m.shape + sign, pt::GL_COUNT);
+            break;
+        default: break;
+    }
+    // A shorter source drops the lines below, and the cursor with them.
+    s.stretchPageLine = std::min(s.stretchPageLine, stretch_page_line_count(g, s) - 1);
+    return !(m == before);
+}
+
+void draw_moonset_stretch_page(Canvas& c, const MoonsetState& s,
+                               const songcore::Instrument::GranularParams& g, int song_tempo,
+                               const Theme& t) {
+    if (!s.stretchPageOpen) return;
+
+    constexpr int W = 340, PAD = 14, LX = PAD, VX = 150;
+    const int lines = stretch_page_line_count(g, s);
+    const int H     = PAD * 2 + ROW_HEIGHT * (lines + 2);
+    const int X     = (DESIGN_W - W) / 2, Y = (DESIGN_H - H) / 2;
+
+    c.reset_clip();
+    draw_modal_backdrop(c);
+    draw_modal_box(c, X, Y, W, H, t);
+
+    const std::string title = "STRETCH";
+    int ty = Y + PAD + TEXT_PADDING;
+    c.draw_text(title, X + (W - Canvas::text_width(title, CHAR_SPACING, FONT_SCALE)) / 2, ty,
+                t.textTitle, CHAR_SPACING, FONT_SCALE);
+    ty += ROW_HEIGHT * 2;
+
+    auto row = [&](int line, const char* label, const std::string& value) {
+        const bool cur = (s.stretchPageLine == line);
+        c.draw_text(label, X + LX, ty, cur ? cursor_mark_ink(t) : t.textParam, CHAR_SPACING, FONT_SCALE);
+        draw_cursor_cell(c, value, X + VX, ty, cur, t.textValue, t);
+        ty += ROW_HEIGHT;
+    };
+
+    static const char* const SRC[]   = {"NONE", "LFO", "RANDOM", "BUS"};
+    static const char* const SHAPE[] = {"SINE", "TRI", "SAW", "SQUARE"};
+
+    row(0, "ORIGIN", s.stretchOriginBpm > 0 ? pad3(s.stretchOriginBpm) : "AUTO");
+    row(1, "DURATION", at(MoonsetModule::duration_values(), s.durationIndex));
+    row(2, "NEW BPM", pad3(s.stretch_bpm(song_tempo)));
+    row(3, "PITCH", fmt_semis(g.grain.pitch));
+    row(4, "GRAIN", fmt_ms(g.grain.size));
+    row(5, "MASTER", fmt_pct(g.grain.stretch) + " " + stretch_ratio_text(g.grain.ratio));
+
+    if (s.stretchModSlot >= 0) {
+        const auto& m = g.mods[std::clamp(s.stretchModSlot, 0, pt::GRAN_MODS - 1)];
+        char b[16];
+        row(STRETCH_PAGE_MOD, "SOURCE", SRC[std::clamp(m.src, 0, pt::GS_COUNT - 1)]);
+        if (m.src != pt::GS_NONE) {
+            const int pct = (m.amount - 0x80) * 100 / 127;
+            std::snprintf(b, sizeof b, "%+d%%", std::clamp(pct, -100, 100));
+            row(STRETCH_PAGE_MOD + 1, "AMOUNT", b);
+            if (m.src == pt::GS_BUS) {
+                row(STRETCH_PAGE_MOD + 2, "BUS", mod_bus_name(m.bus));
+            } else {
+                row(STRETCH_PAGE_MOD + 2, "RATE", hex2(m.rate));
+                if (m.src == pt::GS_LFO)
+                    row(STRETCH_PAGE_MOD + 3, "SHAPE", SHAPE[std::clamp(m.shape, 0, pt::GL_COUNT - 1)]);
+            }
+        }
+    }
 }
 
 }  // namespace pt::ui

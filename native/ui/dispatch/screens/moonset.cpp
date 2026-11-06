@@ -1,27 +1,23 @@
 // The sample editor: its buttons, the selection, the slice markers, the ops, SAVE and CHOP.
 
 #include "ui/dispatch/dispatch_common.h"
+#include "songcore/model.h"
 #include "ui/modules/rec_viz.h"
+
 #include "audio-engine.h"
+#include "songcore/wav_writer.h"
 
 #include "ui/std_filesystem.h"
-#include "ui/modules/rec_viz.h"
+#include <fstream>
 
 #include <algorithm>
-#include "ui/modules/rec_viz.h"
 #include <array>
-#include "ui/modules/rec_viz.h"
 #include <cmath>
-#include "ui/modules/rec_viz.h"
 #include <cstring>
-#include "ui/modules/rec_viz.h"
 #include <string>
-#include "ui/modules/rec_viz.h"
 #include <vector>
-#include "ui/modules/rec_viz.h"
 
 #include "kissfft/kiss_fftr.h"
-#include "ui/modules/rec_viz.h"
 
 namespace pt::ui {
 
@@ -152,34 +148,170 @@ GestureResult InputDispatcher::moonset_screen(Gesture g) {
             refresh_moonset_view(/*reset_selection=*/false);
     }};
 
+    // The GRAIN column's PRESET popup owns every button while it is up.
+    if (se.presetMenuOpen) {
+        switch (g) {
+            case Gesture::DPAD_UP:   se.presetMenuLine = 0; break;
+            case Gesture::DPAD_DOWN: se.presetMenuLine = 1; break;
+            case Gesture::A: {
+                se.presetMenuOpen = false;
+                const std::string dir = fs_.make_app_folder("Samples/GrainPresets");
+                if (se.presetMenuLine == 0) {
+                    std::string seed = safe_file_name(se.sampleName);
+                    if (seed.empty()) seed = "PRESET";
+                    open_qwerty(QwertyContext::MOONSET_PRESET_SAVE, seed, "SAVE PRESET:", dir,
+                                /*max_length=*/24, /*clear_on_first_b=*/true);
+                } else {
+                    open_file_browser(AppState::BrowserPurpose::LOAD_MOONSET_PRESET, dir, {"preset"});
+                }
+                break;
+            }
+            case Gesture::B:
+            case Gesture::Y:
+                se.presetMenuOpen = false;
+                break;
+            default:
+                break;
+        }
+        return GestureResult::TAKEN;
+    }
+
     // The granular block owns A and the D-pad while it has the cursor: the sample rows below it
     // (row 19 in particular) must not also react. B, X and Y keep their meaning.
+    // The MOD window owns every button while it is up (X still auditions, Y keeps its meaning).
+    if (se.granularFocus && se.modOpen) {
+        songcore::Instrument& ins =
+            host_.edit_project().instruments[static_cast<size_t>(se.instrumentId)];
+        auto edit = [&](int delta, bool reset) {
+            if (moonset_mod_edit(ins.granular, se, delta, reset)) host_.push_instrument(se.instrumentId);
+        };
+        switch (g) {
+            case Gesture::DPAD_UP:    moonset_mod_move(ins.granular, se, -1); break;
+            case Gesture::DPAD_DOWN:  moonset_mod_move(ins.granular, se, +1); break;
+            case Gesture::A_RIGHT:    edit(+1, false);  break;
+            case Gesture::A_LEFT:     edit(-1, false);  break;
+            case Gesture::A_UP:       edit(+16, false); break;
+            case Gesture::A_DOWN:     edit(-16, false); break;
+            case Gesture::A_B:        edit(0, true);    break;
+            case Gesture::B:          se.modOpen = false; break;
+            case Gesture::X:          if (host_.is_playing()) { host_.stop(); break; } if (!se.recordActive) moonset_audition(); break;
+            case Gesture::Y:          se.modOpen = false; break;
+            default: break;
+        }
+        return GestureResult::TAKEN;
+    }
+
+    // SHIFT + LEFT/RIGHT toggles the lower half, whichever arrow is used: from the sample rows it
+    // opens GRAIN / ROAM / MOTION, from the panel it closes it. Plain arrows never leave the panel.
+    if (g == Gesture::Y_LEFT || g == Gesture::Y_RIGHT) {
+        if (!se.granularFocus) {
+            se.granularFocus  = true;
+            se.granularColumn = 0;
+            se.granularRow    = 0;
+            se.granularTop    = 0;
+        } else {
+            se.granularFocus = false;
+            se.modOpen       = false;
+            se.cursorRow     = 19;   // back at LOAD, the row the panel was opened from
+            se.cursorCol     = std::min(se.cursorCol,
+                                        MoonsetModule::max_col_for_row(19, se.sliceMethod));
+        }
+        return GestureResult::TAKEN;
+    }
+    // SHIFT + UP/DOWN does nothing inside the panel: the way out is SHIFT + LEFT/RIGHT. Outside it,
+    // they change screen (SHIFT + DOWN no longer opens the granular block).
+    if ((g == Gesture::Y_UP || g == Gesture::Y_DOWN) && se.granularFocus)
+        return GestureResult::TAKEN;
+
+    // SHIFT + PLAY: the whole song from the row the pointer was last on — and the same keys stop it,
+    // so a master pass can be cut without leaving the editor. (Everywhere else Y+X only starts.)
+    if (g == Gesture::Y_X) {
+        if (host_.is_playing())
+            host_.stop();
+        else
+            host_.play_song(pointer_song_row(s_));
+        return GestureResult::TAKEN;
+    }
+
+    // SHIFT + EDIT (or SHIFT + OPTION, for consoles without a PLAY key): the track that plays the
+    // instrument being edited — and the same keys stop it. (A scan of the song: the first track whose
+    // chain carries a note on this instrument.) Using OPTION avoids B, which exits the editor.
+    if (g == Gesture::Y_A || g == Gesture::Y_B) {
+        if (host_.is_playing()) { host_.stop(); return GestureResult::TAKEN; }
+        const int want = se.instrumentId;
+        int trackMask = 0;
+        const songcore::Project& p = host_.project();
+        for (int t = 0; t < 8 && trackMask == 0; ++t) {
+            bool uses = false;
+            const auto& refs = p.tracks[static_cast<size_t>(t)].chainRefs;
+            for (int sr = 0; sr < (int)refs.size() && !uses; ++sr) {
+                int cid = refs[static_cast<size_t>(sr)];
+                if (cid < 0 || cid >= 256) continue;
+                const songcore::Chain& ch = p.chains[static_cast<size_t>(cid)];
+                for (int cr = 0; cr < songcore::CHAIN_ROWS && !uses; ++cr) {
+                    int pr = songcore::chain_phrase_ref(ch, cr);
+                    if (pr < 0 || pr >= (int)p.phrases.size()) continue;
+                    for (const auto& step : p.phrases[static_cast<size_t>(pr)].steps) {
+                        if (step.instrument == want) { uses = true; break; }
+                    }
+                }
+            }
+            if (uses) trackMask = 1 << t;
+        }
+        const int row = pointer_song_row(s_);
+        if (trackMask != 0) host_.play_song_live(row, trackMask);
+        else                host_.play_song(row);
+        return GestureResult::TAKEN;
+    }
+
     if (se.granularFocus) {
         switch (g) {
+            // A is held and a D-pad press (or B) came in: it is an edit, not a tap, so the deferred
+            // open of the MOD window (defer_a_to_release) must not fire when A comes up.
+            case Gesture::A_UP:
+            case Gesture::A_DOWN:
+            case Gesture::A_LEFT:
+            case Gesture::A_RIGHT:
+            case Gesture::A_B:
+                set_a_pressed_alone(false);
+                return GestureResult::PASS;   // the granular cell is edited as before
+            // A on a cell that can be modulated opens its MOD window, like A on the EQ cell opens the EQ.
+            // The GRAIN column's STRETCH cell is the exception: it opens the live STRETCH page.
+            case Gesture::A: {
+                songcore::Instrument& ins =
+                    host_.edit_project().instruments[static_cast<size_t>(se.instrumentId)];
+                if (se.granularColumn == 0 && se.granularRow == moonset_preset_row()) {
+                    se.presetMenuOpen = true;
+                    se.presetMenuLine = 0;
+                    return GestureResult::TAKEN;
+                }
+                if (se.granularColumn == 0 && se.granularRow == 13 &&
+                    open_moonset_stretch_page())
+                    return GestureResult::TAKEN;
+                if (moonset_mod_open(ins.granular, se)) return GestureResult::TAKEN;
+                return GestureResult::PASS;
+            }
             case Gesture::B:
                 if (pt::ui::rec_viz().menuOpen()) { pt::ui::rec_viz().closeMenu(); return GestureResult::TAKEN; }
                 if (se.isModified) se.showConfirmClose = true;
                 else               close_moonset();
                 return GestureResult::TAKEN;
+            // SHIFT alone is only a modifier here; the way out is SHIFT + LEFT/RIGHT (below).
+            case Gesture::Y:
+                return GestureResult::TAKEN;
+            // PLAY auditions the instrument, before and after the swap alike.
             case Gesture::X:
+            case Gesture::X_A:
                 if (!se.recordActive) { moonset_audition(); return GestureResult::TAKEN; }
                 return GestureResult::PASS;
-            case Gesture::Y:
-                se.loopPreview = !se.loopPreview;
-                set_status(s_, se.loopPreview ? "LOOP: ON" : "LOOP: OFF", true);
-                if (se.playbackPosition >= 0.0f) {
-                    host_.stop_preview();
-                    se.playbackPosition = -1.0f;
-                }
-                return GestureResult::TAKEN;
             default:
                 return GestureResult::PASS;   // A / A+DPAD / DPAD edit the granular cell
         }
     }
 
-    // The INPUT cell (row 5, cols 0..1) must show what is plugged in NOW: a USB mic connected after the
+    // The INPUT cell (row 5, cols 0..2) must show what is plugged in NOW: a USB mic connected after the
     // editor opened is missing from the list read at open, and picking it would silently record the mic.
-    if (se.cursorRow == 5 && (se.cursorCol == 0 || se.cursorCol == 1)) refresh_moonset_input_devices();
+    if (se.cursorRow == 5 && (se.cursorCol == 0 || se.cursorCol == 2)) refresh_moonset_input_devices();
 
     // A+DPAD drags the selection's active edge on rows 3..8, the slice boundary on row 11's POSITION
     // cell; elsewhere it edits the cell like any screen.
@@ -193,20 +325,23 @@ GestureResult InputDispatcher::moonset_screen(Gesture g) {
     switch (g) {
         // ?? A cell that opens something (EQ) goes first, or its FX APPLY would run.
         case Gesture::A:
-            // Row 5 is RECORD: A on REC toggles recording, A on INPUT cycles devices,
-            // A on SET opens/closes the viz settings menu.
+            // Row 5 is RECORD: A on REC installs the take, A on REC WAV writes a new file, A on INPUT
+            // cycles devices, A on SET opens/closes the viz settings menu.
             if (se.cursorRow == 5) {
-                if (se.cursorCol == 0) handle_moonset_record_toggle();
-                else if (se.cursorCol == 1) generic_input(pt::ui::increment);
-                else if (se.cursorCol == 2) { pt::ui::rec_viz().toggleMenu(); }
-                else if (se.cursorCol == 3) {
-                    se.loopPreview = !se.loopPreview;
-                    set_status(s_, se.loopPreview ? "LOOP: ON" : "LOOP: OFF", true);
-                    if (se.playbackPosition >= 0.0f) {
-                        host_.stop_preview();
-                        se.playbackPosition = -1.0f;
-                    }
-                }
+                if (se.cursorCol == 0)      handle_moonset_record_toggle(/*to_wav=*/false);
+                else if (se.cursorCol == 1) handle_moonset_record_toggle(/*to_wav=*/true);
+                else if (se.cursorCol == 2) generic_input(pt::ui::increment);
+                else if (se.cursorCol == 3) { pt::ui::rec_viz().toggleMenu(); }
+                return GestureResult::TAKEN;
+            }
+            // Row 8, col 2: the LOOP cell. A plain value cell: it changes the flag and nothing else —
+            // it never starts or stops the preview. A sounding preview just follows the new value.
+            if (se.cursorRow == 8 && se.cursorCol == 2) {
+                se.loopPreview = !se.loopPreview;
+                set_status(s_, se.loopPreview ? "LOOP: ON" : "LOOP: OFF", true);
+                if (se.playbackPosition >= 0.0f)
+                    host_.refresh_sample_preview(se.instrumentId, se.loopPreview,
+                                                 se.selectionStart, se.selectionEnd);
                 return GestureResult::TAKEN;
             }
             // Close the viz menu if it is open and A is pressed elsewhere.
@@ -222,42 +357,34 @@ GestureResult InputDispatcher::moonset_screen(Gesture g) {
 
         // X is the transport (PLAY): on the sample editor it auditions, exactly as START did.
         case Gesture::X:
+            if (host_.is_playing()) { host_.stop(); return GestureResult::TAKEN; }
             if (!se.recordActive) {
                 moonset_audition();
                 return GestureResult::TAKEN;
             }
             return GestureResult::PASS;
-
+        // SHIFT alone is only a modifier here; SHIFT + DOWN opens the granular panel (above).
         case Gesture::Y:
-            // Boucle de pr�-�coute : rejoue le sample en boucle jusqu'� ce qu'on rappuie sur X.
-            se.loopPreview = !se.loopPreview;
-            set_status(s_, se.loopPreview ? "LOOP: ON" : "LOOP: OFF", true);
-            if (se.playbackPosition >= 0.0f) {
-                host_.stop_preview();
-                se.playbackPosition = -1.0f;
-            }
             return GestureResult::TAKEN;
 
-
+        // PLAY auditions the instrument (EDIT+PLAY does the same).
         case Gesture::A_UP:
-            if (se.cursorRow == 5 && se.cursorCol == 0) return GestureResult::TAKEN;
+            if (se.cursorRow == 5) return GestureResult::TAKEN;   // the row is buttons, not a value
             return nudge(+coarse_step(se));
         case Gesture::A_DOWN:
-            if (se.cursorRow == 5 && se.cursorCol == 0) return GestureResult::TAKEN;
+            if (se.cursorRow == 5) return GestureResult::TAKEN;
             return nudge(-coarse_step(se));
         case Gesture::A_LEFT:
-            if (se.cursorRow == 5 && se.cursorCol != 0) {
-                generic_input(pt::ui::decrement);
+            if (se.cursorRow == 5) {
+                if (se.cursorCol == 2) generic_input(pt::ui::decrement);
                 return GestureResult::TAKEN;
             }
-            if (se.cursorRow == 5 && se.cursorCol == 0) return GestureResult::TAKEN;
             return nudge(-fine_step(se));
         case Gesture::A_RIGHT:
-            if (se.cursorRow == 5 && se.cursorCol != 0) {
-                generic_input(pt::ui::increment);
+            if (se.cursorRow == 5) {
+                if (se.cursorCol == 2) generic_input(pt::ui::increment);
                 return GestureResult::TAKEN;
             }
-            if (se.cursorRow == 5 && se.cursorCol == 0) return GestureResult::TAKEN;
             return nudge(+fine_step(se));
 
         case Gesture::A_B:
@@ -267,9 +394,28 @@ GestureResult InputDispatcher::moonset_screen(Gesture g) {
                 else if (se.cursorCol == 1) se.selectionEnd   = se.totalFrames;
                 return GestureResult::TAKEN;
             }
-            // The SLICE DETAIL row: the boundary back where its method would put it; under MANUAL, gone.
+            // The SLICE DETAIL row: A+B deletes the first boundary (the start slice), merging
+            // slices 00 and 01, so the second slice becomes the first.
             if (se.cursorRow == 11) {
-                reset_moonset_slice_marker();
+                MoonsetState& se2 = s_.moonset;
+                if (se2.sliceMethod == MoonsetModule::SLICE_TRANSIENT && se2.manualMarkers.empty()) {
+                    for (int f : se2.transientMarkers)
+                        se2.manualMarkers.push_back(MoonsetSliceMarker{f, f});
+                    se2.manualKeyMethod = se2.sliceMethod;
+                    se2.manualKeyParam  = se2.manual_key_param();
+                }
+                if (!se2.manualMarkers.empty()) {
+                    const int boundary = se2.sliceIndex - 1;
+                    if (boundary >= 0 && boundary < static_cast<int>(se2.manualMarkers.size())) {
+                        se2.manualMarkers.erase(se2.manualMarkers.begin() + boundary);
+                        se2.sliceMethod    = MoonsetModule::SLICE_MANUAL;
+                        se2.sliceSyncHash  = 0;
+                        moonset_sync_slices();
+                        se2.sliceIndex     = std::max(0, se2.sliceIndex - 1);
+                    }
+                } else {
+                    reset_moonset_slice_marker();
+                }
                 return GestureResult::TAKEN;
             }
             // The TSTRETCH cell: everything its box dials, back as a session opens.
@@ -348,7 +494,7 @@ void InputDispatcher::moonset_audition() {
 
     host_.set_preview_track(-1);   // a waveform being edited is not in the arrangement
     host_.preview_sample_editor(se.instrumentId, se.sourceMode, se.selectionStart, se.selectionEnd,
-                                se.totalFrames, pitch, sync);
+                                se.totalFrames, pitch, sync, se.loopPreview);
 }
 
 // ??? Opening and closing ?????????????????????????????????????????????????????????????????????????
@@ -357,6 +503,11 @@ void InputDispatcher::open_moonset() {
     const Instrument& ins = s_.project->instruments[static_cast<size_t>(s_.currentInstrument)];
     if (ins.instrumentType == songcore::InstrumentType::SOUNDFONT) return;
 
+    // An audition left over from the last visit can still be alive — and a granular voice never runs
+    // out its playhead, so it would sit there for ever. Stop it, or the first PLAY would only stop it
+    // and the editor would look silent.
+    host_.stop_preview();
+
     s_.moonset              = MoonsetState{};   // a fresh session, every time
     pt::ui::rec_viz().closeMenu();   // shared with the sample editor: an open menu hides the waveform and eats the D-pad
     s_.moonset.sampleId     = s_.currentInstrument;
@@ -364,6 +515,9 @@ void InputDispatcher::open_moonset() {
     s_.moonset.cursorRow    = 1;
     s_.moonset.cursorCol    = 0;
 
+    // ⚠️ `moonsetReturnScreen`, not `previousScreen`: the PRESET cell's LOAD opens the file browser
+    // from here, and that open rewrites `previousScreen` with MOONSET (B would return to the editor).
+    if (s_.currentScreen != ScreenType::MOONSET) s_.moonsetReturnScreen = s_.currentScreen;
     s_.previousScreen = s_.currentScreen;
     s_.currentScreen  = ScreenType::MOONSET;
     init_moonset_state();
@@ -383,6 +537,11 @@ void InputDispatcher::init_moonset_state() {
     // BIT opens at the sample's own depth, which is also the highest it can offer.
     se.sourceBitDepth = host_.sample_bit_depth(se.instrumentId);
     se.bitDepth       = se.sourceBitDepth;
+    // Persisted MOONSET slice editor state (survives leaving the page).
+    se.sliceMethod      = ins.moonSliceMethod;
+    se.sliceSensitivity = ins.moonSliceSensitivity;
+    se.sliceDivisions   = ins.moonSliceDivisions;
+    se.sliceFollow      = ins.moonSliceFollow;
 
     // ?? SOURCE opens on STEREO for a stereo sample: any other mode saves one channel.
     se.sourceMode = se.hasStereoData ? 2 /*STEREO*/ : 0;
@@ -426,6 +585,7 @@ void InputDispatcher::init_moonset_state() {
     // ?? sliceMethod survives, so a second sample keeps TRANSIENT.
 
     se.recordActive = false;
+    se.recordToWav  = false;
     se.recordFailed = false;
     se.recordSkipFrames = 0;
     se.playbackPosition = -1.0f;
@@ -433,6 +593,9 @@ void InputDispatcher::init_moonset_state() {
     // Populate the audio input devices list from the host
     host_.listInputDevices(se.audioInputDevices);
     set_status(s_, "INPUT DEVICES: " + std::to_string(se.audioInputDevices.size()) + " devices", true);
+
+    // Make sure saved slices stay playable (and SLICE FOLLOW can follow them) even when the editor is OFF.
+    moonset_sync_slices();
 }
 
 void InputDispatcher::close_moonset() {
@@ -442,17 +605,28 @@ void InputDispatcher::close_moonset() {
     if (se.recordActive) {
         host_.stop_record();
         se.recordActive = false;
+        se.recordToWav  = false;
         se.recordSkipFrames = 0;
     }
+    // A take still waiting on the name prompt has nowhere to go once the editor closes.
+    moonsetPending_.recordTakeL.clear();
+    moonsetPending_.recordTakeR.clear();
     
     // Pay any pending audition restore now, or it lands on a slot no longer on screen.
     run_due_moonset_preview_restore(/*force=*/true);
 
+    host_.stop_preview();                       // a granular audition never ends by itself
     host_.restore_fx_preview_backup();          // drop an un-applied FX preview
     host_.free_sample_undo(se.instrumentId);     // unreachable once the editor is gone
     host_.clear_previews();                     // the 254/255 scratch slots
 
-    s_.currentScreen = s_.previousScreen;
+    // Persist the slice editor state so it survives leaving the page.
+    moonset_sync_slices();
+
+    // ⚠️ NOT `previousScreen`: a browser opened from the editor's PRESET cell points it at MOONSET,
+    // so B closed the editor onto itself. `moonsetReturnScreen` is the screen that opened it.
+    s_.currentScreen = s_.moonsetReturnScreen == ScreenType::MOONSET ? ScreenType::SONG
+                                                                    : s_.moonsetReturnScreen;
 }
 
 // ??? The selection: A+DPAD on rows 3..8 ??????????????????????????????????????????????????????????
@@ -481,12 +655,9 @@ void InputDispatcher::nudge_moonset_selection_edge(int64_t delta) {
         se.selectionEnd   = std::clamp<int64_t>(snap(raw), se.selectionStart + 1, maxFrame);
     }
 
-    // LOOP : la pr�-�coute suit les changements de d�but/fin.
-    if (se.loopPreview && se.playbackPosition >= 0.0f) {
-        host_.stop_preview();
-        se.playbackPosition = -1.0f;
-        moonset_audition();
-    }
+    // LOOP: move the live loop window instead of restarting the preview.
+    if (se.loopPreview && se.playbackPosition >= 0.0f)
+        host_.refresh_sample_preview(se.instrumentId, true, se.selectionStart, se.selectionEnd);
 }
 
 // ??? The slice markers: A+DPAD and A+B on row 11 ?????????????????????????????????????????????????
@@ -554,6 +725,17 @@ void InputDispatcher::select_moonset_slice() {
     se.slice_bounds(se.sliceIndex, start, end);
     se.selectionStart = start;
     se.selectionEnd   = end;
+    restart_moonset_slice_audition();
+}
+
+// The cloud reads the SELECTION as its window, so moving to another slice only moves it if the audition
+// is re-triggered (a sounding voice keeps the window it started with). POSITION then reads inside the
+// slice being played instead of the one before it.
+void InputDispatcher::restart_moonset_slice_audition() {
+    MoonsetState& se = s_.moonset;
+    if (se.playbackPosition < 0.0f || se.recordActive || host_.is_playing()) return;
+    se.playbackPosition = -1.0f;   // moonset_audition starts instead of stopping on a live preview
+    moonset_audition();
 }
 
 void InputDispatcher::nudge_moonset_slice_marker(int64_t delta) {
@@ -823,7 +1005,7 @@ void InputDispatcher::moonset_confirm() {
 
         // ?? Row 18: NAME ????????????????????????????????????????????????????????????????????????
         case 18:
-            open_qwerty(QwertyContext::SAMPLE_NAME, se.sampleName, "SAMPLE NAME:",
+            open_qwerty(QwertyContext::MOONSET_NAME, se.sampleName, "SAMPLE NAME:",
                         fs_.samples_directory());
             break;
 
@@ -849,7 +1031,7 @@ void InputDispatcher::moonset_confirm() {
                     if (stem == base)
                         save_moonset_sample_to(dir + "/" + base + ".wav", /*adopt_name=*/true);
                     else
-                        open_qwerty(QwertyContext::SAMPLE_SAVE, stem, "SAVE AS:", dir,
+                        open_qwerty(QwertyContext::MOONSET_SAVE, stem, "SAVE AS:", dir,
                                     /*max_length=*/24, /*clear_on_first_b=*/true);
                     break;
                 }
@@ -867,9 +1049,6 @@ void InputDispatcher::moonset_confirm() {
 
                 default: break;
             }
-            break;
-
-        default:
             break;
     }
 }
@@ -978,6 +1157,42 @@ std::vector<int> InputDispatcher::compute_moonset_slice_cue_points() const {
     return cues;
 }
 
+// The editor's slices reach the engine through the instrument: `slicingMode` is what makes the program
+// select a slice, so the three granular columns only read a slice while it is on. Pushed when the
+// method, the divisions, the sensitivity or a boundary changes - not every frame.
+void InputDispatcher::moonset_sync_slices() {
+    MoonsetState& se = s_.moonset;
+    if (se.instrumentId < 0 || se.instrumentId >= songcore::POOL_INSTRUMENTS) return;
+
+    songcore::Instrument& ins =
+        host_.edit_project().instruments[static_cast<size_t>(se.instrumentId)];
+
+    // MOONSET edits slice MARKERS and its own editor state only; it never overrides the instrument's
+    // slicingMode (mirrors the sample editor, which leaves slicingMode alone). OFF stays OFF.
+    uint32_t h = 2166136261u;
+    auto mix = [&h](int64_t v) { h = (h ^ static_cast<uint32_t>(static_cast<uint64_t>(v))) * 16777619u; };
+    mix(se.sliceMethod);
+    mix(se.totalFrames);
+    mix(se.sliceDivisions);
+    mix(se.sliceSensitivity);
+    mix(se.marker_count());
+    for (int i = 0; i < se.marker_count(); ++i) mix(se.marker_position(i));
+
+    se.sliceSyncHash = h;
+    const std::vector<int> cues = compute_moonset_slice_cue_points();
+    ins.sliceMarkers.clear();
+    ins.sliceMarkers.reserve(cues.size());
+    for (const int c : cues) ins.sliceMarkers.push_back(static_cast<int64_t>(c));
+
+    ins.moonSliceMethod      = se.sliceMethod;
+    ins.moonSliceSensitivity = se.sliceSensitivity;
+    ins.moonSliceDivisions   = se.sliceDivisions;
+    ins.moonSliceFollow      = se.sliceFollow;
+
+    host_.push_instrument(se.instrumentId);
+    mark_modified();
+}
+
 std::vector<std::pair<int64_t, int64_t>> InputDispatcher::current_moonset_slices() const {
     const MoonsetState& se = s_.moonset;
 
@@ -1033,10 +1248,61 @@ void InputDispatcher::save_moonset_sample_to(const std::string& path, bool adopt
     se.hasStereoData = host_.has_stereo_data(se.instrumentId);
 
     mark_modified();
-    s_.currentScreen = s_.previousScreen;   // a save LEAVES the editor, as it does on Android
+    // The save stays on the editor (B is the way out), and the picture follows the file just written.
+    refresh_moonset_view(/*reset_selection=*/false);
+    set_status(s_, "SAVED: " + path_stem(path), true);
+}
+
+// ??? REC WAV ????????????????????????????????????????????????????????????????????????????????????
+
+void InputDispatcher::save_moonset_recording_to(const std::string& path) {
+    std::vector<float>& L      = moonsetPending_.recordTakeL;
+    std::vector<float>& R      = moonsetPending_.recordTakeR;
+    const bool          stereo = !R.empty() && R.size() == L.size();
+    const bool          ok     = !L.empty() &&
+                                 songcore::write_wav(path, L, R, moonsetPending_.recordTakeRate, {},
+                                                     stereo ? 2 : 1, 16);
+    // The take is spent either way: saved, or the write failed and there is nothing to retry with.
+    L.clear();
+    R.clear();
+    set_status(s_, ok ? ("SAVED: " + path_stem(path)) : "SAVE FAILED", ok);
 }
 
 // ??? CHOP ????????????????????????????????????????????????????????????????????????????????????????
+void InputDispatcher::save_moonset_preset_to(const std::string& dir, const std::string& typed_text) {
+    MoonsetState& se = s_.moonset;
+    // Sanitized, then auto-numbered: NUIT twice writes NUIT then NUIT1 (never overwrites a preset).
+    std::string base = safe_file_name(typed_text);
+    if (base.empty()) base = safe_file_name(se.sampleName);
+    if (base.empty()) base = "PRESET";
+    const std::string name = free_file_stem(fs_, dir, base, ".preset");
+    const std::string full = dir + "/" + name + ".preset";
+    songcore::Instrument& ins = host_.edit_project().instruments[static_cast<size_t>(se.instrumentId)];
+    if (!fs_.write_bytes(full, &ins.granular, sizeof(ins.granular))) {
+        set_status(s_, "SAVE FAILED", false);
+        return;
+    }
+    set_status(s_, "PRESET SAVED: " + name, true);
+}
+
+bool InputDispatcher::load_moonset_preset_from(const std::string& path) {
+    MoonsetState& se = s_.moonset;
+    std::string full = path;
+    if (full.find('/') == std::string::npos && full.find('\\') == std::string::npos) {
+        full = fs_.make_app_folder("Samples/GrainPresets") + "/" + full + ".preset";
+    }
+    std::string data;
+    if (!fs_.read_file(full, data) || data.size() != sizeof(songcore::Instrument::GranularParams)) {
+        return false;
+    }
+    songcore::Instrument::GranularParams gp;
+    std::memcpy(&gp, data.data(), sizeof(gp));
+    songcore::Instrument& ins = host_.edit_project().instruments[static_cast<size_t>(se.instrumentId)];
+    ins.granular = gp;
+    host_.push_instrument(se.instrumentId);
+    mark_modified();
+    return true;
+}
 
 void InputDispatcher::moonset_chop() {
     MoonsetState& se = s_.moonset;
@@ -1076,7 +1342,7 @@ CursorContext InputDispatcher::moonset_context() const {
     if (m.granularFocus) {
         const songcore::Instrument& ins =
             s_.project->instruments[static_cast<size_t>(m.instrumentId)];
-        return moonset_granular_context(ins.granular, m.granularColumn, m.granularRow);
+        return moonset_granular_context(ins.granular, m.granularColumn, m.granularRow, m.sliceReading);
     }
     MoonsetState s = s_.moonset;
     return moonset_.cursor_context(s);
@@ -1223,7 +1489,7 @@ void InputDispatcher::refresh_moonset_input_devices() {
         se.recordInputDevice.clear();
 }
 
-void InputDispatcher::handle_moonset_record_toggle() {
+void InputDispatcher::handle_moonset_record_toggle(bool to_wav) {
     MoonsetState& se = s_.moonset;
 
     if (!se.recordActive) {
@@ -1241,8 +1507,10 @@ void InputDispatcher::handle_moonset_record_toggle() {
         int device = -1;
         const int phys = std::max(0, static_cast<int>(se.audioInputDevices.size()) -
                                          AudioEngine::INTERNAL_INPUT_COUNT);
+        // REC WAV records the master bus (M1) directly, not the mic.
+        const std::string targetDevice = to_wav ? std::string("M1 MASTER") : se.recordInputDevice;
         for (size_t i = 0; i < se.audioInputDevices.size(); ++i) {
-            if (se.audioInputDevices[i] != se.recordInputDevice) continue;
+            if (se.audioInputDevices[i] != targetDevice) continue;
             device = (static_cast<int>(i) < phys)
                          ? static_cast<int>(i) + 1   // backend uses 1-based indices (0 = default)
                          : AudioEngine::INTERNAL_INPUT_BASE + (static_cast<int>(i) - phys);
@@ -1250,6 +1518,7 @@ void InputDispatcher::handle_moonset_record_toggle() {
         }
         if (host_.start_record(device)) {
             se.recordActive = true;
+            se.recordToWav  = to_wav;
             se.recordFailed = false;
             // START (SET menu): DIRECT, 1/4, 2/4, 1 BAR, 2 BAR of count-in at the project's tempo, with the
             // click if CLICK is on. The capture runs from now on (the visualiser is live); the count-in's
@@ -1261,23 +1530,71 @@ void InputDispatcher::handle_moonset_record_toggle() {
             set_status(s_, se.recordSkipFrames > 0 ? "COUNT-IN" : "RECORDING", true);
         } else {
             se.recordActive = false;
+            se.recordToWav  = false;
             se.recordFailed = true;
             set_status(s_, "RECORD FAILED", false);
         }
     } else {
-        // Stop and install into the current instrument. Only the user stops a take.
-        const int skip = se.recordSkipFrames;
+        // Stop here; only the user stops a take.
+        const bool to_wav_take = se.recordToWav;
+        const int  skip        = se.recordSkipFrames;
         se.recordSkipFrames = 0;
         if (skip > 0 && host_.record_length() <= skip) {   // stopped during the count-in: nothing to keep
             host_.stop_record();
             se.recordActive = false;
+            se.recordToWav  = false;
             se.recordFailed = false;
             set_status(s_, "CANCELLED", false);
             return;
         }
+
+        if (to_wav_take) {
+            // Freeze the take first: the audio thread must not touch the buffer while it is copied,
+            // and the engine reuses it on the next capture. Then the name prompt saves or discards it;
+            // the instrument and its current sample are never touched.
+            host_.stop_record();
+            se.recordActive = false;
+            se.recordToWav  = false;
+            se.recordFailed = false;
+
+            const int    total = host_.record_length();
+            const int    len   = std::max(0, total - skip);
+            const float* L     = host_.record_buffer_l();
+            const float* R     = host_.record_buffer_r();
+            if (!L || len <= 0) {
+                moonsetPending_.recordTakeL.clear();
+                moonsetPending_.recordTakeR.clear();
+                set_status(s_, "NO TAKE", false);
+                return;
+            }
+
+            // Same MIC GAIN and clip as installRecord, so the file matches what REC would install.
+            const float gainDb = pt::ui::rec_viz().p.micGainDb;
+            const float gain   = (gainDb == 0.0f) ? 1.0f : std::pow(10.0f, gainDb / 20.0f);
+            auto copy_gained = [&](std::vector<float>& dst, const float* src) {
+                dst.resize(static_cast<size_t>(len));
+                for (int i = 0; i < len; ++i) {
+                    const float v = src[i] * gain;
+                    dst[static_cast<size_t>(i)] = v > 1.0f ? 1.0f : (v < -1.0f ? -1.0f : v);
+                }
+            };
+            copy_gained(moonsetPending_.recordTakeL, L + skip);
+            if (R) copy_gained(moonsetPending_.recordTakeR, R + skip);
+            else   moonsetPending_.recordTakeR.clear();
+            moonsetPending_.recordTakeRate = host_.sample_rate();
+
+            const std::string dir  = fs_.samples_directory();
+            const std::string stem = free_wav_stem(fs_, dir, "RECORD");
+            open_qwerty(QwertyContext::MOONSET_REC_SAVE, stem, "SAVE REC:", dir,
+                        /*max_length=*/24, /*clear_on_first_b=*/true);
+            set_status(s_, "SAVE TAKE?", true);
+            return;
+        }
+
         host_.backup_sample(se.instrumentId);
         if (host_.record_capture(se.instrumentId, skip, pt::ui::rec_viz().p.micGainDb)) {
             se.recordActive = false;
+            se.recordToWav  = false;
             se.recordFailed = false;
             se.isModified = true;
             set_status(s_, "RECORDED", true);
@@ -1285,6 +1602,7 @@ void InputDispatcher::handle_moonset_record_toggle() {
             refresh_moonset_view(true);
         } else {
             se.recordActive = false;
+            se.recordToWav  = false;
             se.recordFailed = true;
             set_status(s_, "RECORD FAILED", false);
         }
@@ -1307,22 +1625,43 @@ bool InputDispatcher::moonset_edit(const InputAction& action) {
     const bool    loopBefore = se.loopPreview;
     const int64_t viewStart0 = se.view_start(), viewEnd0 = se.view_end();
     const int     source0    = se.sourceMode;
+    const int         sliceMethod0 = se.sliceMethod;
+    const int         slice0       = se.sliceIndex;
     const MoonsetInputResult r = moonset_.handle_input(se, action);
+    // Row 11's index is the slice being read: a sounding cloud moves to the one just selected.
+    if (se.sliceIndex != slice0) restart_moonset_slice_audition();
     moonset_ensure_transients(host_, se);   // METHOD / SENS clear the list: detect again at once
+
+    // When leaving a slicing method for OFF, keep the current boundaries as *saved* slices, so they
+    // stay visible (blue lines) and SLICE FOLLOW can still follow them after the switch.
+    if (se.sliceMethod == MoonsetModule::SLICE_OFF && sliceMethod0 != MoonsetModule::SLICE_OFF &&
+        se.fileMarkers.empty()) {
+        if (sliceMethod0 == MoonsetModule::SLICE_TRANSIENT) {
+            for (int f : se.transientMarkers)
+                if (f > 0 && f < se.totalFrames) se.fileMarkers.push_back(f);
+        } else if (sliceMethod0 == MoonsetModule::SLICE_DIVIDE) {
+            for (int f : divide_points(se.totalFrames, se.sliceDivisions))
+                if (f > 0 && f < se.totalFrames) se.fileMarkers.push_back(f);
+        } else if (sliceMethod0 == MoonsetModule::SLICE_MANUAL) {
+            for (const auto& m : se.manualMarkers)
+                if (m.frame > 0 && m.frame < se.totalFrames) se.fileMarkers.push_back(m.frame);
+        }
+        std::sort(se.fileMarkers.begin(), se.fileMarkers.end());
+        se.fileMarkers.erase(std::unique(se.fileMarkers.begin(), se.fileMarkers.end()), se.fileMarkers.end());
+    }
+
+    // Push the current slices into the instrument whenever the method or its boundaries change, so
+    // that OFF mode keeps the saved slices (and SLICE FOLLOW can still follow them).
+    if (se.sliceMethod != sliceMethod0) moonset_sync_slices();
     if (se.totalFrames > 0 &&
         (se.view_start() != viewStart0 || se.view_end() != viewEnd0 || se.sourceMode != source0))
         refresh_moonset_view(/*reset_selection=*/false);   // ZOOM, SOURCE: the picture follows the window
     if (r.rateModeChanged || r.bitDepthChanged) apply_moonset_rate_and_bits();
 
-    // LOOP : la pr�-�coute suit l'activation/d�sactivation et les changements de d�but/fin.
-    if (se.loopPreview != loopBefore) {
-        if (se.loopPreview) {
-            if (se.playbackPosition < 0.0f) moonset_audition();
-        } else if (se.playbackPosition >= 0.0f) {
-            host_.stop_preview();
-            se.playbackPosition = -1.0f;
-        }
-    }
+    // LOOP: a sounding preview follows the new value without being restarted.
+    if (se.loopPreview != loopBefore && se.playbackPosition >= 0.0f)
+        host_.refresh_sample_preview(se.instrumentId, se.loopPreview,
+                                     se.selectionStart, se.selectionEnd);
 
     // ?? false: the editor's session is not the document (a held A+UP on ZOOM would arm an autosave).
     // RATE and BIT push for themselves.
@@ -1358,7 +1697,7 @@ GestureResult InputDispatcher::moonset_stretch_layer(Gesture g) {
             break;
 
         // The editor's own X: it plays the sample as these settings would leave it.
-        case Gesture::X: moonset_audition(); break;
+        case Gesture::X: if (host_.is_playing()) { host_.stop(); break; } moonset_audition(); break;
 
         // The settings stay for APPLY on the FX row.
         case Gesture::B: se.stretchOpen = false; break;
@@ -1381,6 +1720,68 @@ void InputDispatcher::moonset_stretch_edit(InputAction (*fn)(const CursorContext
     const InputAction action = fn(moonset_stretch_cursor_context(s_.moonset, tempo));
     // The editor's session, not the document: nothing to mark modified.
     moonset_stretch_handle_input(s_.moonset, action, tempo);
+}
+
+// ─── The STRETCH page ───────────────────────────────────────────────────────────────────────────
+// Raised by A on the GRAIN column's STRETCH cell. It is live: every edit pushes the instrument, so a
+// cloud that is already sounding follows at once. There is no APPLY; B closes it.
+
+bool InputDispatcher::open_moonset_stretch_page() {
+    MoonsetState& se = s_.moonset;
+    songcore::Instrument& ins =
+        host_.edit_project().instruments[static_cast<size_t>(se.instrumentId)];
+    if (!moonset_stretch_page_begin(se, ins.granular, s_.project->tempo)) return false;
+    host_.push_instrument(se.instrumentId);
+    // Audition on open when nothing is sounding, so the page is heard while it is edited.
+    if (se.playbackPosition < 0.0f && !se.recordActive) moonset_audition();
+    return true;
+}
+
+GestureResult InputDispatcher::moonset_stretch_page_layer(Gesture g) {
+    MoonsetState& se = s_.moonset;
+    songcore::Instrument& ins =
+        host_.edit_project().instruments[static_cast<size_t>(se.instrumentId)];
+    const int tempo = s_.project->tempo;
+    auto edit = [&](int delta, bool reset) {
+        if (moonset_stretch_page_edit(ins.granular, se, delta, reset, tempo))
+            host_.push_instrument(se.instrumentId);
+    };
+    switch (g) {
+        case Gesture::DPAD_UP:    moonset_stretch_page_move(ins.granular, se, -1); break;
+        case Gesture::DPAD_DOWN:  moonset_stretch_page_move(ins.granular, se, +1); break;
+
+        // A held with an arrow is an edit, so the release must not also audition (see
+        // defer_a_to_release: the page holds A until it comes up).
+        case Gesture::A_RIGHT:
+        case Gesture::A_LEFT:
+        case Gesture::A_UP:
+        case Gesture::A_DOWN:
+        case Gesture::A_B:
+            set_a_pressed_alone(false);
+            if (g == Gesture::A_RIGHT)     edit(+1, false);
+            else if (g == Gesture::A_LEFT) edit(-1, false);
+            else if (g == Gesture::A_UP)   edit(+16, false);
+            else if (g == Gesture::A_DOWN) edit(-16, false);
+            else                           edit(0, true);
+            break;
+
+        // A tap, and X, (re)start the audition; B closes the page.
+        case Gesture::A:
+        case Gesture::X:
+            if (host_.is_playing()) { host_.stop(); break; }
+            if (!se.recordActive) moonset_audition();
+            break;
+        case Gesture::B:
+            se.stretchPageOpen = false;
+            break;
+
+        // SHIFT alone is a modifier; its cell help still works.
+        case Gesture::Y:
+            return GestureResult::PASS;
+
+        default: break;
+    }
+    return GestureResult::TAKEN;
 }
 
 }  // namespace pt::ui

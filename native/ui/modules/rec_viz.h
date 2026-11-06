@@ -95,7 +95,7 @@ class RecViz {
     bool calibrating() const { return calib_ > 0; }
     // Vrai dès que push() a reçu de l'audio (sert à diagnostiquer un câblage manquant).
     float peakDb() const { return 20.f * std::log10(std::max(peak_.load(std::memory_order_relaxed), 1e-6f)); }
-    bool receiving() const { return wpos_.load(std::memory_order_relaxed) > 0; }
+    bool receiving() const { return armed_; }
 
     // THREAD AUDIO. r peut être nullptr (mono).
     void push(const float* l, const float* r, int frames) {

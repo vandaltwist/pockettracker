@@ -283,6 +283,17 @@ int AudioEngine::getActiveVoiceCount() {
     return count;
 }
 
+int AudioEngine::getActiveSliceForInstrument(int instrumentId) {
+    const VoiceView& view = voiceView();
+    int last = -1;
+    for (int i = 0; i < MAX_VOICES; i++) {
+        if (!view.sampler[i].active) continue;
+        if (view.sampler[i].instrId != instrumentId) continue;
+        if (view.sampler[i].sliceIndex >= 0) last = view.sampler[i].sliceIndex;
+    }
+    return last;
+}
+
 void AudioEngine::getTrackActiveNotes(int* out, int trackCount) {
     for (int t = 0; t < trackCount; t++) out[t] = -1;
     const VoiceView& view = voiceView();
@@ -335,7 +346,7 @@ void AudioEngine::scheduleNote(int64_t targetFrame, int sampleId, int trackId,
                                int noteOctave, int notePitch,
                                float pslInitialOffset, float pslDuration,
                                float pbnRate, float vibratoSpeed, float vibratoDepth,
-                               int tableStartRow) {
+                               int tableStartRow, bool isGranular) {
     ScheduledNote note{};
     note.targetFrame        = targetFrame;
     note.sampleId           = sampleId;
@@ -357,6 +368,10 @@ void AudioEngine::scheduleNote(int64_t targetFrame, int sampleId, int trackId,
     note.vibratoSpeed       = vibratoSpeed;
     note.vibratoDepth       = vibratoDepth;
     note.tableStartRow      = tableStartRow;
+    // The low-level path has no program to resolve, so the caller says whether this note is a cloud.
+    // ⚠️ Without it the sample editor's MOONSET audition is a plain playhead: POSITION / STRETCH are
+    // never read, and the page looks silent.
+    note.isGranular         = isGranular;
     noteQueue.schedule(note);
 }
 
@@ -423,6 +438,7 @@ bool AudioEngine::resolveScheduledNote(ScheduledNote& note) {
     } else {
         const songcore::SamplerNoteArgs& a = d.sampler;
         common(a);
+        note.sliceIndex         = a.sliceIndex;
         note.frequency          = a.frequency;
         note.baseFrequency      = a.baseFrequency;
         note.volume             = a.volume;

@@ -102,6 +102,23 @@ void InputDispatcher::on_y_left() {
 
 void InputDispatcher::on_y_right() {
     if (route(Gesture::Y_RIGHT)) return;
+
+    // On PHRASE, the page change lands on the instrument named by the current row's instrument cell,
+    // whatever column the cursor is on: the whole note/row shares one instrument.
+    if (s_.currentScreen == ScreenType::PHRASE) {
+        const Project& p = *s_.project;
+        if (s_.currentPhrase >= 0 && s_.currentPhrase < static_cast<int>(p.phrases.size())) {
+            const Phrase& ph = p.phrases[static_cast<size_t>(s_.currentPhrase)];
+            if (s_.cursorRow >= 0 && s_.cursorRow < static_cast<int>(ph.steps.size())) {
+                const int last = static_cast<int>(p.instruments.size()) - 1;
+                const int inst = std::clamp(ph.steps[static_cast<size_t>(s_.cursorRow)].instrument, 0,
+                                            std::max(0, last));
+                s_.currentInstrument    = inst;
+                s_.lastEditedInstrument = inst;
+            }
+        }
+    }
+
     const NavResult r = navigate_right(nav_state_of(s_));
     if (!song_relative_entry_allowed(s_, r.screen)) return;
     if (r.screen != s_.currentScreen) sync_last_edited_on_screen_switch(s_.currentScreen, r.screen);

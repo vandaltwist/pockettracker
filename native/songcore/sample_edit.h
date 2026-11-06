@@ -147,9 +147,16 @@ void preview_instrument_dry(Engine& engine, const Instrument& ins, int slotId, f
     engine.setInstrumentEqSlot(slotId, -1);          // −1 = the engine's own bypass
     engine.setInstrumentSendLevels(slotId, 0, 0);
 
+    // ⚠️ The low-level schedule has no program to resolve, so a MOONSET instrument must say it is a
+    // cloud: otherwise the audition is a plain playhead and the granular page edits nothing audible.
     engine.scheduleNote(engine.getCurrentFrame() + 100, slotId, Engine::PREVIEW_LANE,
                         /*frequency=*/targetFreq, /*baseFrequency=*/baseFreq, /*volume=*/1.0f,
-                        /*phraseVolume=*/1.0f, /*pan=*/0.5f);
+                        /*phraseVolume=*/1.0f, /*pan=*/0.5f,
+                        /*startPointOverride=*/-1, /*endPointOverride=*/-1,
+                        /*tableId=*/-1, /*tableTicRate=*/6, /*noteOctave=*/4, /*notePitch=*/0,
+                        /*pslInitialOffset=*/0.0f, /*pslDuration=*/0.0f, /*pbnRate=*/0.0f,
+                        /*vibratoSpeed=*/0.0f, /*vibratoDepth=*/0.0f, /*tableStartRow=*/-1,
+                        /*isGranular=*/ins.instrumentType == InstrumentType::GRANULAR);
 }
 
 // ─── SAVE and CHOP ───────────────────────────────────────────────────────────────────────────────

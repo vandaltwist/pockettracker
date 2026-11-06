@@ -212,10 +212,25 @@ void SongcoreHost::push_params() {
 void SongcoreHost::push_instrument(int id, bool refreshSounding) {
     if (!engine_) return;
     if (id < 0 || id >= static_cast<int>(project_.instruments.size())) return;
-    push_instrument_params(*engine_, project_.instruments[id], routing_, tempo_in_force(project_), sampleRate_);
+    Instrument& ins = project_.instruments[id];
+    push_instrument_params(*engine_, ins, routing_, tempo_in_force(project_), sampleRate_);
+    // ⚠️ That push cleared the preview's exact-frame window (setInstrumentParams does). Put the last
+    // selection back, or a live edit on a sounding slice drags the cloud back over the whole sample.
+    if (previewEditorId_ == id && previewEditorSlot_ >= 0) apply_preview_window(previewEditorSlot_);
     // `sampleId` is the index the params were written at and the one a voice remembers.
     // ⚠️ Only for an EDIT: the refresh wipes what a table row or phrase command set on the voice.
-    if (refreshSounding) engine_->refreshSoundingInstrument(project_.instruments[id].sampleId);
+    if (refreshSounding) engine_->refreshSoundingInstrument(ins.sampleId);
+    // An editor preview of LEFT / RIGHT / MONO plays from the scratch slot: mirror the push there, or a
+    // live granular edit (POSITION, STRETCH, the cloud's shape) is silent until the next audition.
+    if (previewEditorId_ == id && previewEditorSlot_ >= 0 && previewEditorSlot_ != id) {
+        const int saved = ins.sampleId;
+        ins.sampleId = previewEditorSlot_;
+        push_instrument_playback_params(*engine_, ins);
+        apply_preview_window(previewEditorSlot_);   // the push above cleared it
+        push_instrument_granular_params(*engine_, ins, previewEditorSlot_);
+        if (refreshSounding) engine_->refreshSoundingInstrument(previewEditorSlot_);
+        ins.sampleId = saved;
+    }
 }
 
 void SongcoreHost::push_globals() {
@@ -485,6 +500,10 @@ float SongcoreHost::sample_playback_position(int id) const {
     return engine_ ? engine_->getSamplePlaybackPosition(id) : -1.0f;
 }
 
+int SongcoreHost::grain_positions(float* out, int max) const {
+    return engine_ ? engine_->getGrainPositions(out, max) : 0;
+}
+
 std::vector<float> SongcoreHost::sample_waveform(int id, int bins, int startFrame, int endFrame,
                                                  int channel) const {
     std::vector<float> out(static_cast<size_t>(std::max(bins, 0)) * 2, 0.0f);
@@ -568,6 +587,9 @@ void SongcoreHost::preview_sample_editor(int id, int sourceMode, int64_t selStar
     if (slot != id) ins.sampleId = slot;
     ins.loopMode = loop ? "fwd" : "off";   // the editor's LOOP cell, not the instrument's saved state
     push_instrument_playback_params(*engine_, ins);
+    // The cloud's own block is keyed on the slot too: on a stereo sample's LEFT/RIGHT audition the note
+    // plays from the scratch slot, and without this push POSITION / STRETCH would stay at their defaults.
+    push_instrument_granular_params(*engine_, ins, slot);
     // After the push, which clears any previous window. A channel copy is frame-for-frame, so the
     // selection indexes it as it is; a synced one is scaled onto its new length.
     if (totalFrames > 0 && selEnd > selStart) {
@@ -589,6 +611,17 @@ void SongcoreHost::preview_sample_editor(int id, int sourceMode, int64_t selStar
     previewEditorSelEnd_   = selEnd;
 }
 
+void SongcoreHost::apply_preview_window(int slot) {
+    if (!engine_ || slot < 0) return;
+    const int64_t total = previewEditorTotal_;
+    if (total <= 0 || previewEditorSelEnd_ <= previewEditorSelStart_) return;
+    const int64_t len = engine_->getSampleLength(slot);
+    if (len <= 0) return;
+    const int64_t a = std::clamp<int64_t>(previewEditorSelStart_ * len / total, 0, len);
+    const int64_t b = std::clamp<int64_t>(previewEditorSelEnd_ * len / total, 0, len);
+    if (b > a) engine_->setInstrumentFrameWindow(slot, static_cast<int>(a), static_cast<int>(b));
+}
+
 void SongcoreHost::refresh_sample_preview(int id, bool loop, int64_t selStart, int64_t selEnd) {
     if (!engine_ || id < 0 || id >= POOL_INSTRUMENTS) return;
     Instrument& ins = project_.instruments[static_cast<size_t>(id)];
@@ -604,6 +637,8 @@ void SongcoreHost::refresh_sample_preview(int id, bool loop, int64_t selStart, i
     if (slot != id) ins.sampleId = slot;
     ins.loopMode = loop ? "fwd" : "off";
     push_instrument_playback_params(*engine_, ins);
+    // Same keying as the audition: the scratch slot needs the cloud's block too.
+    push_instrument_granular_params(*engine_, ins, slot);
     if (total > 0 && selEnd > selStart) {
         const int64_t len = engine_->getSampleLength(slot);
         const int64_t a   = std::clamp<int64_t>(selStart * len / total, 0, len);

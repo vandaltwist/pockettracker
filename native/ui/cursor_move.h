@@ -171,7 +171,6 @@ inline void moonset_keep_granular_visible(AppState& s) {
 inline void moonset_enter_granular(AppState& s) {
     MoonsetState& m = s.moonset;
     m.granularFocus = true;
-    m.pageScrollPx  = MoonsetState::PAGE_SCROLL_MAX;
     m.granularColumn = 0;
     m.granularRow    = 0;
     m.granularTop    = 0;
@@ -182,26 +181,24 @@ inline void moonset_step_row(AppState& s, int delta) {
     MoonsetState& m = s.moonset;
 
     if (m.granularFocus) {
-        if (delta < 0 && m.granularRow == 0) {   // back to LOAD / SAVE / OVERWRITE
-            m.granularFocus = false;
-            m.pageScrollPx  = 0;
-            m.cursorRow     = 19;
-            m.cursorCol     = std::min(m.cursorCol,
-                                       MoonsetModule::max_col_for_row(19, m.sliceMethod));
-            return;
-        }
         const int count = moonset_granular_row_count(m.granularColumn);
         if (count <= 0) return;
-        m.granularRow = std::clamp(m.granularRow + delta, 0, count - 1);
+
+        // The block wraps BOTH ways: DOWN past its last row comes back to its first, UP from its
+        // first goes to its last. Leaving it is SHIFT + LEFT/RIGHT, never a plain arrow.
+        if (delta > 0 && m.granularRow >= count - 1) {
+            m.granularRow = 0;
+        } else if (delta < 0 && m.granularRow <= 0) {
+            m.granularRow = count - 1;
+        } else {
+            m.granularRow = std::clamp(m.granularRow + delta, 0, count - 1);
+        }
         moonset_keep_granular_visible(s);
         return;
     }
 
-    if (delta > 0 && m.cursorRow == 19) {   // DOWN from the last sample row enters GRAIN
-        moonset_enter_granular(s);
-        return;
-    }
-
+    // The sample page wraps too: DOWN past LOAD comes back to the first row. The granular panel is
+    // reached with SHIFT + DOWN, not by walking off the bottom.
     const int newRow = (delta < 0) ? MoonsetModule::row_above(m.cursorRow, m.sliceMethod)
                                    : MoonsetModule::row_below(m.cursorRow, m.sliceMethod);
     m.cursorRow = newRow;
@@ -212,7 +209,10 @@ inline void moonset_step_col(AppState& s, int delta) {
     MoonsetState& m = s.moonset;
 
     if (m.granularFocus) {
-        m.granularColumn = std::clamp(m.granularColumn + delta, 0, 2);
+        // The granular panel's three columns wrap around: LEFT on GRAIN reaches MOTION, RIGHT on
+        // MOTION reaches GRAIN. Only the panel (not the sample rows) — leaving it is still
+        // SHIFT + LEFT/RIGHT.
+        m.granularColumn = ((m.granularColumn + delta) % 3 + 3) % 3;
         const int count = moonset_granular_row_count(m.granularColumn);
         if (count > 0) m.granularRow = std::min(m.granularRow, count - 1);
         moonset_keep_granular_visible(s);

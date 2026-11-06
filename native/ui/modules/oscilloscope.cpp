@@ -3,6 +3,7 @@
 #include <algorithm>  // std::max — libstdc++ does not pull it in
 
 #include "ui/helpers.h"
+#include "ui/modules/rec_viz.h"
 
 namespace pt::ui {
 
@@ -22,6 +23,9 @@ void OscilloscopeModule::draw(Canvas& c, int x, int y, const OscilloscopeState& 
     switch (t.visualizerType) {
         case VisualizerType::SCOPE:
             draw_scope(c, x, y, s.waveform, t);
+            break;
+        case VisualizerType::MOONVIZ:
+            pt::ui::rec_viz().draw(c, x, y, WIDTH, HEIGHT, 1, 1);
             break;
         case VisualizerType::FLAT:
             draw_flat(c, x, y, t);

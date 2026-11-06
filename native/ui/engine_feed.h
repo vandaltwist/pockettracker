@@ -12,7 +12,7 @@
 #include "songcore/host.h"
 #include "ui/app_state.h"
 #include "ui/modules/oscilloscope.h"
-
+#include "ui/modules/moonset.h"
 namespace pt::ui {
 
 class EngineFeed {
@@ -316,7 +316,41 @@ private:
         }
         m.sampleRate = host.sample_rate_of(m.instrumentId);
         m.totalFrames = host.sample_length(m.instrumentId);
-        m.playbackPosition = host.sample_playback_position(m.instrumentId);
+        // The audition plays from the scratch slot for a stereo sample's LEFT/RIGHT/MONO reads, so ask
+        // that slot first: without it a running preview reads as silent and never follows the slice.
+        // While the sequencer plays, the tracker's own voice wins: a preview may still be looping on
+        // the slicing tool's slice, which is exactly what the playhead must not show.
+        if (host.is_playing()) {
+            m.playbackPosition = host.sample_playback_position(m.instrumentId);
+        } else {
+            m.playbackPosition = host.sample_playback_position(songcore::SOURCE_PREVIEW_SLOT);
+            if (m.playbackPosition < 0.0f)
+                m.playbackPosition = host.sample_playback_position(m.instrumentId);
+        }
+
+        // SLICE FOLLOW: move the editor's slice cursor to the slice the tracker is actually playing.
+        int sampleId = m.instrumentId;
+        if (m.instrumentId >= 0 && m.instrumentId < (int)host.edit_project().instruments.size()) {
+            sampleId = host.edit_project().instruments[(size_t)m.instrumentId].sampleId;
+        }
+        if (m.sliceFollow && host.is_playing()) {
+            const int played = engine.getActiveSliceForInstrument(sampleId);
+            if (played >= 0) {
+                m.trackerSliceActive  = true;
+                m.trackerSliceDisplay = played;
+            } else {
+                m.trackerSliceActive  = false;
+                m.trackerSliceDisplay = -1;
+            }
+        } else {
+            m.trackerSliceActive  = false;
+            m.trackerSliceDisplay = -1;
+        }
+        // What the GRAIN/ROAM/MOTION cloud reads. ONLY a slice the tracker is actually sounding;
+        // otherwise -1, so the cloud reads the whole sample at GRAIN POSITION. The slicing tool's
+        // cursor is never a fallback: TRANSIENT/DIVIDE/MANUAL must not drive the grain.
+        m.granularSliceIndex = m.trackerSliceActive ? m.trackerSliceDisplay : -1;
+        m.sliceReading       = m.granularSliceIndex >= 0;
         (void)engine;
     }
 

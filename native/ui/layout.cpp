@@ -9,6 +9,7 @@
 #include "ui/helpers.h"
 #include "ui/modules/fx_helper_overlay.h"
 #include "ui/modules/map_picker_overlay.h"
+#include "ui/modules/rec_viz.h"
 #include "ui/modules/render_dialog.h"
 #include "ui/song_pointer.h"
 
@@ -69,6 +70,7 @@ void TrackerLayout::draw_full_screen(Canvas& c, const AppState& s) {
         moonset_.draw(c, 0, 0, s.moonset, ins.granular, t);
         // The TSTRETCH box dims the frame, so help is drawn after it.
         if (s.project) draw_moonset_stretch_editor(c, s.moonset, s.project->tempo, t);
+        draw_moonset_stretch_page(c, s.moonset, ins.granular, s.project->tempo, t);
         if (s.helpOpen)
             helpPanel_.draw(c, SIDE_SPACER, MoonsetModule::WAVEFORM_Y, help_topic(s), t,
                             MoonsetModule::WAVEFORM_H);
@@ -110,6 +112,11 @@ void TrackerLayout::draw_scope_strip(Canvas& c, const AppState& s) {
     if (t.visualizerType == VisualizerType::SPECTRUM ||
         t.visualizerType == VisualizerType::SPECTRUM_PEAKS) {
         os.spectrum = s.spectrum;
+    }
+
+    if (t.visualizerType == VisualizerType::MOONVIZ && s.waveform) {
+        pt::ui::rec_viz().push(s.waveform, nullptr, WAVEFORM_SIZE);
+        pt::ui::rec_viz().update();
     }
 
     oscilloscope_.draw(c, SIDE_SPACER, SCREEN_SPACER, os);
@@ -408,6 +415,8 @@ bool TrackerLayout::has_falling_meters(const AppState& s) const {
 
     // MOONSET: the grain cloud moves by itself, so keep repainting while the page is up.
     if (moonset_cloud_animating(s)) return true;
+
+    // MOONSET: the grain cloud moves by itself, so keep repainting while the page is up.
 
     // The EQ editor's panel, asked what it last drew.
     if (s.eq.isOpen && !eq_.spectrum_at_rest()) return true;

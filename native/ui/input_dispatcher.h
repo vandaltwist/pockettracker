@@ -749,6 +749,7 @@ class InputDispatcher {
     void browser_cycle_sort(int delta);
     // Move the cursor, keeping the window around it; `page` is LEFT/RIGHT's jump.
     void browser_move_cursor(int delta, bool page);
+    void browser_move_and_audition(int delta);
     // LEFT / RIGHT in the list: the first or the last entry.
     void browser_jump_to_edge(bool bottom);
     // A: open a folder, go up, or load the file — per `browserPurpose`.
@@ -766,7 +767,13 @@ class InputDispatcher {
     // APPLY (START, or A on APPLY): acts on the context it was opened with.
     void qwerty_apply();
     // ABORT (SELECT, or A on ABORT): discards the text.
-    void qwerty_cancel() { s_.qwerty = QwertyKeyboardState{}; }
+    void qwerty_cancel() {
+        if (s_.qwerty.context == QwertyContext::MOONSET_REC_SAVE) {
+            moonsetPending_.recordTakeL.clear();
+            moonsetPending_.recordTakeR.clear();
+        }
+        s_.qwerty = QwertyKeyboardState{};
+    }
 
     // ── PROJECT and SETTINGS (ui/dispatch/screens/project.cpp) ───────────────────────────────────
 
@@ -1074,11 +1081,14 @@ class InputDispatcher {
     GestureResult moonset_close_layer(Gesture g);
 
     void moonset_audition();
+    // A sounding cloud follows the slice the cursor just landed on: restart it at that slice.
+    void restart_moonset_slice_audition();
 
     // Rows 3..8: the D-pad drags the selection instead of moving a cursor.
     bool on_moonset_selection_row() const {
         return on_moonset() && !s_.moonset.granularFocus &&
-               s_.moonset.cursorRow >= 3 && s_.moonset.cursorRow <= 8;
+               s_.moonset.cursorRow >= 3 && s_.moonset.cursorRow <= 8 &&
+               !(s_.moonset.cursorRow == 8 && s_.moonset.cursorCol == 2);   // LOOP is a toggle cell
     }
     void nudge_moonset_selection_edge(int64_t delta);
 
@@ -1095,7 +1105,8 @@ class InputDispatcher {
     void reset_moonset_slice_marker();
     void tap_moonset_slice_marker();
 
-    void handle_moonset_record_toggle();
+    // `to_wav`: REC WAV (new file) instead of REC (install into the instrument).
+    void handle_moonset_record_toggle(bool to_wav = false);
     void refresh_moonset_input_devices();
     void refresh_moonset_record();
 
@@ -1111,10 +1122,22 @@ class InputDispatcher {
     void open_moonset_stretch();
     void moonset_stretch_edit(InputAction (*fn)(const CursorContext&));
 
+    // ── The STRETCH page (A on the GRAIN column's STRETCH cell) ─────────────────────────────────
+    bool moonset_stretch_page_open() const { return on_moonset() && s_.moonset.stretchPageOpen; }
+    GestureResult moonset_stretch_page_layer(Gesture g);
+    bool open_moonset_stretch_page();
+
     void bake_moonset_pending_pitch();
     std::vector<int> compute_moonset_slice_cue_points() const;
+    // Pushes the editor's slices into the instrument and turns the engine's slice reading on/off, so
+    // the GRAIN / ROAM / MOTION columns read the same window the editor shows. Cheap when unchanged.
+    void moonset_sync_slices();
     void refresh_moonset_view(bool reset_selection);
     void save_moonset_sample_to(const std::string& path, bool adopt_name);
+    // Write the REC WAV take copied at stop time. Never touches the instrument.
+    void save_moonset_recording_to(const std::string& path);
+    void save_moonset_preset_to(const std::string& dir, const std::string& typed_text);
+    bool load_moonset_preset_from(const std::string& path);
     void moonset_chop();
     std::vector<std::pair<int64_t, int64_t>> current_moonset_slices() const;
     void run_due_moonset_preview_restore(bool force = false);
@@ -1139,6 +1162,12 @@ class InputDispatcher {
 
         // The playhead when A went down on the tap cell (0..1, −1 = nothing sounding).
         float sliceTapPlayhead = -1.0f;
+
+        // A finished REC WAV take, copied out of the engine at stop so the name prompt outlives the
+        // capture. `recordTakeR` empty = mono.
+        std::vector<float> recordTakeL;
+        std::vector<float> recordTakeR;
+        int                recordTakeRate = 48000;
     };
     MoonsetPending moonsetPending_{};
 

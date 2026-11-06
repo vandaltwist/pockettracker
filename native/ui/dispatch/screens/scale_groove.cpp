@@ -83,23 +83,23 @@ void InputDispatcher::scale_row_action() {
 }
 
 void InputDispatcher::save_scale_as(const std::string& dir, const std::string& typed_text) {
-    // Sanitized filename (empty → SCALE.pts), raw name inside.
-    const std::string safe = safe_file_name(typed_text);
-    const std::string file = (safe.empty() ? std::string("SCALE") : safe) + ".pts";
-
     songcore::Scale& slot = host_.edit_project().scales[static_cast<size_t>(s_.currentScale)];
 
+    // Sanitized, then auto-numbered: a second MINOR becomes MINOR1, never a silent overwrite.
+    std::string base = safe_file_name(typed_text);
+    if (base.empty()) base = safe_file_name(!slot.name.empty() ? slot.name
+                                                               : songcore::scale_display_name(slot));
+    if (base.empty()) base = "SCALE";
+    const std::string name = free_file_stem(fs_, dir, base, ".pts");
+
     // The slot adopts the name it was saved under, which clears the `*`.
-    const std::string want = !typed_text.empty()          ? typed_text
-                           : !slot.name.empty()           ? slot.name
-                                                          : songcore::scale_display_name(slot);
-    if (slot.name != want) {
-        slot.name = want;
+    if (slot.name != name) {
+        slot.name = name;
         mark_modified();
     }
 
-    const bool ok = save_scale_file(fs_, dir + "/" + file, slot);
-    set_status(s_, ok ? "SCALE SAVED" : "SAVE FAILED", ok);
+    const bool ok = save_scale_file(fs_, dir + "/" + name + ".pts", slot);
+    set_status(s_, ok ? ("SCALE SAVED: " + name) : "SAVE FAILED", ok);
 }
 
 // ─── The GROOVE screen's SAVE / LOAD cells ───────────────────────────────────────────────────────
@@ -127,22 +127,22 @@ void InputDispatcher::groove_row_action() {
 }
 
 void InputDispatcher::save_groove_as(const std::string& dir, const std::string& typed_text) {
-    // As for scales (empty → GROOVE.ptg).
-    const std::string safe = safe_file_name(typed_text);
-    const std::string file = (safe.empty() ? std::string("GROOVE") : safe) + ".ptg";
-
     songcore::Groove& slot = host_.edit_project().grooves[static_cast<size_t>(s_.currentGroove)];
 
-    const std::string want = !typed_text.empty()          ? typed_text
-                           : !slot.name.empty()           ? slot.name
-                                                          : songcore::groove_display_name(slot);
-    if (slot.name != want) {
-        slot.name = want;
+    // As for scales, including the auto-numbering (GROOVE, GROOVE1, …).
+    std::string base = safe_file_name(typed_text);
+    if (base.empty()) base = safe_file_name(!slot.name.empty() ? slot.name
+                                                               : songcore::groove_display_name(slot));
+    if (base.empty()) base = "GROOVE";
+    const std::string name = free_file_stem(fs_, dir, base, ".ptg");
+
+    if (slot.name != name) {
+        slot.name = name;
         mark_modified();
     }
 
-    const bool ok = save_groove_file(fs_, dir + "/" + file, slot);
-    set_status(s_, ok ? "GROOVE SAVED" : "SAVE FAILED", ok);
+    const bool ok = save_groove_file(fs_, dir + "/" + name + ".ptg", slot);
+    set_status(s_, ok ? ("GROOVE SAVED: " + name) : "SAVE FAILED", ok);
 }
 
 // ─── The cursor and the edit ─────────────────────────────────────────────────────────────────────

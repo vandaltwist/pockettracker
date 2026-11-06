@@ -219,7 +219,8 @@ struct AppState {
         LOAD_SOURCE,        // a sample (or an .sf2 — the instrument's TYPE decides, at open time)
         LOAD_PRESET,        // a .pti into the current instrument slot
         LOAD_SAMPLE_EDITOR, // a .wav into the slot the SAMPLE EDITOR is open on - and back to it
-LOAD_MOONSET,       // a .wav into the slot the MOONSET editor is open on - and back to it
+        LOAD_MOONSET,       // a .wav into the slot the MOONSET editor is open on - and back to it
+        LOAD_MOONSET_PRESET, // a .preset into the open MOONSET instrument - and back to it
         LOAD_PROJECT,       // a .ptp — the whole document (PROJECT's LOAD)
         LOAD_THEME,         // a .ptt — and back into the THEME EDITOR that raised the browser
         LOAD_SCALE,         // a .pts into the slot the SCALE screen is showing
@@ -231,6 +232,11 @@ LOAD_MOONSET,       // a .wav into the slot the MOONSET editor is open on - and 
 
     // The screen the browser (or a full-screen overlay) returns to; every overlay open writes it.
     ScreenType previousScreen = ScreenType::PROJECT;
+
+    // Where B goes to leave MOONSET. ⚠️ Not `previousScreen`: the editor's PRESET cell opens the file
+    // browser, which writes MOONSET into `previousScreen` — B then "left" to MOONSET and trapped the
+    // user in the editor.
+    ScreenType moonsetReturnScreen = ScreenType::PROJECT;
 
     // Where B goes from SETTINGS. ⚠️ Not `previousScreen`, which every browser open moves.
     // Only PROJECT → SYSTEM writes it.
@@ -421,7 +427,8 @@ inline bool modal_backdrop_active(const AppState& s) {
     // A load is not here: its strip dims nothing.
     return s.qwerty.isOpen || s.confirm.is_open() || s.fxHelper.isOpen || s.mapPicker.isOpen ||
            s.helpFull || s.renderDialog.isOpen || send_editor_drawn(s) || stretch_editor_up(s) || moonset_stretch_up(s) ||
-           (s.currentScreen == ScreenType::MOONSET && s.moonset.granularFocus && s.moonset.modOpen);
+           (s.currentScreen == ScreenType::MOONSET && s.moonset.presetMenuOpen) ||
+           false;
 }
 
 // Does a full-screen module own the frame (no furniture)? ⚠️ `draw` and `has_falling_meters` both ask

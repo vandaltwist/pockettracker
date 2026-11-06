@@ -48,18 +48,45 @@ GestureResult InputDispatcher::file_browser_screen(Gesture g) {
         // An audition rings until stopped; scrolling must not stack them.
         case Gesture::STOP_PREVIEW: host_.stop_preview(); break;
 
-        // SHIFT + OPTION: cycle the sort; SHIFT + UP/DOWN does the same either way.
+        // SHIFT + OPTION: cycle the sort. SHIFT + UP/DOWN walks the list and auditions whatever lands
+        // under the cursor, so a folder can be listened through without PLAY on every row.
+        // EDIT + UP/DOWN does the same: a held EDIT must not freeze the walk (the audition used to
+        // raise the loading layer, which swallowed the arrows until the decode ended).
         case Gesture::Y_B:    browser_cycle_sort(+1); break;
-        case Gesture::Y_UP:   browser_cycle_sort(+1); break;
-        case Gesture::Y_DOWN: browser_cycle_sort(-1); break;
+        case Gesture::Y:      browser_audition(); break;   // PLAY (held): preview the current entry
+        case Gesture::Y_UP:   browser_move_and_audition(-1); break;
+        case Gesture::Y_DOWN: browser_move_and_audition(+1); break;
+        // EDIT + a direction: the press is held (defer_a_to_release), so clear it here — otherwise the
+        // release would also open / load the entry the arrows just walked to.
+        case Gesture::A_UP:
+            set_a_pressed_alone(false);
+            browser_move_cursor(-1, /*page=*/false);
+            break;
+        case Gesture::A_DOWN:
+            set_a_pressed_alone(false);
+            browser_move_cursor(+1, /*page=*/false);
+            break;
+        case Gesture::A_LEFT:
+            set_a_pressed_alone(false);
+            browser_jump_to_edge(/*bottom=*/false);
+            break;
+        case Gesture::A_RIGHT:
+            set_a_pressed_alone(false);
+            browser_jump_to_edge(/*bottom=*/true);
+            break;
         case Gesture::Y_LEFT: navigate_to_parent(fb, fs_); break;
 
         case Gesture::Y_A: browser_cut_or_paste(); break;
 
         // EDIT + OPTION: delete (arms the confirm); EDIT + PLAY: rename; PLAY + OPTION: new folder.
-        case Gesture::A_B: browser_arm_delete(); break;
+        case Gesture::A_B: set_a_pressed_alone(false); browser_arm_delete(); break;
         case Gesture::X_A: browser_rename(); break;
         case Gesture::X_B: browser_new_folder(); break;
+
+        // SHIFT + PLAY: silence the arrangement, so the file being auditioned is heard on its own.
+        case Gesture::Y_X:
+            if (host_.is_playing()) host_.stop();
+            break;
 
         default: break;   // every other gesture means nothing here
     }
@@ -103,8 +130,9 @@ void InputDispatcher::browser_audition() {
 
     // No song cell behind a file: neutral gain.
     host_.set_preview_track(-1);
-    // ⚠️ A full decode (a long mp3 is a real load), so the loading strip and B.
-    const LoadScope previewScope(*this, now_ms_, item->displayName);
+    // ⚠️ No LoadScope here: raising the loading layer swallowed the D-pad, so a held SHIFT/EDIT + arrow
+    // stopped walking the list as soon as the first preview decoded. The preview is short and the walk
+    // re-triggers it on the next row; B no longer cancels a decode, but it never blocked the scroll.
     if (!host_.preview_file(item->path)) {
         if (host_.last_load_cancelled()) return;   // stopped on purpose
         set_status(s_.fileBrowser, "PREVIEW FAILED", false);
@@ -136,19 +164,61 @@ void InputDispatcher::open_file_browser(AppState::BrowserPurpose purpose, const 
     s_.fileBrowser.fileExtensions = extensions;
     s_.fileBrowser.mode           = BrowserMode::NORMAL;
 
+    // The source already loaded in the slot the browser is about to load into. A sample load opens on
+    // that file's own folder (and puts the cursor on it), so a replacement starts from what is there
+    // rather than from the last folder another slot used.
+    std::string sourcePath;
+    if (s_.project) {
+        switch (purpose) {
+            case AppState::BrowserPurpose::LOAD_SOURCE: {
+                const int id = std::clamp(s_.currentInstrument, 0,
+                                          static_cast<int>(s_.project->instruments.size()) - 1);
+                const Instrument& ins = s_.project->instruments[static_cast<size_t>(id)];
+                sourcePath = ins.sampleFilePath.value_or("");
+                if (sourcePath.empty() && ins.soundfontPath) sourcePath = *ins.soundfontPath;
+                break;
+            }
+            case AppState::BrowserPurpose::LOAD_SAMPLE_EDITOR:
+                sourcePath = s_.sampleEditor.sampleFilePath;
+                break;
+            case AppState::BrowserPurpose::LOAD_MOONSET:
+                sourcePath = s_.moonset.sampleFilePath;
+                break;
+            default:
+                break;
+        }
+    }
+
     // FOLDER = REMEMBER: a sample load starts in the last sample's folder, if it still exists.
     std::string start = directory;
     if (s_.settings.rememberFolder && directory == browser_dir(BrowserDir::SAMPLES) &&
         !s_.settings.lastSampleFolder.empty() && fs_.is_directory(s_.settings.lastSampleFolder)) {
         start = s_.settings.lastSampleFolder;
     }
+    // ⚠️ After the remembered folder: the current sample's own folder wins when it has one.
+    if (!sourcePath.empty()) {
+        const std::string dir = fs_.parent_path(sourcePath);
+        if (!dir.empty() && fs_.is_directory(dir)) start = dir;
+    }
     navigate_to_folder(s_.fileBrowser, fs_, start);
+
+    // The cursor on the file it came from (a fresh slot has none and opens at the top).
+    if (!sourcePath.empty()) {
+        FileBrowserState& b = s_.fileBrowser;
+        for (int i = 0; i < static_cast<int>(b.items.size()); ++i) {
+            if (b.items[static_cast<size_t>(i)].path == sourcePath) { b.cursor = i; break; }
+        }
+        if (b.cursor >= b.scroll + BROWSER_VISIBLE_ROWS)
+            b.scroll = b.cursor - BROWSER_VISIBLE_ROWS + 1;
+    }
 
     s_.currentScreen = ScreenType::FILE_BROWSER;
 }
 
 void InputDispatcher::close_file_browser() {
-    // The audition is over; a preview left resident is PCM nothing will play again.
+    // The audition is over; a preview left resident is PCM nothing will play again. Stop the voice too:
+    // a granular audition never runs out its playhead, so clearing the slot alone would leave it alive.
+    host_.stop_preview();
     host_.clear_previews();
     end_selection(s_.fileBrowser);
     s_.currentScreen = s_.previousScreen;
@@ -203,6 +273,13 @@ void InputDispatcher::browser_move_cursor(int delta, bool page) {
     } else if (b.cursor >= b.scroll + BROWSER_VISIBLE_ROWS) {
         b.scroll = b.cursor - BROWSER_VISIBLE_ROWS + 1;
     }
+}
+
+// SHIFT + UP/DOWN: one row, then audition what is under the cursor. A folder or a non-audible file
+// is simply silent (browser_audition ignores it), so the walk never gets stuck.
+void InputDispatcher::browser_move_and_audition(int delta) {
+    browser_move_cursor(delta, /*page=*/false);
+    browser_audition();
 }
 
 // ─── LEFT / RIGHT: the first or the last entry ───────────────────────────────────────────────────
@@ -329,6 +406,17 @@ void InputDispatcher::browser_confirm() {
             // The MOONSET editor's own LOAD: the same load, returning to MOONSET.
             ok = host_.load_sample(s_.moonset.instrumentId, path);
             break;
+
+        case AppState::BrowserPurpose::LOAD_MOONSET_PRESET:
+            // A .preset into the open MOONSET instrument. ⚠️ No init_moonset_state(): the editor keeps
+            // its selection, zoom and cursor; only the granular bytes change.
+            if (ext != "preset" || !load_moonset_preset_from(path)) {
+                set_status(b, "LOAD FAILED", false);
+                return;
+            }
+            close_file_browser();
+            set_status(s_, "PRESET LOADED", true);
+            return;
 
         case AppState::BrowserPurpose::LOAD_PROJECT:
             // ⚠️ The whole document, returning early: load_project_file is parse, push, media and params.

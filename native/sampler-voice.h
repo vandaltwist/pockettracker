@@ -135,7 +135,7 @@ struct Voice : public IAudioVoice {
     // widen a note that was deliberately narrowed.
     int noteStartOverride = -1;
     int noteEndOverride   = -1;
-    // double: float spacing reaches 1.0 at 2^24 frames (~6 min), where interpolation collapses.
+    int sliceIndex         = -1;   // resolved slice for this note (-1 = none)    // double: float spacing reaches 1.0 at 2^24 frames (~6 min), where interpolation collapses.
     double position = 0;
     int trackId = -1;
     int instrId = -1;                  // = sampleId; names the instrument for its spectrum

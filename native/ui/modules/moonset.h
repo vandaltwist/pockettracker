@@ -19,6 +19,7 @@
 #include "ui/canvas.h"
 #include "ui/cursor.h"
 #include "ui/theme.h"
+#include "ui/modules/grain_preview.h"
 
 namespace pt::ui {
 
@@ -80,7 +81,15 @@ struct MoonsetState {
     int sliceDivisions   = 8;   // DIVIDE: cut into N equal parts
     // Row 11: which slice, under every method. ⚠️ Slice 00's left edge is the sample start, not a
     // marker (`slice_marker_index()`). Under MANUAL it reaches one past the last slice: the next one.
-    int sliceIndex       = 0;
+    int sliceIndex             = 0;
+    bool trackerSliceActive    = false; // a tracker note is currently playing a slice of this instrument
+    int trackerSliceDisplay    = -1;    // slice index shown in POSITION (from tracker), not the editor's
+    bool sliceFollow           = true;  // follow tracker slices in POSITION (toggle in MOD window)
+    int  granularSliceIndex    = -1;    // the slice the cloud reads (-1 = the editor cursor's slice)
+    // The instrument's `slicingMode` as the dispatcher last pushed it: the engine reads slices only
+    // then, so the grain columns follow the slice only when it is true. Hash of the pushed state.
+    bool     sliceReading = false;
+    uint32_t sliceSyncHash = 0;
 
     // ⚠️ Kept for UNDO and the two SYNC ops; the slice rows read `effective_slice_position()`.
     int64_t slicePosition = 0;
@@ -117,6 +126,15 @@ struct MoonsetState {
     int         stretchBpm     = 0;    // the tempo to fit to. ⚠️ 0 = the song's, read when it is needed
     int         stretchGrainMs = 40;   // the length of each piece, in milliseconds (sola-stretch.h)
 
+    // ── The STRETCH page (A on the GRAIN column's STRETCH cell) ─────────────────────────────────
+    // A live page: ORIGIN / DURATION / NEW BPM / PITCH / GRAIN / MASTER plus the LFO-RANDOM row that
+    // modulates MASTER. Nothing is applied: every edit pushes the instrument and a sounding cloud
+    // follows at once.
+    bool stretchPageOpen = false;
+    int  stretchPageLine = 0;
+    int  stretchModSlot  = -1;   // the granular.mods row it edits; -1 = every row is taken
+    int  stretchOriginBpm = 0;   // 0 = automatic (the sample's own tempo, source_bpm())
+
     // ── Flags ────────────────────────────────────────────────────────────────────────────────────
     // An unsaved destructive edit is in the engine's buffer. B asks before dropping it.
     bool isModified       = false;
@@ -125,6 +143,8 @@ struct MoonsetState {
     // ── Record ───────────────────────────────────────────────────────────────────────────────────
     // The editor is recording input audio into a new sample. REC draws lit; INPUT picks the device.
     bool recordActive = false;
+    // REC installs the take into the instrument's slot; REC WAV writes a new file and leaves it alone.
+    bool recordToWav  = false;
     bool recordFailed  = false;   // last record attempt failed (shown in the REC cell)
     float recordLevel  = 0.0f;    // live input peak (0..1) while recording
     float recordPan   = 0.0f;    // stereo pan of input (-1..1)
@@ -160,20 +180,37 @@ struct MoonsetState {
     // 0..1 while the sample sounds, −1 when not: the playhead line.
     float playbackPosition = -1.0f;
 
-    // Boucle de pré-écoute (cellule LOOP, rangée RECORD) : le sample boucle jusqu'à ce qu'on rappuie sur X.
+    // Boucle de pré-écoute (cellule LOOP, rangée SELECTION) : le sample boucle jusqu'à ce qu'on rappuie sur X.
     bool loopPreview = false;
 
-    // ── The granular block, under the sample rows (MOONGRANULAR only) ─────────────────────────────
-    // The page scrolls: 0 while the sample rows have the cursor, PAGE_SCROLL_MAX when the granular
-    // block does (the block starts at y=414 and seven of its rows do not fit under 480).
+    // ── The granular block, under the waveform (MOONGRANULAR only) ────────────────────────────────
+    // ⚠️ SHIFT swaps the LOWER HALF only, between the sample edit rows (SELECTION … LOAD) and
+    // GRAIN / ROAM / MOTION. The four header rows and the waveform (red playhead included) stay.
+    // `granularFocus` says which one the cursor is in; SHIFT toggles it.
     bool granularFocus  = false;
     int  granularColumn = 0;   // 0 = GRAIN, 1 = ROAM, 2 = MOTION
     int  granularRow    = 0;
-    int  granularTop    = 0;   // the block's own scroll, in rows (seven visible)
-    int  pageScrollPx   = 0;
+    int  granularTop    = 0;   // kept for the shared helper: every row fits in the panel
+    // The GRAIN column's PRESET cell: drawn in the column's title line (small, so the parameter rows
+    // never move) but walked as its last row. A opens a SAVE / LOAD popup; `presetMenuLine` 0 = SAVE,
+    // 1 = LOAD.
+    bool presetMenuOpen = false;
+    int  presetMenuLine = 0;
+    // The MOD window (A on a cell that can be modulated): which of the 8 mod rows it edits, and its cursor.
+    // Live grains: where each one reads, 0..1 of the sample. Refreshed every frame by the dispatcher.
+    static constexpr int GRAIN_HEADS_MAX = 64;
+    float grainHeads[GRAIN_HEADS_MAX] = {};
+    int   grainHeadCount = 0;
+    // Animation of the red lines: the dispatcher stamps the frame clock, the draw advances the simulation.
+    long long nowMs = 0;
+    mutable GrainPreview preview;
+    bool modOpen = false;
+    int  modSlot = 0;    // 0..7, a row of Instrument::granular.mods
+    int  modLine = 0;    // 0 SOURCE, 1 AMOUNT, 2 RATE or BUS, 3 SHAPE (LFO only)
+    // Live sidechain level for the BUS visualiser (0..1).
+    float modBusLevel = 0.0f;
 
-    static constexpr int GRANULAR_VISIBLE = 7;
-    static constexpr int PAGE_SCROLL_MAX  = 100;
+    static constexpr int GRANULAR_VISIBLE = 17;   // ROAM's depth: all three columns fit full-page
 
 
     // ── Derived ──────────────────────────────────────────────────────────────────────────────────
@@ -203,6 +240,10 @@ struct MoonsetState {
 
     // (start, end) of slice `idx`. OFF = the whole sample.
     void slice_bounds(int idx, int64_t& start, int64_t& end) const;
+
+    // The slice the GRAIN/ROAM/MOTION cloud reads: the tracker's slice while SLICE FOLLOW has one
+    // sounding, -1 otherwise (whole sample at GRAIN POSITION). Never the slicing tool's cursor.
+    int reading_slice_index() const;
 
     // Row 11's position: the start of the slice under the cursor.
     int64_t effective_slice_position() const;
@@ -247,6 +288,29 @@ void moonset_stretch_handle_input(MoonsetState& s, const InputAction& action, in
 // No-op when the box is not open.
 void draw_moonset_stretch_editor(Canvas& c, const MoonsetState& s, int song_tempo, const Theme& t);
 
+// ── The STRETCH page ───────────────────────────────────────────────────────────────────────────
+// A on the GRAIN column's STRETCH cell. `begin` finds (or makes) the granular.mods row that targets
+// GT_STRETCH and computes the ratio from DURATION + NEW BPM; `edit` changes the line under the
+// cursor; both are live (the dispatcher pushes the instrument). `move` walks the lines that exist.
+bool moonset_stretch_page_begin(MoonsetState& s, songcore::Instrument::GranularParams& g, int song_tempo);
+void moonset_stretch_page_move(const songcore::Instrument::GranularParams& g, MoonsetState& s, int dir);
+bool moonset_stretch_page_edit(songcore::Instrument::GranularParams& g, MoonsetState& s, int delta,
+                               bool reset, int song_tempo);
+void draw_moonset_stretch_page(Canvas& c, const MoonsetState& s,
+                               const songcore::Instrument::GranularParams& g, int song_tempo,
+                               const Theme& t);
+
+// ── The MOD window of the granular cells ────────────────────────────────────────────────────────
+// GranTarget (granular-voice.h) a cell can be modulated through; 0 = this cell has none.
+int  moonset_granular_target(int col, int line);
+// Opens the window on the cell's mod row (its own row, else a free one). False: no target, or all 8 rows used.
+bool moonset_mod_open(songcore::Instrument::GranularParams& g, MoonsetState& s);
+// Cursor up/down over the lines that exist for the row's source.
+void moonset_mod_move(const songcore::Instrument::GranularParams& g, MoonsetState& s, int dir);
+// Edits the line under the cursor by `delta` (A+LEFT/RIGHT = 1, A+UP/DOWN = 16). `reset`: A+B. True if a byte changed.
+bool moonset_mod_edit(songcore::Instrument::GranularParams& g, MoonsetState& s, int delta, bool reset);
+void draw_moonset_mod_window(Canvas& c, const MoonsetState& s, const songcore::Instrument::GranularParams& g, const Theme& t);
+
 // What `handle_input` changed, so the dispatcher knows which engine calls to make.
 struct MoonsetInputResult {
     bool modified = false;
@@ -268,8 +332,8 @@ public:
     // Rows 8..19 sit under the waveform.
     static int content_y(int row);
 
-    // The granular block's title line, in page coordinates (pageScrollPx scrolls it up).
-    static constexpr int GRANULAR_Y = 428;
+    // The granular panel's title line, in the lower half (under the waveform, y=240).
+    static constexpr int GRANULAR_Y = 243;
 
     static const std::vector<std::string>& source_values();    // LEFT / RIGHT / STEREO / MONO
     static const std::vector<std::string>& rate_values();      // HIGH / NORM / LOFI
@@ -348,13 +412,20 @@ private:
 // DENSITY and SPEED become divisions while GRAIN TIME = BPM (the model keeps a separate div index).
 
 int  moonset_granular_row_count(int col);
-std::string moonset_granular_value(const songcore::Instrument::GranularParams& g, int col, int line);
-CursorContext moonset_granular_context(const songcore::Instrument::GranularParams& g, int col, int line);
+// The GRAIN column's virtual PRESET row: its last walked row, drawn in the column's title line.
+int  moonset_preset_row();
+std::string moonset_granular_value(const songcore::Instrument::GranularParams& g, int col, int line, bool sliceReading = false);
+CursorContext moonset_granular_context(const songcore::Instrument::GranularParams& g, int col, int line, bool sliceReading = false);
 bool moonset_granular_apply(songcore::Instrument::GranularParams& g, int col, int line, int value);
 
 // `gy` is the top of the block's title; `top` is the first visible row.
 void draw_moonset_granular(Canvas& c, int x, int gy,
                            const songcore::Instrument::GranularParams& g,
-                           int cursorLine, int cursorCol, int top, const Theme& t);
+                           int cursorLine, int cursorCol, int top, const Theme& t,
+                           bool sliceReading = false,
+                           const MoonsetState* s = nullptr);
+
+// The GRAIN column's PRESET popup: SAVE / LOAD over the dimmed page.
+void draw_moonset_preset_menu(Canvas& c, const MoonsetState& s, const Theme& t);
 
 }  // namespace pt::ui

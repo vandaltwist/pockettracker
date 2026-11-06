@@ -265,7 +265,7 @@ void AudioEngine::triggerSamplerNote(const ScheduledNote& note, int frame, int64
                                             -1, (float)tempo(), granBus);
             }
             voices[v].instrId = note.sampleId;
-            voices[v].sampleGen = gen;
+            voices[v].sliceIndex = note.sliceIndex;            voices[v].sampleGen = gen;
             voices[v].faderHeld = false;
             if (note.trackId >= 0 && note.trackId < SF_VOICE_COUNT) trackOnsetFrame[note.trackId] = note.targetFrame;
             voices[v].startDelayFrames = frame;

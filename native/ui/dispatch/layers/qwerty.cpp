@@ -100,7 +100,10 @@ void InputDispatcher::qwerty_apply() {
             break;
 
         case QwertyContext::INSTRUMENT_SAVE: {
-            const std::string name = text.empty() ? "PRESET" : text;
+            // Auto-numbered: a second PRESET becomes PRESET1, never a silent overwrite.
+            std::string base = safe_file_name(text.empty() ? "PRESET" : text);
+            if (base.empty()) base = "PRESET";
+            const std::string name = free_file_stem(fs_, k.contextExtra, base, ".pti");
             const std::string path = k.contextExtra + "/" + name + ".pti";
             if (save_instrument_preset(host_, fs_, s_.currentInstrument, path)) {
                 set_status(s_, "SAVED: " + name, true);
@@ -131,6 +134,39 @@ void InputDispatcher::qwerty_apply() {
             save_delay_preset_as(k.contextExtra, text);
             break;
 
+        case QwertyContext::MOONSET_NAME: {
+            // MOONSET owns its own copy of the sample-editor page, so its NAME must not touch the
+            // sample editor's state (that would rename whatever slot the other screen had open).
+            MoonsetState&      se   = s_.moonset;
+            const std::string  name = text.empty() ? se.sampleName : text;
+            se.sampleName = name;
+            host_.edit_project().instruments[static_cast<size_t>(se.instrumentId)].name = name;
+            mark_modified();
+            break;
+        }
+
+        case QwertyContext::MOONSET_SAVE: {
+            std::string base = safe_file_name(text.empty() ? "SAMPLE" : text);
+            if (base.empty()) base = "SAMPLE";
+            const std::string stem = free_wav_stem(fs_, k.contextExtra, base);
+            bake_moonset_pending_pitch();
+            save_moonset_sample_to(k.contextExtra + "/" + stem + ".wav", /*adopt_name=*/true);
+            break;
+        }
+
+        case QwertyContext::MOONSET_REC_SAVE: {
+            // The take is a new file, not a replacement: save_moonset_recording_to never installs it.
+            std::string base = safe_file_name(text.empty() ? "RECORD" : text);
+            if (base.empty()) base = "RECORD";
+            const std::string stem = free_wav_stem(fs_, k.contextExtra, base);
+            save_moonset_recording_to(k.contextExtra + "/" + stem + ".wav");
+            break;
+        }
+
+        case QwertyContext::MOONSET_PRESET_SAVE:
+            save_moonset_preset_to(k.contextExtra, text);
+            break;
+
         case QwertyContext::SAMPLE_NAME: {
             // Renames the editor's sample and its instrument — one thing to the user. Empty keeps the name.
             SampleEditorState& se = s_.sampleEditor;
@@ -142,8 +178,10 @@ void InputDispatcher::qwerty_apply() {
         }
 
         case QwertyContext::SAMPLE_SAVE: {
-            // SAVE-AS never replaces (SNARE, SNARE_0001, …): OVERWRITE is its own button.
-            const std::string stem = free_wav_stem(fs_, k.contextExtra, text.empty() ? "SAMPLE" : text);
+            // SAVE-AS never replaces (SNARE, SNARE1, …): OVERWRITE is its own button.
+            std::string base = safe_file_name(text.empty() ? "SAMPLE" : text);
+            if (base.empty()) base = "SAMPLE";
+            const std::string stem = free_wav_stem(fs_, k.contextExtra, base);
             save_sample_to(k.contextExtra + "/" + stem + ".wav", /*adopt_name=*/true);
             break;
         }

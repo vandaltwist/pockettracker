@@ -302,6 +302,8 @@ class SongcoreHost {
     bool stop_record();
     int  record_length() const { return engine_ ? engine_->recordLength() : 0; }
     float record_peak() const { return engine_ ? engine_->recordPeak() : 0.0f; }
+// Live sidechain/message level for the granular BUS visualiser (0..1).
+float gran_bus_level(int idx) const { return engine_ ? engine_->granBusLevel(idx) : 0.0f; }
     const float* record_buffer_l() const { return engine_ ? engine_->recordBufferL() : nullptr; }
     const float* record_buffer_r() const { return engine_ ? engine_->recordBufferR() : nullptr; }
     bool is_recording() const { return engine_ && engine_->isRecording(); }
@@ -551,6 +553,10 @@ class SongcoreHost {
 
     // The preview lane's note-off on the cable, through `consume` — the same gate as the note-on.
     void preview_note_off(int64_t frame);
+
+    // Re-arms the editor preview's exact-frame window on `slot` from the last preview's selection. A
+    // playback-param push clears it (setInstrumentParams), so every live push must put it back.
+    void apply_preview_window(int slot);
 
     // Flushed after each verb: a long session stays bounded in RAM and a crash keeps the trace so far.
     void flush_trace();

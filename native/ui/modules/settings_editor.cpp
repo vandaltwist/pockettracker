@@ -28,7 +28,7 @@ inline int btn_for_sel(const SettingsValues& v) {
 
 const std::vector<std::string>& SettingsModule::visualizer_names() {
     static const std::vector<std::string> names = {
-        "SCOPE", "FLAT", "OCTA", "OCTA.F", "SPECT", "SPCT.P",
+        "SCOPE", "FLAT", "OCTA", "OCTA.F", "SPECT", "SPCT.P", "MOONviz",
     };
     return names;
 }

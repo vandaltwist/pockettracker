@@ -92,35 +92,37 @@ bool InputDispatcher::effects_release_action(int row, bool peek) {
 }
 
 void InputDispatcher::save_reverb_preset_as(const std::string& dir, const std::string& typed_text) {
-    // Sanitized filename, raw name in the file and on the row; empty falls back to the shown name, then
-    // "REVERB" (never the dotfile .ptr).
+    // Sanitized and auto-numbered (a second HALL becomes HALL1); empty falls back to the shown name,
+    // then "REVERB" (never the dotfile .ptr).
     const std::string shown = reverb_preset_display_name(host_.project());
-    const std::string want  = !typed_text.empty() ? typed_text : !shown.empty() ? shown : "REVERB";
-    const std::string safe  = safe_file_name(want);
+    std::string base = safe_file_name(!typed_text.empty() ? typed_text : shown);
+    if (base.empty()) base = "REVERB";
+    const std::string name = free_file_stem(fs_, dir, base, ".ptr");
 
     // The row adopts the name it was saved under — the only thing on screen naming the file.
-    if (host_.project().reverbPreset != want) {
-        host_.edit_project().reverbPreset = want;
+    if (host_.project().reverbPreset != name) {
+        host_.edit_project().reverbPreset = name;
         mark_modified();
     }
 
-    const bool ok = save_reverb_file(fs_, dir + "/" + safe + ".ptr", reverb_cells_of(host_.project()));
-    set_status(s_, ok ? "REVERB SAVED" : "SAVE FAILED", ok);
+    const bool ok = save_reverb_file(fs_, dir + "/" + name + ".ptr", reverb_cells_of(host_.project()));
+    set_status(s_, ok ? ("REVERB SAVED: " + name) : "SAVE FAILED", ok);
 }
 
 void InputDispatcher::save_delay_preset_as(const std::string& dir, const std::string& typed_text) {
     // As the reverb's.
     const std::string shown = delay_preset_display_name(host_.project());
-    const std::string want  = !typed_text.empty() ? typed_text : !shown.empty() ? shown : "DELAY";
-    const std::string safe  = safe_file_name(want);
+    std::string base = safe_file_name(!typed_text.empty() ? typed_text : shown);
+    if (base.empty()) base = "DELAY";
+    const std::string name = free_file_stem(fs_, dir, base, ".ptd");
 
-    if (host_.project().delayPreset != want) {
-        host_.edit_project().delayPreset = want;
+    if (host_.project().delayPreset != name) {
+        host_.edit_project().delayPreset = name;
         mark_modified();
     }
 
-    const bool ok = save_delay_file(fs_, dir + "/" + safe + ".ptd", delay_cells_of(host_.project()));
-    set_status(s_, ok ? "DELAY SAVED" : "SAVE FAILED", ok);
+    const bool ok = save_delay_file(fs_, dir + "/" + name + ".ptd", delay_cells_of(host_.project()));
+    set_status(s_, ok ? ("DELAY SAVED: " + name) : "SAVE FAILED", ok);
 }
 
 // ─── The cursor and the edit ─────────────────────────────────────────────────────────────────────

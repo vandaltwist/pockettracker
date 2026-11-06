@@ -21,8 +21,9 @@ bool InputDispatcher::defer_a_to_release() const {
     InputDispatcher& self = const_cast<InputDispatcher&>(*this);
 
     // ⚠️ No cell opens a sub-screen under a layer (else every A in the EQ editor is deferred), except the
-    // send editor's own INP EQ and TIME.
+    // send editor's own INP EQ and TIME, and the STRETCH page (A alone auditions there, A+arrow edits).
     if (top_layer()) {
+        if (s_.currentScreen == ScreenType::MOONSET && s_.moonset.stretchPageOpen) return true;
         return send_editor_on_top() &&
                self.effects_release_action(s_.sendEditor.cursorRow, /*peek=*/true);
     }
@@ -30,6 +31,18 @@ bool InputDispatcher::defer_a_to_release() const {
     // ⚠️ Opens nothing, but deferred too: row 11's A under MANUAL is held for the tap, the drag and the
     // delete.
     if (on_slice_tap_cell()) return true;
+
+    // The file browser: A + UP/DOWN walks the list and auditions, so A must not load the file on the
+    // press. A alone still opens / loads on the release.
+    if (s_.currentScreen == ScreenType::FILE_BROWSER &&
+        s_.fileBrowser.mode == BrowserMode::NORMAL)
+        return true;
+
+    // MOONSET's granular cells that can be modulated: A opens their MOD window on the RELEASE, so A+D-pad
+    // has time to edit the value first (moonset_screen cancels the open when a D-pad press comes in).
+    if (s_.currentScreen == ScreenType::MOONSET && s_.moonset.granularFocus && !s_.moonset.modOpen &&
+        moonset_granular_target(s_.moonset.granularColumn, s_.moonset.granularRow) != 0)
+        return true;
 
     switch (s_.currentScreen) {
         case ScreenType::INSTRUMENT:

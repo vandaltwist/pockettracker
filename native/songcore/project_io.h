@@ -238,6 +238,10 @@ inline Instrument parse_instrument(const json& j, int index) {
     i.delaySend      = get_int(j, "delaySend", i.delaySend);
     i.eqSlot         = get_int(j, "eqSlot", i.eqSlot);
     i.slicingMode    = get_int(j, "slicingMode", i.slicingMode);
+    i.moonSliceMethod      = get_int(j, "moonSliceMethod", i.moonSliceMethod);
+    i.moonSliceSensitivity = get_int(j, "moonSliceSensitivity", i.moonSliceSensitivity);
+    i.moonSliceDivisions   = get_int(j, "moonSliceDivisions", i.moonSliceDivisions);
+    i.moonSliceFollow      = get_bool(j, "moonSliceFollow", i.moonSliceFollow);
     i.transposeEnabled = get_bool(j, "transposeEnabled", i.transposeEnabled);
     { auto it = j.find("granular");
       if (it != j.end() && it->is_object()) {
@@ -268,7 +272,14 @@ inline Instrument parse_instrument(const json& j, int index) {
               i.granular.grain.decay    = get_int(o, "decay", i.granular.grain.decay);
               i.granular.grain.pan      = get_int(o, "pan", i.granular.grain.pan);
               i.granular.grain.jitter   = get_int(o, "jitter", i.granular.grain.jitter);
+              i.granular.grain.stretch  = get_int(o, "stretch", i.granular.grain.stretch);
+              i.granular.grain.ratio    = get_int(o, "ratio", i.granular.grain.ratio);
               i.granular.grain.mix      = get_int(o, "mix", i.granular.grain.mix);
+i.granular.bypass.size     = get_bool(o, "bypass_size", i.granular.bypass.size);
+i.granular.bypass.density  = get_bool(o, "bypass_density", i.granular.bypass.density);
+i.granular.bypass.pitch    = get_bool(o, "bypass_pitch", i.granular.bypass.pitch);
+i.granular.bypass.position = get_bool(o, "bypass_position", i.granular.bypass.position);
+i.granular.bypass.dir      = get_bool(o, "bypass_dir", i.granular.bypass.dir);
           } }
           { auto b = g.find("roam"); if (b != g.end() && b->is_object()) {
               const auto& o = *b;
@@ -289,6 +300,7 @@ inline Instrument parse_instrument(const json& j, int index) {
               i.granular.roam.inertia   = get_int(o, "inertia", i.granular.roam.inertia);
               i.granular.roam.target    = get_int(o, "target", i.granular.roam.target);
               i.granular.roam.tlock     = get_int(o, "tlock", i.granular.roam.tlock);
+               i.granular.roam.mix      = get_int(o, "mix", i.granular.roam.mix);
           } }
           { auto b = g.find("motion"); if (b != g.end() && b->is_object()) {
               const auto& o = *b;
@@ -307,6 +319,7 @@ inline Instrument parse_instrument(const json& j, int index) {
               i.granular.motion.trigger     = get_int(o, "trigger", i.granular.motion.trigger);
               i.granular.motion.spin        = get_int(o, "spin", i.granular.motion.spin);
               i.granular.motion.factor      = get_int(o, "factor", i.granular.motion.factor);
+               i.granular.motion.mix         = get_int(o, "mix", i.granular.motion.mix);
           } }
       } }
     { auto it = j.find("granular");   // v2 modulation rows
@@ -775,6 +788,10 @@ inline void emit_instrument(JsonWriter& w, const Instrument& i) {
     if (i.delaySend != 0x00) w.field_int("delaySend", i.delaySend);
     if (i.eqSlot != -1)     w.field_int("eqSlot", i.eqSlot);
     if (i.slicingMode != 0) w.field_int("slicingMode", i.slicingMode);
+    if (i.moonSliceMethod != 2) w.field_int("moonSliceMethod", i.moonSliceMethod);
+    if (i.moonSliceSensitivity != 64) w.field_int("moonSliceSensitivity", i.moonSliceSensitivity);
+    if (i.moonSliceDivisions != 8) w.field_int("moonSliceDivisions", i.moonSliceDivisions);
+    if (!i.moonSliceFollow) w.field_bool("moonSliceFollow", i.moonSliceFollow);
     // Ã¢Å¡Â Ã¯Â¸Â Defaults to TRUE, so the guard is inverted: the field appears only once turned OFF.
     if (!i.transposeEnabled) w.field_bool("transposeEnabled", i.transposeEnabled);
     if (i.instrumentType == InstrumentType::GRANULAR) {
@@ -795,7 +812,14 @@ inline void emit_instrument(JsonWriter& w, const Instrument& i) {
         w.field_int("decay", i.granular.grain.decay);
         w.field_int("pan", i.granular.grain.pan);
         w.field_int("jitter", i.granular.grain.jitter);
+        w.field_int("stretch", i.granular.grain.stretch);
+        w.field_int("ratio", i.granular.grain.ratio);
         w.field_int("mix", i.granular.grain.mix);
+        w.field_bool("bypass_size", i.granular.bypass.size);
+        w.field_bool("bypass_density", i.granular.bypass.density);
+        w.field_bool("bypass_pitch", i.granular.bypass.pitch);
+        w.field_bool("bypass_position", i.granular.bypass.position);
+        w.field_bool("bypass_dir", i.granular.bypass.dir);
         w.end_object();
         w.key("roam"); w.begin_object();
         w.field_bool("state", i.granular.roam.state);
@@ -815,6 +839,7 @@ inline void emit_instrument(JsonWriter& w, const Instrument& i) {
         w.field_int("inertia", i.granular.roam.inertia);
         w.field_int("target", i.granular.roam.target);
         w.field_int("tlock", i.granular.roam.tlock);
+        w.field_int("mix", i.granular.roam.mix);
         w.end_object();
         w.key("motion"); w.begin_object();
         w.field_bool("state", i.granular.motion.state);
@@ -832,6 +857,7 @@ inline void emit_instrument(JsonWriter& w, const Instrument& i) {
         w.field_int("trigger", i.granular.motion.trigger);
         w.field_int("spin", i.granular.motion.spin);
         w.field_int("factor", i.granular.motion.factor);
+        w.field_int("mix", i.granular.motion.mix);
         w.end_object();
         if (!i.granular.master) w.field_bool("master", false);
         {   // v2 modulation rows: only the used ones are written

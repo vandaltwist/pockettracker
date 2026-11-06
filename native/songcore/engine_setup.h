@@ -26,13 +26,10 @@ namespace songcore {
 
 // ─── params: no I/O, idempotent ──────────────────────────────────────────────────────────────────
 
-// One instrument's params.
-// ⚠️ THE "instrument N changed" seam: the program snapshot the engine plays notes from rides on it.
+// The granular blocks, keyed by the slot the note will play from. Split out so an editor preview on
+// the scratch slot carries the same cloud as the instrument's own slot.
 template <typename Engine>
-void push_instrument_params(Engine& engine, const Instrument& ins, const Routing& routing,
-                            int tempo, int sampleRate) {
-    push_instrument_playback_params(engine, ins);
-    // The granular blocks ride with the playback params, keyed by the slot the note will play from.
+void push_instrument_granular_params(Engine& engine, const Instrument& ins, int slot) {
     pt::GranularSettings gs;
     gs.master = ins.granular.master;
     gs.grain.state   = ins.granular.grain.state;
@@ -61,7 +58,14 @@ void push_instrument_params(Engine& engine, const Instrument& ins, const Routing
     gs.grain.decay = ins.granular.grain.decay;
     gs.grain.pan = ins.granular.grain.pan;
     gs.grain.jitter = ins.granular.grain.jitter;
+    gs.grain.stretch = ins.granular.grain.stretch;
+    gs.grain.ratio = ins.granular.grain.ratio;
     gs.grain.mix = ins.granular.grain.mix;
+    gs.grain.bypass_size      = ins.granular.bypass.size;
+    gs.grain.bypass_density   = ins.granular.bypass.density;
+    gs.grain.bypass_pitch     = ins.granular.bypass.pitch;
+    gs.grain.bypass_position  = ins.granular.bypass.position;
+    gs.motion.bypass_dir      = ins.granular.bypass.dir;
     gs.roam.speed_div = ins.granular.roam.speed_div;
     gs.roam.freeze = ins.granular.roam.freeze;
     gs.roam.dcurve = ins.granular.roam.dcurve;
@@ -87,7 +91,16 @@ void push_instrument_params(Engine& engine, const Instrument& ins, const Routing
         gs.mods[k].target = m.target; gs.mods[k].src = m.src; gs.mods[k].amount = m.amount;
         gs.mods[k].rate = m.rate; gs.mods[k].shape = m.shape; gs.mods[k].bus = m.bus;
     }
-    engine.setGranularParams(ins.sampleId, gs);
+    engine.setGranularParams(slot, gs);
+}
+
+// One instrument's params.
+// ⚠️ THE "instrument N changed" seam: the program snapshot the engine plays notes from rides on it.
+template <typename Engine>
+void push_instrument_params(Engine& engine, const Instrument& ins, const Routing& routing,
+                            int tempo, int sampleRate) {
+    push_instrument_playback_params(engine, ins);
+    push_instrument_granular_params(engine, ins, ins.sampleId);
     push_instrument_mod_eq_sends(engine, ins, tempo, sampleRate);
     // The SF ADSR override — a live key is scheduled with no push, so the engine's copy must be current.
     const SFOverrides& ov = ins.sfOverrides;

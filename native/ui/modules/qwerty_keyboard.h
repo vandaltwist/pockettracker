@@ -30,7 +30,11 @@ enum class QwertyContext {
     SCALE_SAVE,       // write the SCALE screen's slot to `contextExtra`/<text>.pts, and name it <text>
     GROOVE_SAVE,      // write the GROOVE screen's slot to `contextExtra`/<text>.ptg, and name it <text>
     REVERB_SAVE,      // write EFFECTS' reverb cells to `contextExtra`/<text>.ptr, and name them <text>
-    DELAY_SAVE        // write EFFECTS' delay cells to `contextExtra`/<text>.ptd, and name them <text>
+    DELAY_SAVE,       // write EFFECTS' delay cells to `contextExtra`/<text>.ptd, and name them <text>
+    MOONSET_NAME,     // MOONSET's sample and instrument name
+    MOONSET_SAVE,     // SAVE-AS: write MOONSET's edited sample to `contextExtra`/<text>.wav
+    MOONSET_REC_SAVE, // SAVE-AS: write the just-recorded take to `contextExtra`/<text>.wav
+    MOONSET_PRESET_SAVE  // SAVE the current grain params to `contextExtra`/<text>.preset
 };
 
 // 3 key rows of 10, then the space bar. The ABORT/APPLY row is virtual.
