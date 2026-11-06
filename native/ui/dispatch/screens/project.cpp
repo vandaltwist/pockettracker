@@ -43,7 +43,7 @@ GestureResult InputDispatcher::settings_screen(Gesture g) {
             case Gesture::A_RIGHT:    viz.menuAdjust(+1); return GestureResult::TAKEN;
             case Gesture::A_UP:       viz.menuAdjust(+1, true); return GestureResult::TAKEN;
             case Gesture::A_DOWN:     viz.menuAdjust(-1, true); return GestureResult::TAKEN;
-            case Gesture::A:
+            case Gesture::A:          return GestureResult::TAKEN;
             case Gesture::B:
             case Gesture::A_B:        viz.closeMenu(); return GestureResult::TAKEN;
             default:                  return GestureResult::PASS;

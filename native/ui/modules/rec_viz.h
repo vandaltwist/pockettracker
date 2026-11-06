@@ -683,6 +683,8 @@ void RecViz::draw(Cv& c, int x, int y, int w, int h, int cs, int fs,
             tick(static_cast<int>(oy[0] + ph * (1.f - pp)), lb);
             tick(static_cast<int>(oy[1] + ph * pp), lb);
         }
+        txt("L", ml + pw - tw("L") - 4, oy[0] + 2, DIMTXT);
+        txt("R", ml + pw - tw("R") - 4, oy[1] + 2, DIMTXT);
     } else {
         tick(oy[0], "L"); tick(oy[0] + ph / 2, ""); tick(oy[0] + ph, "C");
         tick(oy[1], "C"); tick(oy[1] + ph / 2, ""); tick(oy[1] + ph, "R");
