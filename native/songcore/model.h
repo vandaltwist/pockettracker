@@ -462,7 +462,7 @@ struct Instrument {
             int inertia   = 0x00;
             int target    = 0x00;
             int tlock     = 0x00;
-            int mix       = 0xFF;   // per-layer mix (0x00 = sample only, 0xFF = cloud only)
+            int mix       = 0xFF;   // ROAM depth: 0 = no offset, 0xFF = full offset
         } roam{};
         struct Motion {
             bool state       = false;
@@ -480,7 +480,7 @@ struct Instrument {
             int trigger      = 0x00;
             int spin         = 0x00;
             int factor       = 0x00;
-            int mix          = 0xFF;   // per-layer mix (0x00 = sample only, 0xFF = cloud only)
+            int mix          = 0xFF;   // MOTION depth: 0 = no effects, 0xFF = full effects
         } motion{};
         bool master = true;   // A/B: false = the sample plays normally, no cloud (saved as "master")
         // v2: up to 8 modulation rows (the double-click popup). amount 0x80 = none.

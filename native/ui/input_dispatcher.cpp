@@ -26,6 +26,7 @@ void InputDispatcher::set_now(long long now_ms) {
     run_due_status_dismiss();
     // MOONSET's live grains: the waveform draws where each grain of the cloud is reading right now.
     s_.moonset.nowMs = now_ms;
+    s_.moonset.tempoBpm = songcore::tempo_in_force(*s_.project);
     if (s_.currentScreen == ScreenType::MOONSET) {
         s_.moonset.grainHeadCount = host_.grain_positions(s_.moonset.grainHeads, MoonsetState::GRAIN_HEADS_MAX);
         // Keep the engine's slice reading in step with the editor (markers + CUT/OFF).
@@ -33,11 +34,13 @@ void InputDispatcher::set_now(long long now_ms) {
         // The REC visualiser reads the capture buffer every frame; without this it stayed blank.
         refresh_moonset_record();
         // Live sidechain level for the BUS visualiser in the MOD window.
+        for (int bus = 0; bus < pt::GRAN_BUS_COUNT; ++bus)
+            s_.moonset.modBusLevels[bus] = host_.gran_bus_level(bus);
         if (s_.moonset.modOpen) {
             const auto& ins = s_.project->instruments[static_cast<size_t>(s_.moonset.instrumentId)];
             const int slot = std::clamp(s_.moonset.modSlot, 0, pt::GRAN_MODS - 1);
             const int bus = ins.granular.mods[slot].bus;
-            s_.moonset.modBusLevel = host_.gran_bus_level(bus);
+            s_.moonset.modBusLevel = s_.moonset.modBusLevels[std::clamp(bus, 0, pt::GRAN_BUS_COUNT - 1)];
         }
     } else if (s_.currentScreen == ScreenType::SAMPLE_EDITOR) {
         refresh_sample_record();

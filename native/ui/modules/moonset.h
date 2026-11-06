@@ -203,12 +203,14 @@ struct MoonsetState {
     int   grainHeadCount = 0;
     // Animation of the red lines: the dispatcher stamps the frame clock, the draw advances the simulation.
     long long nowMs = 0;
+    int tempoBpm = 128;
     mutable GrainPreview preview;
     bool modOpen = false;
     int  modSlot = 0;    // 0..7, a row of Instrument::granular.mods
     int  modLine = 0;    // 0 SOURCE, 1 AMOUNT, 2 RATE or BUS, 3 SHAPE (LFO only)
     // Live sidechain level for the BUS visualiser (0..1).
     float modBusLevel = 0.0f;
+    float modBusLevels[pt::GRAN_BUS_COUNT] = {};
 
     static constexpr int GRANULAR_VISIBLE = 17;   // ROAM's depth: all three columns fit full-page
 

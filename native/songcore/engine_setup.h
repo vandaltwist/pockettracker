@@ -77,6 +77,7 @@ void push_instrument_granular_params(Engine& engine, const Instrument& ins, int 
     gs.roam.inertia = ins.granular.roam.inertia;
     gs.roam.target = ins.granular.roam.target;
     gs.roam.tlock = ins.granular.roam.tlock;
+    gs.roam.mix = ins.granular.roam.mix;
     gs.motion.stutter = ins.granular.motion.stutter;
     gs.motion.tapestop = ins.granular.motion.tapestop;
     gs.motion.tunnel = ins.granular.motion.tunnel;
@@ -86,6 +87,7 @@ void push_instrument_granular_params(Engine& engine, const Instrument& ins, int 
     gs.motion.trigger = ins.granular.motion.trigger;
     gs.motion.spin = ins.granular.motion.spin;
     gs.motion.factor = ins.granular.motion.factor;
+    gs.motion.mix = ins.granular.motion.mix;
     for (int k = 0; k < pt::GRAN_MODS; ++k) {
         const auto& m = ins.granular.mods[k];
         gs.mods[k].target = m.target; gs.mods[k].src = m.src; gs.mods[k].amount = m.amount;

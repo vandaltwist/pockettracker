@@ -25,7 +25,12 @@ enum GranTarget : int {
     GT_NONE = 0, GT_POSITION, GT_SIZE, GT_DENSITY, GT_SPRAY, GT_PITCH, GT_JITTER, GT_REV, GT_JUMP,
     GT_CHAOS, GT_STEREO, GT_ROAM_SPEED, GT_ROAM_RANGE, GT_LEVEL,
     // Appended: a project written before STRETCH keeps its byte values.
-    GT_STRETCH, GT_COUNT
+    GT_STRETCH, GT_GRAIN_WINDOW, GT_GRAIN_SPREAD, GT_GRAIN_ATTACK, GT_GRAIN_DECAY, GT_GRAIN_MIX,
+    GT_ROAM_WANDER, GT_ROAM_SMOOTH, GT_ROAM_STEP_RATE, GT_ROAM_INERTIA, GT_ROAM_TARGET,
+    GT_ROAM_TLOCK, GT_ROAM_MIX,
+    GT_MOTION_HOLD, GT_MOTION_ELASTIC, GT_MOTION_STUTTER, GT_MOTION_TAPESTOP,
+    GT_MOTION_TUNNEL, GT_MOTION_PROBABILITY, GT_MOTION_LFO_DEPTH, GT_MOTION_SPIN, GT_MOTION_MIX,
+    GT_COUNT
 };
 enum GranSource : int { GS_NONE = 0, GS_LFO, GS_RANDOM, GS_BUS, GS_COUNT };
 enum GranLfoShape : int { GL_SIN = 0, GL_TRI, GL_SAW, GL_SQR, GL_COUNT };
@@ -82,7 +87,7 @@ struct GranularSettings {
         int  inertia   = 0x00;   // extra slew
         int  target    = 0x00;   // a place the head is pulled to...
         int  tlock     = 0x00;   // ...by this much
-        int  mix       = 0xFF;   // per-layer mix (0x00 = sample only, 0xFF = cloud only)
+        int  mix       = 0xFF;   // 0 = no ROAM offset, 0xFF = full ROAM offset
 
     } roam;
     struct Motion {
@@ -101,7 +106,7 @@ struct GranularSettings {
         int  trigger   = 0x00;   // reserved
         int  spin      = 0x00;   // the stereo image rotates
         int  factor    = 0x00;   // reserved
-        int  mix          = 0xFF;   // per-layer mix (0x00 = sample only, 0xFF = cloud only)
+        int  mix          = 0xFF;   // 0 = no MOTION effects, 0xFF = full MOTION effects
 
         bool bypass_dir = false;
     } motion;
@@ -232,14 +237,11 @@ public:
         mix_.set((float)std::clamp(p.grain.mix, 0, 255) / 255.0f, sounding, frames);
         // Mixed with the sample, the cloud is brought to about the sample's own level (a dense cloud of
         // long grains is several times louder than its source). Cloud alone (mix 0xFF) is left as it was.
-        float comp = 1.0f;
-        if (p.grain.mix < 255) {
-            const float ms   = 1.0f + (float)std::clamp(cfg_.grain.size, 0, 255) * (999.0f / 255.0f);
-            const float dens = 1.0f + (float)std::clamp(cfg_.grain.density, 0, 255) * (199.0f / 255.0f);
-            const float overlap = ms * 0.001f * dens;
-            comp = 1.0f / std::sqrt(std::max(1.0f, overlap * 0.375f));
-        }
-        comp_ = comp;
+        const float ms   = 1.0f + (float)std::clamp(cfg_.grain.size, 0, 255) * (999.0f / 255.0f);
+        const float dens = 1.0f + (float)std::clamp(cfg_.grain.density, 0, 255) * (199.0f / 255.0f);
+        const float overlap = ms * 0.001f * dens;
+        const float comp = 1.0f / std::sqrt(std::max(1.0f, overlap * 0.375f));
+        comp_.set(comp, sounding, frames);
     }
 
     // One output frame. The cloud sums every live grain into `outL`/`outR`.
@@ -312,7 +314,7 @@ public:
     bool  active() const { return running_ && enabled_; }
     // MIX < 0xFF: the sample plays too. `blending()` = the engine must also run the classic playhead;
     // `dryGain()` = the share of the classic read at the sample just rendered (the cloud is already scaled).
-    bool  blending() const { return mix_.goal < 0.999f || mix_.moving(); }
+    bool  blending() const { return mix_.goal < 0.999f || mix_.moving() || mod_[GT_GRAIN_MIX] < -0.001f; }
     float dryGain() const { return dry_; }
 
     // The frames the cloud lives in: the note's window (slice, CUT, or the instrument's START/END).
@@ -329,9 +331,12 @@ public:
 private:
     // One frame of the cloud. `read` false = no audio is touched (see advance()).
     void frame(const float* left, const float* right, bool read, float& outL, float& outR) {
-        const float wet = mix_.next();
-        dry_ = 1.0f - wet;
         if ((ctl_++ & (CONTROL_EVERY - 1)) == 0) updateControl((float)CONTROL_EVERY / sampleRate_);
+        const float mix = std::clamp(mix_.next() + mod_[GT_GRAIN_MIX], 0.0f, 1.0f);
+        constexpr float HALF_PI = 1.57079632679f;
+        dry_ = cosf(mix * HALF_PI);
+        const float wet = sinf(mix * HALF_PI);
+        const float cloudComp = 1.0f + (comp_.next() - 1.0f) * (1.0f - mix);
 
         const float densByte = std::clamp(density_.next() + mod_[GT_DENSITY] * 255.0f, 0.0f, 255.0f);
         float density = 1.0f + densByte * (199.0f / 255.0f);
@@ -377,7 +382,7 @@ private:
             g.step += g.dstep;
             if (++g.age >= g.life) g.on = false;
         }
-        const float lvl = std::max(0.0f, 1.0f + mod_[GT_LEVEL]) * wet * comp_;
+        const float lvl = std::max(0.0f, 1.0f + mod_[GT_LEVEL]) * wet * cloudComp;
         outL = sumL * lvl;
         outR = sumR * lvl;
     }
@@ -451,11 +456,12 @@ private:
         float off = 0.0f;
         if (rm.state) {
             float hz = 0.05f * powf(400.0f, (float)std::clamp(rm.speed, 0, 255) / 255.0f);
-            hz *= 1.0f + mod_[GT_ROAM_SPEED] * 2.0f;
             if (cfg_.grain.time == 1 && bpm_ > 0.0f)
                 hz = (bpm_ / 60.0f) / GRAN_BEATS[std::clamp(rm.speed_div, 0, 14)];
+            hz *= 1.0f + mod_[GT_ROAM_SPEED] * 2.0f;
             hz = std::max(0.0f, hz);
             const float range = std::clamp((float)rm.range / 255.0f + mod_[GT_ROAM_RANGE], 0.0f, 1.0f);
+            const float wander = std::clamp((float)rm.wander / 255.0f + mod_[GT_ROAM_WANDER], 0.0f, 1.0f);
             if (rm.freeze == 0) {
                 const float dir = rm.dir >= 0x80 ? -1.0f : 1.0f;
                 const float prev = roamPh_;
@@ -473,15 +479,20 @@ private:
                 case 4: off = 0.0f; break;                                                                       // SLC: head locked to the slice start
                 default: off = roamTarget_ * range; break;                                                       // RANDOM
             }
-            if (rm.wander > 0 && rm.freeze == 0)
-                walk2_ = std::clamp(walk2_ + rndb() * sqrtf(dt) * (float)rm.wander / 255.0f * 2.0f, -1.0f, 1.0f);
-            off += walk2_ * (float)rm.wander / 255.0f * 0.5f + driftAcc_;
-            if (rm.step_rate > 0) {
-                const float q = 2.0f + (float)rm.step_rate / 8.0f;
+            if (wander > 0.0f && rm.freeze == 0)
+                walk2_ = std::clamp(walk2_ + rndb() * sqrtf(dt) * wander * 2.0f, -1.0f, 1.0f);
+            off += walk2_ * wander * 0.5f + driftAcc_;
+            const float stepRate = std::clamp((float)rm.step_rate / 255.0f + mod_[GT_ROAM_STEP_RATE], 0.0f, 1.0f);
+            if (stepRate > 0.0f) {
+                const float q = 2.0f + stepRate * 255.0f / 8.0f;
                 off = floorf(off * q) / q;
             }
         }
-        const float tau = (float)rm.smooth / 255.0f * 0.5f + (float)rm.inertia / 255.0f * 1.0f;
+        const float roamMix = std::clamp((float)rm.mix / 255.0f + mod_[GT_ROAM_MIX], 0.0f, 1.0f);
+        off *= roamMix;
+        const float smooth = std::clamp((float)rm.smooth / 255.0f + mod_[GT_ROAM_SMOOTH], 0.0f, 1.0f);
+        const float inertia = std::clamp((float)rm.inertia / 255.0f + mod_[GT_ROAM_INERTIA], 0.0f, 1.0f);
+        const float tau = smooth * 0.5f + inertia * 1.0f;
         if (tau > 0.0005f) roamSmooth_ += (off - roamSmooth_) * (1.0f - expf(-dt / tau));
         else roamSmooth_ = off;
 
@@ -505,17 +516,28 @@ private:
 
         // ---- MOTION: things that evolve while the note sounds -------------------------------
         const auto& mo = cfg_.motion;
+        const float motionMix = mo.state ? std::clamp((float)mo.mix / 255.0f + mod_[GT_MOTION_MIX], 0.0f, 1.0f) : 0.0f;
+        const float motionModMix = mo.state ? motionMix : 1.0f;
         if (mo.state) {
-            if (mo.lfo_depth > 0) {
+            const float lfoDepth = std::clamp((float)mo.lfo_depth / 255.0f * motionMix + mod_[GT_MOTION_LFO_DEPTH] * motionModMix, 0.0f, 1.0f);
+            if (lfoDepth > 0.0f) {
                 posLfo_ += (0.05f * powf(400.0f, (float)std::clamp(rm.speed, 0, 255) / 255.0f)) * dt;
                 posLfo_ -= floorf(posLfo_);
             }
-            spinPh_ += (float)mo.spin / 255.0f * 2.0f * dt;
+            const float spin = std::clamp((float)mo.spin / 255.0f * motionMix + mod_[GT_MOTION_SPIN] * motionModMix, 0.0f, 1.0f);
+            spinPh_ += spin * 2.0f * dt;
             spinPh_ -= floorf(spinPh_);
-            if (mo.tapestop > 0) {
+            const float tapestop = std::clamp((float)mo.tapestop / 255.0f * motionMix + mod_[GT_MOTION_TAPESTOP] * motionModMix, 0.0f, 1.0f);
+            if (tapestop > 0.0f) {
                 tapeT_ += dt;
-                tapeMul_ = std::max(0.02f, expf(-tapeT_ * (float)mo.tapestop / 255.0f * 3.0f));
+                tapeMul_ = std::max(0.02f, expf(-tapeT_ * tapestop * 3.0f));
+            } else {
+                tapeT_ = 0.0f;
+                tapeMul_ = 1.0f;
             }
+        } else {
+            tapeT_ = 0.0f;
+            tapeMul_ = 1.0f;
         }
     }
 
@@ -532,21 +554,34 @@ private:
         const auto& gr = cfg_.grain;
         const auto& mo = cfg_.motion;
         const bool  mv = mo.state;
+        const float motionMix = mv ? std::clamp((float)mo.mix / 255.0f + mod_[GT_MOTION_MIX], 0.0f, 1.0f) : 0.0f;
+        const float modMix = mv ? motionMix : 1.0f;
+        const float probability = std::clamp((float)mo.probability / 255.0f * motionMix + mod_[GT_MOTION_PROBABILITY] * modMix, 0.0f, 1.0f);
+        const float hold = std::clamp((float)mo.hold / 255.0f * motionMix + mod_[GT_MOTION_HOLD] * modMix, 0.0f, 1.0f);
+        const float tunnel = std::clamp((float)mo.tunnel / 255.0f * motionMix + mod_[GT_MOTION_TUNNEL] * modMix, 0.0f, 1.0f);
+        const float elastic = std::clamp((float)mo.elastic / 255.0f * motionMix + mod_[GT_MOTION_ELASTIC] * modMix, 0.0f, 1.0f);
+        const float stutter = std::clamp(1.0f + (float)(mo.stutter - 1) * motionMix + mod_[GT_MOTION_STUTTER] * 15.0f * modMix, 1.0f, 16.0f);
+        const int stutterCount = (int)std::lround(stutter);
 
         // MOTION: gaps
-        if (mv && mo.probability > 0 && rnd() < (float)mo.probability / 255.0f) return;
+        if (mv && probability > 0.0f && rnd() < probability) return;
 
-        const float chaos = mv ? std::clamp((float)mo.chaos / 255.0f + mod_[GT_CHAOS], 0.0f, 1.0f)
+        const float chaos = mv ? std::clamp((float)mo.chaos / 255.0f * motionMix + mod_[GT_CHAOS] * modMix, 0.0f, 1.0f)
                                : std::clamp(mod_[GT_CHAOS], 0.0f, 1.0f);
 
         // ---- position -----------------------------------------------------------------------
         float basePos = position_.next() + mod_[GT_POSITION] + roamSmooth_ + (float)headPhase_;
-        if (mv && mo.lfo_depth > 0) basePos += sinf(6.28318530718f * posLfo_) * (float)mo.lfo_depth / 255.0f * 0.25f;
-        if (cfg_.roam.state && cfg_.roam.tlock > 0) {
-            const float k = (float)cfg_.roam.tlock / 255.0f;
-            basePos = basePos + ((float)cfg_.roam.target / 255.0f - basePos) * k;
+        const float lfoDepth = std::clamp((float)mo.lfo_depth / 255.0f * motionMix + mod_[GT_MOTION_LFO_DEPTH] * modMix, 0.0f, 1.0f);
+        if (mv && lfoDepth > 0.0f) basePos += sinf(6.28318530718f * posLfo_) * lfoDepth * 0.25f;
+        if (cfg_.roam.state) {
+            const float roamMix = std::clamp((float)cfg_.roam.mix / 255.0f + mod_[GT_ROAM_MIX], 0.0f, 1.0f);
+            const float target = std::clamp((float)cfg_.roam.target / 255.0f + mod_[GT_ROAM_TARGET], 0.0f, 1.0f);
+            const float lock = std::clamp((float)cfg_.roam.tlock / 255.0f + mod_[GT_ROAM_TLOCK], 0.0f, 1.0f);
+            const float k = lock * roamMix;
+            basePos = basePos + (target - basePos) * k;
         }
         const float spray = std::clamp(spray_.next() + mod_[GT_SPRAY], 0.0f, 1.0f) * 0.5f;
+        const float spread = std::clamp((float)gr.spread / 255.0f + mod_[GT_GRAIN_SPREAD], 0.0f, 1.0f);
         const double wLo = winOn_ ? (double)winStart_ : 0.0;
         const double wHi = winOn_ ? (double)std::min(winEnd_, length_ - 1) : (double)(length_ - 1);
         const double wSpan = std::max(2.0, wHi - wLo);
@@ -555,17 +590,17 @@ private:
         if (chaos > 0.0f) start += (double)rndb() * (double)chaos * 0.25 * wSpan;
         start = std::clamp(start, 0.0, (double)(length_ - 1));
 
-        const float pJump = mv ? std::clamp((float)mo.jump / 255.0f + mod_[GT_JUMP], 0.0f, 1.0f)
+        const float pJump = mv ? std::clamp((float)mo.jump / 255.0f * motionMix + mod_[GT_JUMP] * modMix, 0.0f, 1.0f)
                                : std::clamp(mod_[GT_JUMP], 0.0f, 1.0f);
         if (pJump > 0.0f && rnd() < pJump) start = wLo + (double)rnd() * (wSpan - 1.0);
 
         // HOLD / STUTTER: replay the previous position
         if (mv && haveLast_) {
             if (stutterLeft_ > 0) { start = lastStart_; --stutterLeft_; }
-            else if (mo.hold > 0 && rnd() < (float)mo.hold / 255.0f) start = lastStart_;
-            else if (mo.stutter > 1) stutterLeft_ = std::min(mo.stutter, 16) - 1;
-        } else if (mv && mo.stutter > 1) {
-            stutterLeft_ = std::min(mo.stutter, 16) - 1;
+            else if (hold > 0.0f && rnd() < hold) start = lastStart_;
+            else if (stutterCount > 1) stutterLeft_ = stutterCount - 1;
+        } else if (mv && stutterCount > 1) {
+            stutterLeft_ = stutterCount - 1;
         }
         start = std::clamp(start, wLo, std::max(wLo, wHi - 1.0));
         lastStart_ = start;
@@ -574,7 +609,7 @@ private:
         // ---- length -------------------------------------------------------------------------
         float sizeByte = std::clamp(size_.next() + mod_[GT_SIZE] * 255.0f, 0.0f, 255.0f);
         float lifeMs   = 1.0f + sizeByte * (999.0f / 255.0f);
-        if (mv && mo.tunnel > 0) lifeMs *= 1.0f + (float)mo.tunnel / 255.0f * 3.0f;
+        if (mv && tunnel > 0.0f) lifeMs *= 1.0f + tunnel * 3.0f;
         if (chaos > 0.0f) lifeMs *= std::max(0.2f, 1.0f + rndb() * chaos * 0.7f);
         const int life = std::max(2, (int)(lifeMs * sampleRate_ / 1000.0f));
 
@@ -586,18 +621,19 @@ private:
         double step = (double)noteRate_ * (double)powf(2.0f, semis / 12.0f) * (double)tapeMul_;
 
         // ---- direction + elastic ------------------------------------------------------------
-        const float pRev = mv ? std::clamp((float)mo.rev / 255.0f + mod_[GT_REV], 0.0f, 1.0f)
+        const float pRev = mv ? std::clamp((float)mo.rev / 255.0f * motionMix + mod_[GT_REV] * modMix, 0.0f, 1.0f)
                               : std::clamp(mod_[GT_REV], 0.0f, 1.0f);
         if (pRev > 0.0f && rnd() < pRev) step = -step;
         double dstep = 0.0;
         if (mv && mo.elastic > 0) {
-            const float bend = rndb() * (float)mo.elastic / 255.0f * 0.5f;   // octaves over the grain
+            const float bend = rndb() * elastic * 0.5f;   // octaves over the grain
             dstep = step * (double)(powf(2.0f, bend) - 1.0f) / (double)life;
         }
 
         // ---- stereo -------------------------------------------------------------------------
         float p = rndb() * std::clamp((float)gr.pan / 255.0f + mod_[GT_STEREO], 0.0f, 1.0f);
-        if (mv && mo.spin > 0) p += sinf(6.28318530718f * spinPh_);
+        const float spin = std::clamp((float)mo.spin / 255.0f * motionMix + mod_[GT_MOTION_SPIN] * modMix, 0.0f, 1.0f);
+        if (mv && spin > 0.0f) p += sinf(6.28318530718f * spinPh_) * spin;
         p = std::clamp(p, -1.0f, 1.0f);
         const float ang = (p + 1.0f) * 0.7853981634f;
 
@@ -605,12 +641,12 @@ private:
         dst->pos   = start;
         dst->step  = step;
         dst->dstep = dstep;
-        dst->offR  = gr.spread > 0 ? (double)rndb() * (double)gr.spread / 255.0 * 0.02 * (double)length_ : 0.0;
+        dst->offR  = spread > 0.0f ? (double)rndb() * (double)spread * 0.02 * (double)length_ : 0.0;
         dst->age   = 0;
         dst->life  = life;
-        dst->win   = std::clamp(gr.window, 0, 4);
-        dst->att   = (float)gr.attack / 255.0f * 0.5f;
-        dst->dec   = (float)gr.decay  / 255.0f * 0.5f;
+        dst->win   = std::clamp((int)std::lround((float)gr.window + mod_[GT_GRAIN_WINDOW] * 4.0f), 0, 4);
+        dst->att   = std::clamp((float)gr.attack / 255.0f + mod_[GT_GRAIN_ATTACK], 0.0f, 1.0f) * 0.5f;
+        dst->dec   = std::clamp((float)gr.decay / 255.0f + mod_[GT_GRAIN_DECAY], 0.0f, 1.0f) * 0.5f;
         dst->gL    = cosf(ang) * 1.41421356f;
         dst->gR    = sinf(ang) * 1.41421356f;
     }
@@ -638,8 +674,8 @@ private:
     int      stutterLeft_ = 0;
     int      winStart_ = 0, winEnd_ = 0;
     bool     winOn_ = false;
-    Ramp    position_, size_, density_, spray_, pitch_, mix_;
-    float   comp_ = 1.0f, dry_ = 1.0f;
+    Ramp    position_, size_, density_, spray_, pitch_, mix_, comp_;
+    float   dry_ = 1.0f;
 };
 
 }  // namespace pt

@@ -726,7 +726,8 @@ void MoonsetModule::draw_waveform(Canvas& c, int x, int y, const MoonsetState& s
         const float hi = static_cast<float>(sliceEndF) / totalF;
 
         s.preview.advance(*g, s.nowMs, lo, hi, hasSlice,
-                          totalF / static_cast<float>(std::max(s.sampleRate, 1)), 120.0f);
+                          totalF / static_cast<float>(std::max(s.sampleRate, 1)), (float)s.tempoBpm,
+                          s.modBusLevels);
         const GrainPreview& pv = s.preview;
 
         auto inside = [&](float px) { return px >= static_cast<float>(wfLeft) && px <= static_cast<float>(wfRight); };
@@ -813,8 +814,9 @@ void MoonsetModule::draw_waveform(Canvas& c, int x, int y, const MoonsetState& s
         }
 
         // The dry sample (MIX under FF): a white line at normal speed.
-        const float mixN   = static_cast<float>(std::clamp(g->grain.mix, 0, 255)) / 255.0f;
-        const float dryGn  = g->grain.state ? std::min(1.0f, 2.0f * (1.0f - mixN)) : 1.0f;
+        const float mixN = std::clamp((float)g->grain.mix / 255.0f + pv.modValue(pt::GT_GRAIN_MIX), 0.0f, 1.0f);
+        const bool cloudActive = g->master && (g->grain.state || g->roam.state || g->motion.state);
+        const float dryGn = cloudActive ? std::cos(mixN * 1.57079632679f) : 1.0f;
         if (dryGn > 0.01f) {
             const float dx = nx(pv.dryPos);
             if (inside(dx)) v_line(c, std::min(static_cast<int>(dx), wfLast), y + WAVEFORM_H - 40, 40,
@@ -1389,12 +1391,13 @@ GRowRef row_ref(songcore::Instrument::GranularParams& g, int col, int line) {
 }
 
 int default_value(int col, int line) {
-    // A+B: 0 everywhere, except the three values that have no musical meaning at 0.
+    // A+B: 0 everywhere, except the neutral pitch/density and the three mix endpoints.
     if (col == 0) {
         if (line == 3)  return 0x80;   // DENSITY: one grain per millisecond
         if (line == 5)  return 0x80;   // PITCH: centre (unison)
-        if (line == 14) return 0xFF;   // MIX: the cloud alone
     }
+    if ((col == 0 && line == 14) || (col == 1 && line == 16) || (col == 2 && line == 15))
+        return 0xFF;
     return 0;
 }
 
@@ -1411,6 +1414,7 @@ int granular_large_step(int col, int line) {
             default: break;
         }
     }
+    if ((col == 1 && line == 16) || (col == 2 && line == 15)) return 1;
     return 10;
 }
 
@@ -1474,7 +1478,9 @@ std::string moonset_granular_value(const songcore::Instrument::GranularParams& g
         const int v = (col == 0) ? std::clamp(g.grain.mix, 0, 255)
                     : (col == 1) ? std::clamp(g.roam.mix, 0, 255)
                                  : std::clamp(g.motion.mix, 0, 255);
-        std::string s = v == 0 ? "DRY" : (v == 255 ? "WET" : fmt_pct(v));
+        std::string s = col == 0
+                    ? (v == 0 ? "DRY" : (v == 255 ? "WET" : fmt_pct(v)))
+                    : (v == 0 ? "OFF" : (v == 255 ? "FULL" : fmt_pct(v)));
         s += " M";
         return s;
     }
@@ -1615,21 +1621,25 @@ void draw_moonset_granular(Canvas& c, int x, int gy,
                             Canvas::text_width(val, SP, FS) + 2 * SP, 5 * FS + 4, t.rowCursor);
             c.draw_text(val, vx, ty, on ? cursor_cell_ink(t) : t.textValue, SP, FS);
 
-            // Blinking red square for any cell that carries a live LFO/RANDOM/BUS modulator.
+            // Bipolar live modulation meter: center is zero, edges are -100% / +100%.
             if (sp) {
                 const int tgt = moonset_granular_target(ci, line);
                 if (tgt != 0) {
+                    bool hasMod = false;
                     for (int k = 0; k < pt::GRAN_MODS; ++k) {
                         if (g.mods[k].target != tgt || g.mods[k].src == pt::GS_NONE) continue;
-                        const float rateByte = (float)std::clamp(g.mods[k].rate, 0, 255) / 255.0f;
-                        const float hz = 0.05f * std::pow(400.0f, rateByte);
-                        const float ph = (float)(sp->nowMs % 100000) * 0.001f * hz;
-                        const bool on = (ph - std::floor(ph)) < 0.5f;
-                        if (on) {
-                            const int sqX = vx + (int)Canvas::text_width(val, SP, FS) + 4;
-                            c.fill_rect(sqX, ty + 2, 4, 4, t.textGranular);
-                        }
+                        hasMod = true;
                         break;
+                    }
+                    if (hasMod) {
+                        constexpr int BAR_W = 30;
+                        const int barX = vx + 1;
+                        const int barY = ty - 2;
+                        c.fill_rect(barX, barY, BAR_W, 1, t.textParam);
+                        c.fill_rect(barX + BAR_W / 2, barY - 1, 1, 3, t.textParam);
+                        const float value = std::clamp(sp->preview.modValue(tgt), -1.0f, 1.0f);
+                        const int markerX = barX + (int)std::lround((value + 1.0f) * 0.5f * (BAR_W - 1));
+                        c.fill_rect(markerX - 1, barY - 1, 3, 3, t.textGranular);
                     }
                 }
             }
@@ -1688,18 +1698,45 @@ int moonset_granular_target(int col, int line) {
             case 3:  return pt::GT_DENSITY;
             case 4:  return pt::GT_SPRAY;
             case 5:  return pt::GT_PITCH;
+            case 7:  return pt::GT_GRAIN_WINDOW;
+            case 8:  return pt::GT_GRAIN_SPREAD;
+            case 9:  return pt::GT_GRAIN_ATTACK;
+            case 10: return pt::GT_GRAIN_DECAY;
             case 11: return pt::GT_STEREO;   // G PAN
             case 12: return pt::GT_JITTER;   // P JITTER
             case 13: return pt::GT_STRETCH;  // STRETCH
+            case 14: return pt::GT_GRAIN_MIX;
             default: return 0;
         }
     }
-    if (col == 1) return line == 2 ? pt::GT_ROAM_RANGE : (line == 4 ? pt::GT_ROAM_SPEED : 0);
+    if (col == 1) {
+        switch (line) {
+            case 2:  return pt::GT_ROAM_RANGE;
+            case 3:  return pt::GT_ROAM_WANDER;
+            case 4:  return pt::GT_ROAM_SPEED;
+            case 5:  return pt::GT_ROAM_SMOOTH;
+            case 12: return pt::GT_ROAM_STEP_RATE;
+            case 13: return pt::GT_ROAM_INERTIA;
+            case 14: return pt::GT_ROAM_TARGET;
+            case 15: return pt::GT_ROAM_TLOCK;
+            case 16: return pt::GT_ROAM_MIX;
+            default: return 0;
+        }
+    }
     if (col == 2) {
         switch (line) {
             case 1:  return pt::GT_JUMP;
+            case 2:  return pt::GT_MOTION_HOLD;
             case 3:  return pt::GT_REV;
+            case 4:  return pt::GT_MOTION_ELASTIC;
             case 5:  return pt::GT_CHAOS;
+            case 6:  return pt::GT_MOTION_STUTTER;
+            case 7:  return pt::GT_MOTION_TAPESTOP;
+            case 8:  return pt::GT_MOTION_TUNNEL;
+            case 9:  return pt::GT_MOTION_PROBABILITY;
+            case 10: return pt::GT_MOTION_LFO_DEPTH;
+            case 13: return pt::GT_MOTION_SPIN;
+            case 15: return pt::GT_MOTION_MIX;
             default: return 0;
         }
     }
