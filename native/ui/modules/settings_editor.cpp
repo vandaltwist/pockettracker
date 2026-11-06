@@ -206,9 +206,12 @@ void SettingsModule::draw(Canvas& c, int x, int y, const SettingsState& s) const
             const int ry = rowY(row);
             c.draw_text("VISUALIZER", labelX, ry + TEXT_PADDING,
                         on_row(row) ? cursor_mark_ink(t) : t.textParam, CHAR_SPACING, FONT_SCALE);
-            draw_cursor_cell(c, names[static_cast<size_t>(index)], val1X, ry + TEXT_PADDING,
+            const std::string& visualizerName = names[static_cast<size_t>(index)];
+            draw_cursor_cell(c, visualizerName, val1X, ry + TEXT_PADDING,
                              on_cell(row, 1), t.textValue, t);
-            draw_cursor_cell(c, "SET", val2X, ry + TEXT_PADDING,
+            const int setX = val1X + static_cast<int>(Canvas::text_width(visualizerName, CHAR_SPACING,
+                                                                         FONT_SCALE)) + 18;
+            draw_cursor_cell(c, "SET", setX, ry + TEXT_PADDING,
                              on_cell(row, 2), t.textValue, t);
         } else {
             param_row(row, "VISUALIZER", names[static_cast<size_t>(index)]);
