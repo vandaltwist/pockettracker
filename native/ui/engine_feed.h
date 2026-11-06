@@ -12,6 +12,7 @@
 #include "songcore/host.h"
 #include "ui/app_state.h"
 #include "ui/modules/oscilloscope.h"
+#include "ui/modules/rec_viz.h"
 #include "ui/modules/moonset.h"
 namespace pt::ui {
 
@@ -109,9 +110,10 @@ private:
         const VisualizerType vt = state.theme.visualizerType;
         const bool octa     = (vt == VisualizerType::OCTA || vt == VisualizerType::OCTA_FULL);
         const bool spectrum = (vt == VisualizerType::SPECTRUM || vt == VisualizerType::SPECTRUM_PEAKS);
+        const bool moonvizTrack = vt == VisualizerType::MOONVIZ && rec_viz().p.track >= 0;
 
         // Ask only for what the mode draws: the engine fills these only while they are read.
-        if (octa) {
+        if (octa || moonvizTrack) {
             engine.getTrackWaveforms(trackWaveforms_, activeFlags_);
             state.trackWaveforms    = trackWaveforms_;
             state.previewLaneActive = activeFlags_[PREVIEW_LANE];

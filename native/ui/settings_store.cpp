@@ -109,6 +109,7 @@ bool load_settings(FileSystem& fs, SettingsValues& values, Theme& theme) {
     values.recordInput = get_string(j, "record_input", values.recordInput);
 
     auto read_params = [&](const json& o, RecViz::Params& r) {
+        r.track = clamp(get_int(o, "track", r.track), -1, 8);
         r.axis   = get_int(o, "axis", static_cast<int>(r.axis)) == 1 ? RecViz::Axis::Freq
                                                                     : RecViz::Axis::Pan;
         r.gate   = clampf(get_float(o, "gate",     r.gate),     -90.f, -10.f);
@@ -216,7 +217,8 @@ std::string serialize_settings(const SettingsValues& values, const Theme& theme)
     j["record_input"] = values.recordInput;
 
     auto write_params = [](const RecViz::Params& r) {
-        return json{{"axis", static_cast<int>(r.axis)}, {"gate", r.gate},      {"time", r.timePow},
+        return json{{"track", r.track},               {"axis", static_cast<int>(r.axis)},
+                    {"gate", r.gate},                {"time", r.timePow},
                     {"bass", r.bass},                   {"trail", r.fall},      {"spread", r.spread},
                     {"mic_gain", r.micGainDb},          {"start", r.startMode}, {"click", r.clickOn},
                     {"duration", r.recordMaxSeconds}};

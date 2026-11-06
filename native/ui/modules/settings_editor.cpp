@@ -1,6 +1,8 @@
 #include "ui/modules/settings_editor.h"
 
 #include <algorithm>
+#include <cmath>
+#include <cstdio>
 
 #include "ui/helpers.h"
 #include "ui/input_config.h"   // abxy_name
@@ -40,15 +42,21 @@ void SettingsModule::draw(Canvas& c, int x, int y, const SettingsState& s) const
     const Theme&          t = s.theme;
     const SettingsValues& v = s.values;
 
-    c.fill_rect(x, y, WIDTH, HEIGHT, t.background);
+    c.fill_rect(x, y, s.moonvizSettingsOpen ? DESIGN_W : WIDTH,
+                s.moonvizSettingsOpen ? DESIGN_H : HEIGHT, t.background);
 
     if (s.moonvizSettingsOpen) {
         RecViz& viz = rec_viz();
-        c.draw_text("MOONVIZ", x + NAME_X, y + TEXT_PADDING, t.textTitle, CHAR_SPACING, FONT_SCALE);
-        viz.draw(c, x + 12, y + 30, WIDTH - 24, 194, CHAR_SPACING, FONT_SCALE, &t, false);
+        const float* source = s.waveform;
+        if (viz.p.track >= 0)
+            source = s.trackWaveforms ? s.trackWaveforms + viz.p.track * WAVEFORM_SIZE : nullptr;
+        if (source) viz.push(source, nullptr, WAVEFORM_SIZE);
+        viz.update();
+        c.draw_text("MOONVIZ", x + 16, y + 7, t.textTitle, CHAR_SPACING, FONT_SCALE);
+        viz.draw(c, x, y + 28, DESIGN_W, 278, CHAR_SPACING, FONT_SCALE, &t, false);
 
-        const int settingsY = y + 230;
-        c.draw_text("VIZ", x + NAME_X, settingsY, t.textTitle, CHAR_SPACING, FONT_SCALE);
+        const int settingsY = y + 313;
+        c.draw_text("VISUALIZER", x + 16, settingsY, t.textTitle, CHAR_SPACING, FONT_SCALE);
 
         auto one_decimal = [](float value) {
             char text[16];
@@ -56,27 +64,31 @@ void SettingsModule::draw(Canvas& c, int x, int y, const SettingsState& s) const
             return std::string(text);
         };
         const auto& p = viz.p;
-        const std::string values[6] = {
+        const char* trackName = p.track < 0 ? "MASTER" : (p.track < 8 ? nullptr : "PREVIEW");
+        const std::string sourceName = trackName ? trackName : "TRACK " + std::to_string(p.track + 1);
+        const std::string values[7] = {
             std::to_string(static_cast<int>(std::lround(p.gate))) + "DB",
             one_decimal(p.timePow),
             std::to_string(static_cast<int>(std::lround(p.bass))) + "DB",
             one_decimal(p.fall),
             p.axis == RecViz::Axis::Pan ? "PAN" : "FREQ",
             "x" + one_decimal(p.spread),
+            sourceName,
         };
-        static const char* const labels[6] = {"GATE", "TIME", "BASS", "TRAIL", "AXIS", "SPREAD"};
-        constexpr int CELL_W = (WIDTH - 36) / 2;
-        constexpr int ROW_H = 39;
+        static const char* const labels[7] = {"GATE", "TIME", "BASS", "TRAIL", "AXIS", "SPREAD", "SOURCE"};
+        constexpr int MARGIN = 16, GAP = 16;
+        constexpr int CELL_W = (DESIGN_W - 2 * MARGIN - GAP) / 2;
+        constexpr int ROW_H = 31;
         const int selected = viz.menuSelection();
-        for (int i = 0; i < 6; ++i) {
-            const int column = i / 3;
-            const int row = i % 3;
-            const int cellX = x + 12 + column * (CELL_W + 12);
+        for (int i = 0; i < 7; ++i) {
+            const int column = i / 4;
+            const int row = i % 4;
+            const int cellX = x + MARGIN + column * (CELL_W + GAP);
             const int cellY = settingsY + ROW_H + row * ROW_H;
             const bool current = i == selected;
             c.draw_text(labels[i], cellX + 4, cellY + TEXT_PADDING,
                         current ? cursor_mark_ink(t) : t.textParam, CHAR_SPACING, FONT_SCALE);
-            draw_cursor_cell(c, values[i], cellX + CELL_W - 78, cellY + TEXT_PADDING,
+            draw_cursor_cell(c, values[i], cellX + CELL_W - 92, cellY + TEXT_PADDING,
                              current, t.textValue, t);
         }
         return;

@@ -26,6 +26,7 @@ class RecViz {
     enum class Axis { Pan, Freq };
 
     struct Params {
+        int   track     = -1;    // -1 master, 0..7 song tracks, 8 preview lane
         Axis  axis      = Axis::Pan;
         float gate      = -72.f;  // seuil de base (dB)
         float timePow   = 2.9f;   // compression du passé
@@ -136,8 +137,8 @@ class RecViz {
     // ---- Menu de réglages (bouton « J:SET » à l'écran / touche J) -------------------------------
     // Branche tes touches ainsi : toggleMenu() sur J ; quand menuOpen() : menuMove(±1) haut/bas,
     // menuAdjust(±1) gauche/droite (menuAdjust(±1, true) = pas x5). click(x, y) pour la souris.
-    static constexpr int MENU_N = 14;   // VIZ 0..5, SAMPLE/REC 6..9, PRESETS 10..13
-    static constexpr int VIZ_MENU_N = 6;
+    static constexpr int MENU_N = 15;   // VIZ 0..6, SAMPLE/REC 7..10, PRESETS 11..14
+    static constexpr int VIZ_MENU_N = 7;
     bool menuOpen() const { return menu_; }
     bool visualizerMenu() const { return visualizerOnly_; }
     int menuSelection() const { return menuSel_; }
@@ -157,15 +158,23 @@ class RecViz {
             case 3: p.fall    = clampf(std::round((p.fall + d * 0.5f) * 2.f) / 2.f, 0.5f, 6.f); break;
             case 4: setAxis(p.axis == Axis::Pan ? Axis::Freq : Axis::Pan); break;
             case 5: p.spread  = clampf(std::round((p.spread + d * (big ? 1.0f : 0.2f)) * 10.f) / 10.f, 0.5f, 8.f); break;
-            case 6: p.micGainDb = clampf(std::round(p.micGainDb + d * (big ? 6 : 1)), 0.f, 36.f); break;
-            case 7: p.startMode = ((p.startMode + d) % 5 + 5) % 5; break;
-            case 8: p.clickOn = !p.clickOn; break;
-            case 9: p.recordMaxSeconds = std::max(0, p.recordMaxSeconds + d * (big ? 10 : 1)); break;
-            // PRESETS : 10 = l'emplacement, 11 = SAVE, 12 = LOAD, 13 = CLEAR (←/→ pour effacer).
-            case 10: presetSlot_ = ((presetSlot_ + d) % PRESET_N + PRESET_N) % PRESET_N; break;
-            case 11: storePreset(); break;
-            case 12: recallPreset(); break;
-            case 13: clearPreset(); break;
+            case 6: {
+                const int track = ((p.track + 1 + d) % 10 + 10) % 10 - 1;
+                if (track != p.track) {
+                    p.track = track;
+                    reset();
+                }
+                break;
+            }
+            case 7: p.micGainDb = clampf(std::round(p.micGainDb + d * (big ? 6 : 1)), 0.f, 36.f); break;
+            case 8: p.startMode = ((p.startMode + d) % 5 + 5) % 5; break;
+            case 9: p.clickOn = !p.clickOn; break;
+            case 10: p.recordMaxSeconds = std::max(0, p.recordMaxSeconds + d * (big ? 10 : 1)); break;
+            // PRESETS : 11 = l'emplacement, 12 = SAVE, 13 = LOAD, 14 = CLEAR (←/→ pour effacer).
+            case 11: presetSlot_ = ((presetSlot_ + d) % PRESET_N + PRESET_N) % PRESET_N; break;
+            case 12: storePreset(); break;
+            case 13: recallPreset(); break;
+            case 14: clearPreset(); break;
         }
         dirty_ = true;
     }
@@ -674,14 +683,16 @@ void RecViz::draw(Cv& c, int x, int y, int w, int h, int cs, int fs,
         static const char* START_NAMES[5] = {"DIRECT", "1/4", "2/4", "1 BAR", "2 BAR"};
         // Deux sections : les réglages du VISUALISEUR, puis ceux du SAMPLE / REC. Les en-têtes ne sont
         // pas sélectionnables : menuSel_ ne compte que les réglages (0..MENU_N-1).
-        static const char* VIZ_LBL[6]    = {"GATE", "TIME", "BASS", "TRAIL", "AXIS", "SPREAD"};
+        static const char* VIZ_LBL[7]    = {"GATE", "TIME", "BASS", "TRAIL", "AXIS", "SPREAD", "SOURCE"};
         static const char* SAMPLE_LBL[4] = {"MIC GAIN", "START", "CLICK", "DURATION"};
         static const char* PRESET_LBL[4] = {"PRESET", "SAVE", "LOAD", "CLEAR"};
+        const char* trackName = p.track < 0 ? "MASTER" : (p.track < 8 ? nullptr : "PREVIEW");
+        const std::string source = trackName ? trackName : "TRACK " + std::to_string(p.track + 1);
         const std::string VAL[MENU_N] = {
             std::to_string(static_cast<int>(std::lround(p.gate))) + "DB", f1(p.timePow),
             std::to_string(static_cast<int>(std::lround(p.bass))) + "DB", f1(p.fall),
             p.axis == Axis::Pan ? "PAN" : "FREQ",
-            "x" + f1(p.spread),
+            "x" + f1(p.spread), source,
             "+" + std::to_string(static_cast<int>(std::lround(p.micGainDb))) + "DB",
             START_NAMES[std::max(0, std::min(4, p.startMode))], p.clickOn ? "ON" : "OFF",
             p.recordMaxSeconds <= 0 ? "INF" : (std::to_string(p.recordMaxSeconds) + "S"),
@@ -693,12 +704,12 @@ void RecViz::draw(Cv& c, int x, int y, int w, int h, int cs, int fs,
         std::vector<int> item(static_cast<size_t>(nRows)); // index du réglage, -1 pour un en-tête
         int         n = 0;
         lab[n] = "VIZ";           item[n] = -1; ++n;
-        for (int i = 0; i < 6; ++i) { lab[n] = VIZ_LBL[i];    item[n] = i;     ++n; }
+        for (int i = 0; i < VIZ_MENU_N; ++i) { lab[n] = VIZ_LBL[i]; item[n] = i; ++n; }
         if (!visualizerOnly_) {
             lab[n] = "SAMPLE / REC";  item[n] = -1; ++n;
-            for (int i = 0; i < 4; ++i) { lab[n] = SAMPLE_LBL[i]; item[n] = 6 + i; ++n; }
+            for (int i = 0; i < 4; ++i) { lab[n] = SAMPLE_LBL[i]; item[n] = 7 + i; ++n; }
             lab[n] = "PRESETS";        item[n] = -1; ++n;
-            for (int i = 0; i < 4; ++i) { lab[n] = PRESET_LBL[i]; item[n] = 10 + i; ++n; }
+            for (int i = 0; i < 4; ++i) { lab[n] = PRESET_LBL[i]; item[n] = 11 + i; ++n; }
         }
 
         const int rowH = G.ch + 4, pad = 6;
@@ -744,11 +755,7 @@ void RecViz::draw(Cv& c, int x, int y, int w, int h, int cs, int fs,
         txt(st, ml + 4, oy[0] + 3, DIMTXT);
     }
 
-    // Aucune donnée audio reçue : on le dit (sinon l'écran reste désespérément vide).
-    if (!receiving()) {
-        const std::string m = "NO AUDIO INPUT";
-        txt(m, ml + (pw - tw(m)) / 2, oy[0] + (ph - G.ch) / 2, WAVE);
-    } else if (calib_ > 0) {
+    if (receiving() && calib_ > 0) {
         const std::string m = "CALIBRATING... KEEP QUIET";
         txt(m, ml + (pw - tw(m)) / 2, oy[0] + (ph - G.ch) / 2, WAVE);
     }

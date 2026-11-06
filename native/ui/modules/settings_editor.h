@@ -12,6 +12,7 @@
 #include "ui/canvas.h"
 #include "ui/cursor.h"
 #include "ui/platform_caps.h"
+#include "ui/modules/oscilloscope.h"
 #include "ui/settings_row_layout.h"
 #include "ui/theme.h"
 
@@ -156,6 +157,8 @@ struct SettingsState {
     std::string appVersion{};
     std::string themeName   = "CLASSIC";
     bool moonvizSettingsOpen = false;
+    const float* waveform = nullptr;
+    const float* trackWaveforms = nullptr;
 
     PlatformCaps caps{};
     Theme        theme = theme_classic();

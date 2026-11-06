@@ -39,6 +39,16 @@ void TrackerLayout::draw_frame(Canvas& c, const AppState& s) {
 
     if (!s.project) return;
 
+    if (s.currentScreen == ScreenType::SETTINGS && rec_viz().visualizerMenu()) {
+        SettingsState state{s.settings};
+        state.theme = s.theme;
+        state.moonvizSettingsOpen = true;
+        state.waveform = s.waveform;
+        state.trackWaveforms = s.trackWaveforms;
+        settings_.draw(c, 0, 0, state);
+        return;
+    }
+
     if (full_screen_module(s)) {
         draw_full_screen(c, s);
         return;
@@ -114,8 +124,12 @@ void TrackerLayout::draw_scope_strip(Canvas& c, const AppState& s) {
         os.spectrum = s.spectrum;
     }
 
-    if (t.visualizerType == VisualizerType::MOONVIZ && s.waveform) {
-        pt::ui::rec_viz().push(s.waveform, nullptr, WAVEFORM_SIZE);
+    if (t.visualizerType == VisualizerType::MOONVIZ) {
+        const int track = pt::ui::rec_viz().p.track;
+        const float* source = s.waveform;
+        if (track >= 0)
+            source = s.trackWaveforms ? s.trackWaveforms + track * WAVEFORM_SIZE : nullptr;
+        if (source) pt::ui::rec_viz().push(source, nullptr, WAVEFORM_SIZE);
         pt::ui::rec_viz().update();
     }
 
